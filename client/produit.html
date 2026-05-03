@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produit — Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .product-gallery { display: grid; grid-template-columns: 80px 1fr; gap: 12px; }
+    .gallery-thumbs { display: flex; flex-direction: column; gap: 8px; }
+    .gallery-thumb {
+      width: 72px; height: 72px; border-radius: 8px; overflow: hidden; cursor: pointer;
+      border: 2px solid var(--border); background: var(--cream-dark);
+      display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+      transition: border-color var(--transition);
+    }
+    .gallery-thumb.active { border-color: var(--rose-dark); }
+    .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-main {
+      aspect-ratio: 1; border-radius: var(--radius-xl); overflow: hidden;
+      background: var(--cream-dark); display: flex; align-items: center;
+      justify-content: center; font-size: 6rem;
+    }
+    .gallery-main img { width: 100%; height: 100%; object-fit: cover; }
+    .product-info { padding: 0 0 0 40px; }
+    @media (max-width: 768px) {
+      .product-layout { grid-template-columns: 1fr !important; }
+      .product-info { padding: 0; }
+      .product-gallery { grid-template-columns: 1fr; }
+      .gallery-thumbs { flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
+    <nav class="nav">
+      <a href="/">Accueil</a>
+      <a href="/boutique.html">Boutique</a>
+      <a href="/actualites.html">Actualités</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="user-btn">👤</button>
+      <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
+    </div>
+  </div>
+</header>
+
+<main style="padding: 32px 0 80px">
+  <div class="container">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <a href="/">Accueil</a><span class="breadcrumb-sep">›</span>
+      <a href="/boutique.html">Boutique</a><span class="breadcrumb-sep">›</span>
+      <span id="bc-name">Produit</span>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="loading"><div class="spinner"></div> Chargement du produit…</div>
+
+    <!-- Product detail -->
+    <div id="product-detail" style="display:none">
+      <div class="product-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start">
+
+        <!-- Gallery -->
+        <div>
+          <div class="product-gallery">
+            <div class="gallery-thumbs" id="thumbs"></div>
+            <div class="gallery-main" id="main-img"><span>🧶</span></div>
+          </div>
+        </div>
+
+        <!-- Info -->
+        <div class="product-info">
+          <div id="prod-cat" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sage-dark);margin-bottom:8px"></div>
+          <h1 id="prod-name" style="font-size:clamp(1.4rem,3vw,2rem);margin-bottom:12px"></h1>
+
+          <!-- Price + Stock -->
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+            <span id="prod-price" style="font-size:2rem;font-weight:700;color:var(--rose-dark)"></span>
+            <span id="prod-stock"></span>
+          </div>
+
+          <!-- Description -->
+          <div style="background:var(--cream);border-radius:var(--radius-lg);padding:20px;margin-bottom:24px">
+            <p id="prod-desc" style="color:var(--text);font-size:.95rem;line-height:1.7"></p>
+          </div>
+
+          <!-- Tags -->
+          <div id="prod-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
+
+          <!-- Quantity + Add to cart -->
+          <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
+            <div class="qty-control">
+              <button class="qty-btn" onclick="changeQty(-1)">−</button>
+              <span class="qty-val" id="qty-display">1</span>
+              <button class="qty-btn" onclick="changeQty(1)">+</button>
+            </div>
+            <button id="add-cart-btn" class="btn btn-primary" style="flex:1" onclick="addToCartFromPage()">
+              🛒 Ajouter au panier
+            </button>
+            <button id="fav-btn" class="favorite-btn" onclick="toggleFavFromPage()" title="Ajouter aux favoris">🤍</button>
+          </div>
+          <button class="btn btn-secondary btn-block" onclick="window.location='/panier.html'">Voir mon panier →</button>
+
+          <!-- Shipping info -->
+          <div style="margin-top:24px;padding:16px;background:var(--sage-pale);border-radius:var(--radius-lg)">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:.85rem;font-weight:700;color:var(--sage-dark)">🚚 Livraison</div>
+            <p style="font-size:.82rem;color:var(--text-light)">Expédition sous 3-5 jours ouvrés. Livraison en France métropolitaine.</p>
+          </div>
+
+          <!-- Custom order note -->
+          <div style="margin-top:12px;padding:16px;background:var(--rose-pale);border-radius:var(--radius-lg)">
+            <div style="font-size:.85rem;font-weight:700;color:var(--rose-dark);margin-bottom:4px">🎨 Personnalisation</div>
+            <p style="font-size:.82rem;color:var(--text-light)">Couleur différente, prénom brodé… <a href="/#contact" style="color:var(--rose-dark);font-weight:700">Contactez-nous</a> pour une commande personnalisée !</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Related products -->
+      <div style="margin-top:80px">
+        <h2 style="margin-bottom:32px;text-align:center">Vous aimerez aussi ✨</h2>
+        <div id="related-grid" class="grid-4"></div>
+      </div>
+    </div>
+
+    <!-- Not found -->
+    <div id="not-found" style="display:none" class="empty-state">
+      <div class="empty-state-icon">😢</div>
+      <h3>Produit introuvable</h3>
+      <p>Ce produit n'existe pas ou n'est plus disponible</p>
+      <a href="/boutique.html" class="btn btn-primary mt-md">Retour à la boutique</a>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
+      <span>© 2024 Tout en Aiguilles</span>
+      <a href="/boutique.html" style="color:rgba(255,255,255,.6)">← Retour boutique</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let currentProduct = null;
+let currentQty = 1;
+
+async function loadProduct() {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  if (!id) { showNotFound(); return; }
+
+  try {
+    // Try by id first, then slug
+    let product;
+    try {
+      // Get all products to find by id (or we could use slug route)
+      const products = await apiFetch('/products?limit=200');
+      product = products.find(p => p.id == id || p.slug === id);
+    } catch {}
+
+    if (!product) { showNotFound(); return; }
+    currentProduct = product;
+    renderProduct(product);
+    loadRelated(product);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('product-detail').style.display = '';
+    document.title = `${product.name} — Tout en Aiguilles`;
+  } catch (e) {
+    showNotFound();
+  }
+}
+
+function renderProduct(p) {
+  document.getElementById('bc-name').textContent = p.name;
+  document.getElementById('prod-cat').textContent = p.category_name || '';
+  document.getElementById('prod-name').textContent = p.name;
+  document.getElementById('prod-price').textContent = p.price.toFixed(2) + ' €';
+  document.getElementById('prod-desc').textContent = p.description || '';
+
+  // Stock badge
+  const stockEl = document.getElementById('prod-stock');
+  if (p.stock > 0) {
+    stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${p.stock} dispo.)</span>`;
+  } else {
+    stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
+    document.getElementById('add-cart-btn').disabled = true;
+  }
+
+  // Tags
+  const tags = p.tags || [];
+  document.getElementById('prod-tags').innerHTML = tags.map(t =>
+    `<span style="background:var(--cream-dark);padding:4px 12px;border-radius:20px;font-size:.78rem;color:var(--text-light)">${t}</span>`
+  ).join('');
+
+  // Gallery
+  const images = p.images || [];
+  const thumbsEl = document.getElementById('thumbs');
+  const mainEl = document.getElementById('main-img');
+
+  if (images.length > 0) {
+    thumbsEl.innerHTML = images.map((img, i) => `
+      <div class="gallery-thumb ${i === 0 ? 'active' : ''}" onclick="setMainImg('${img}', this)">
+        <img src="${img}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🧶'">
+      </div>`).join('');
+    mainEl.innerHTML = `<img id="main-img-el" src="${images[0]}" alt="${p.name}" onerror="this.parentElement.innerHTML='🧶'">`;
+  } else {
+    thumbsEl.innerHTML = `<div class="gallery-thumb active">🧶</div>`;
+    mainEl.innerHTML = '<span>🧶</span>';
+  }
+
+  // Favorites
+  const favBtn = document.getElementById('fav-btn');
+  if (Favorites.has(p.id)) favBtn.classList.add('active'), favBtn.textContent = '❤️';
+}
+
+function setMainImg(src, thumb) {
+  document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+  thumb.classList.add('active');
+  const main = document.getElementById('main-img-el');
+  if (main) main.src = src;
+}
+
+function changeQty(delta) {
+  currentQty = Math.max(1, Math.min(currentProduct?.stock || 99, currentQty + delta));
+  document.getElementById('qty-display').textContent = currentQty;
+}
+
+function addToCartFromPage() {
+  if (!currentProduct) return;
+  Cart.add(currentProduct, currentQty);
+}
+
+function toggleFavFromPage() {
+  if (!currentProduct) return;
+  Favorites.toggle(currentProduct.id, document.getElementById('fav-btn'));
+}
+
+async function loadRelated(product) {
+  try {
+    const all = await apiFetch(`/products?category=${product.category_slug || ''}&limit=5`);
+    const related = all.filter(p => p.id !== product.id).slice(0, 4);
+    document.getElementById('related-grid').innerHTML = related.length
+      ? related.map(renderProductCard).join('')
+      : '<p class="text-muted text-center" style="grid-column:1/-1">Pas d\'articles similaires pour l\'instant.</p>';
+  } catch {}
+}
+
+function showNotFound() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('not-found').style.display = '';
+}
+
+loadProduct();
+</script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commandes — Admin Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
+    <nav class="admin-nav">
+      <a href="/admin/index.html">📊 Tableau de bord</a>
+      <a href="/admin/produits.html">🧶 Produits</a>
+      <a href="/admin/commandes.html" class="active">📦 Commandes</a>
+      <a href="/admin/actualites.html">📝 Actualités</a>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+      <a href="/" target="_blank">🌐 Voir le site</a>
+      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
+    </nav>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>Gestion des commandes</h1>
+      <div style="font-size:.85rem;color:var(--text-light)" id="order-count"></div>
+    </div>
+
+    <!-- Status filter tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="cat-chip active" onclick="filterStatus('', this)">Toutes</button>
+      <button class="cat-chip" onclick="filterStatus('pending', this)">⏳ En attente</button>
+      <button class="cat-chip" onclick="filterStatus('paid', this)">💳 Payées</button>
+      <button class="cat-chip" onclick="filterStatus('shipped', this)">🚚 Expédiées</button>
+      <button class="cat-chip" onclick="filterStatus('delivered', this)">✓ Livrées</button>
+      <button class="cat-chip" onclick="filterStatus('cancelled', this)">✗ Annulées</button>
+    </div>
+
+    <!-- Order detail panel -->
+    <div id="order-detail" style="display:none" class="admin-panel mb-lg">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:20px">
+        <div>
+          <div class="admin-panel-title" style="margin-bottom:4px" id="detail-title">Commande #</div>
+          <span id="detail-status"></span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('order-detail').style.display='none'">✕ Fermer</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div>
+          <h4 style="margin-bottom:12px;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light)">Client</h4>
+          <div id="detail-customer" style="font-size:.9rem;line-height:2"></div>
+        </div>
+        <div>
+          <h4 style="margin-bottom:12px;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light)">Changer le statut</h4>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="status-buttons"></div>
+        </div>
+      </div>
+      <div style="margin-top:20px">
+        <h4 style="margin-bottom:12px;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light)">Articles commandés</h4>
+        <div id="detail-items"></div>
+        <div style="text-align:right;margin-top:12px;font-family:var(--font-title);font-size:1.2rem;font-weight:700;color:var(--rose-dark)" id="detail-total"></div>
+      </div>
+      <div id="detail-notes" style="display:none;margin-top:16px;padding:12px;background:var(--cream);border-radius:var(--radius)"></div>
+    </div>
+
+    <!-- Table -->
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>#</th><th>Client</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="orders-tbody">
+          <tr><td colspan="7" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let allOrders = [];
+let currentFilter = '';
+
+const STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
+
+async function init() {
+  if (!Auth.isAdmin()) { window.location.href = '/admin/index.html'; return; }
+  await loadOrders();
+}
+
+async function loadOrders() {
+  try {
+    allOrders = await apiFetch('/orders');
+    renderOrders(allOrders);
+    document.getElementById('order-count').textContent = `${allOrders.length} commande${allOrders.length > 1 ? 's' : ''}`;
+  } catch (e) {
+    document.getElementById('orders-tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+  }
+}
+
+function filterStatus(status, btn) {
+  currentFilter = status;
+  document.querySelectorAll('.admin-main .cat-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = status ? allOrders.filter(o => o.status === status) : allOrders;
+  renderOrders(filtered);
+}
+
+function renderOrders(orders) {
+  const tbody = document.getElementById('orders-tbody');
+  if (!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-light)">Aucune commande</td></tr>';
+    return;
+  }
+  tbody.innerHTML = orders.map(o => `
+    <tr>
+      <td style="font-weight:700">#${o.id}</td>
+      <td>
+        <div style="font-weight:700">${o.first_name} ${o.last_name}</div>
+        <div style="font-size:.78rem;color:var(--text-light)">${o.email}</div>
+      </td>
+      <td>${o.items.length} article${o.items.length > 1 ? 's' : ''}</td>
+      <td style="font-weight:700;color:var(--rose-dark)">${Number(o.total).toFixed(2)} €</td>
+      <td><span class="order-status status-${o.status}">${STATUS[o.status] || o.status}</span></td>
+      <td style="font-size:.8rem;color:var(--text-light)">${formatDate(o.created_at)}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="showDetail(${o.id})">Détails</button>
+      </td>
+    </tr>`).join('');
+}
+
+function showDetail(id) {
+  const o = allOrders.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('order-detail').style.display = '';
+  document.getElementById('detail-title').textContent = `Commande #${o.id}`;
+  document.getElementById('detail-status').innerHTML = `<span class="order-status status-${o.status}">${STATUS[o.status]}</span>`;
+  document.getElementById('detail-customer').innerHTML = `
+    <strong>${o.first_name} ${o.last_name}</strong><br>
+    ${o.email}<br>${o.address}<br>${o.postal_code} ${o.city}, ${o.country}`;
+
+  const statusFlow = ['pending','paid','shipped','delivered','cancelled'];
+  document.getElementById('status-buttons').innerHTML = statusFlow.map(s => `
+    <button class="btn btn-sm ${s === o.status ? 'btn-primary' : 'btn-ghost'}" onclick="changeStatus(${o.id}, '${s}')">
+      ${STATUS[s]}
+    </button>`).join('');
+
+  document.getElementById('detail-items').innerHTML = o.items.map(item => `
+    <div style="display:flex;gap:12px;align-items:center;padding:10px;background:var(--cream);border-radius:8px;margin-bottom:6px">
+      <div style="width:40px;height:40px;border-radius:6px;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.2rem">
+        ${item.image ? `<img src="${item.image}" style="width:100%;height:100%;object-fit:cover;border-radius:6px" onerror="this.innerHTML='🧶'">` : '🧶'}
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:.875rem">${item.name}</div>
+        <div style="font-size:.78rem;color:var(--text-light)">Qté : ${item.qty} × ${Number(item.price).toFixed(2)} €</div>
+      </div>
+      <div style="font-weight:700;color:var(--rose-dark)">${(item.qty * item.price).toFixed(2)} €</div>
+    </div>`).join('');
+
+  document.getElementById('detail-total').textContent = `Total : ${Number(o.total).toFixed(2)} €`;
+
+  if (o.notes) {
+    document.getElementById('detail-notes').style.display = '';
+    document.getElementById('detail-notes').innerHTML = `<strong>📝 Note :</strong> ${o.notes}`;
+  } else {
+    document.getElementById('detail-notes').style.display = 'none';
+  }
+
+  document.getElementById('order-detail').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function changeStatus(id, status) {
+  try {
+    await apiFetch(`/orders/${id}/status`, { method: 'PUT', body: { status } });
+    Toast.show(`Statut mis à jour : ${STATUS[status]}`, 'success');
+    await loadOrders();
+    showDetail(id); // refresh detail
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

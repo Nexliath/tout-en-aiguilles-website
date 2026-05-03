@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuration initiale — Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    body { min-height:100vh; display:flex; align-items:center; justify-content:center;
+           background: linear-gradient(135deg, var(--rose-pale), var(--cream), var(--sage-pale)); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { width:20px; height:20px; border:3px solid rgba(255,255,255,.4);
+            border-top-color:white; border-radius:50%; animation:spin .8s linear infinite; display:inline-block; }
+    #debug-banner { display:none; background:#fff3cd; border:1px solid #ffc107; color:#856404;
+                    padding:12px 16px; border-radius:8px; font-size:.85rem; margin-bottom:16px; }
+  </style>
+</head>
+<body>
+<div style="width:100%; max-width:480px; padding:24px;">
+
+  <div id="view-already" style="display:none; text-align:center;">
+    <div style="font-size:3rem; margin-bottom:16px;">✅</div>
+    <h2 style="margin-bottom:8px;">Déjà configuré !</h2>
+    <p style="margin-bottom:24px;">Un compte administrateur existe déjà.</p>
+    <a href="/admin/" class="btn btn-primary">Aller à l'admin →</a>
+  </div>
+
+  <div id="view-form">
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="font-size:3rem; margin-bottom:12px;">🧶</div>
+      <h1 style="font-size:1.8rem; margin-bottom:8px;">Configuration initiale</h1>
+      <p style="font-size:.9rem;">Créez votre compte administrateur pour gérer la boutique.</p>
+      <div style="margin-top:12px; padding:10px 16px; background:var(--sage-pale); border-radius:8px; font-size:.8rem; color:var(--sage-dark);">
+        🔒 Cette page disparaît après la création du premier admin.
+      </div>
+    </div>
+
+    <div style="background:white; border-radius:var(--radius-xl); padding:32px; box-shadow:0 8px 40px var(--shadow-lg);">
+      <h2 style="font-size:1.2rem; margin-bottom:24px;">Créer le compte administrateur</h2>
+
+      <div id="debug-banner"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Prénom *</label>
+          <input type="text" id="s-fname" class="form-input" placeholder="Victorine">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nom *</label>
+          <input type="text" id="s-lname" class="form-input" placeholder="Richard">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input type="email" id="s-email" class="form-input" placeholder="victorine@toutenaiguilles.fr">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe *</label>
+        <input type="password" id="s-password" class="form-input" placeholder="Au moins 6 caractères">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirmer le mot de passe *</label>
+        <input type="password" id="s-confirm" class="form-input">
+      </div>
+
+      <div id="setup-error" style="display:none; color:#d9534f; font-size:.875rem; font-weight:700; padding:10px 14px; background:#f8d7da; border-radius:8px; margin-bottom:16px;"></div>
+
+      <button id="setup-btn" class="btn btn-primary btn-block btn-lg" type="button">
+        🚀 Créer mon compte admin
+      </button>
+
+      <p style="font-size:.75rem; color:var(--text-light); text-align:center; margin-top:16px;">
+        Ce compte aura accès à l'interface d'administration complète.
+      </p>
+    </div>
+  </div>
+
+  <div id="view-success" style="display:none; text-align:center;">
+    <div style="background:white; border-radius:var(--radius-xl); padding:40px; box-shadow:0 8px 40px var(--shadow-lg);">
+      <div style="font-size:3rem; margin-bottom:16px;">🎉</div>
+      <h2 style="color:var(--sage-dark); margin-bottom:8px;">Compte créé !</h2>
+      <p style="margin-bottom:8px;">Bienvenue <strong id="success-name"></strong> !</p>
+      <p style="font-size:.9rem; margin-bottom:28px;">Vous êtes maintenant connecté(e) en tant qu'administrateur.</p>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <a href="/admin/" class="btn btn-primary btn-lg">Aller au panneau admin →</a>
+        <a href="/" class="btn btn-secondary">Voir le site</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var API = '/api';
+
+  function showError(msg) {
+    var el = document.getElementById('setup-error');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('setup-error').style.display = 'none';
+  }
+
+  function showDebug(msg) {
+    var el = document.getElementById('debug-banner');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  // Vérifier si setup déjà fait
+  fetch(API + '/health')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.setup_needed === false) {
+        document.getElementById('view-form').style.display = 'none';
+        document.getElementById('view-already').style.display = 'block';
+      }
+    })
+    .catch(function (err) {
+      showDebug('⚠️ Serveur inaccessible : ' + err.message + '. Vérifiez que npm start est lancé.');
+    });
+
+  // Bouton via addEventListener (évite les problèmes CSP)
+  document.getElementById('setup-btn').addEventListener('click', doSetup);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') doSetup();
+  });
+
+  function doSetup() {
+    hideError();
+
+    var fname    = document.getElementById('s-fname').value.trim();
+    var lname    = document.getElementById('s-lname').value.trim();
+    var email    = document.getElementById('s-email').value.trim();
+    var password = document.getElementById('s-password').value;
+    var confirm  = document.getElementById('s-confirm').value;
+
+    if (!fname || !lname || !email || !password) {
+      showError('Veuillez remplir tous les champs obligatoires (*).');
+      return;
+    }
+    if (password !== confirm) {
+      showError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    if (password.length < 6) {
+      showError('Le mot de passe doit faire au moins 6 caractères.');
+      return;
+    }
+
+    var btn = document.getElementById('setup-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span>';
+
+    fetch(API + '/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password, first_name: fname, last_name: lname })
+    })
+    .then(function (res) {
+      return res.json().then(function (data) {
+        return { ok: res.ok, data: data };
+      });
+    })
+    .then(function (result) {
+      if (!result.ok) {
+        throw new Error(result.data.error || 'Erreur serveur (' + result.ok + ')');
+      }
+      // Sauvegarder le token
+      localStorage.setItem('tea_token', result.data.token);
+      localStorage.setItem('tea_user', JSON.stringify(result.data.user));
+      // Afficher succès
+      document.getElementById('success-name').textContent = fname;
+      document.getElementById('view-form').style.display = 'none';
+      document.getElementById('view-success').style.display = 'block';
+    })
+    .catch(function (err) {
+      showError('Erreur : ' + err.message);
+      btn.disabled = false;
+      btn.innerHTML = '🚀 Créer mon compte admin';
+    });
+  }
+
+}());
+</script>
+</body>
+</html>

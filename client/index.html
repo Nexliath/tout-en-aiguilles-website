@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tout en Aiguilles — Créations crochet & couture artisanales</title>
+  <meta name="description" content="Boutique artisanale de créations crochet et couture. Doudous, peluches, tote bags, sorties de bain bébé — faits main avec amour par Victorine.">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<!-- ════ HEADER ════ -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <span class="logo-icon">🧶</span>
+      Tout en <span>Aiguilles</span>
+    </a>
+    <nav class="nav">
+      <a href="/" class="active">Accueil</a>
+      <a href="/boutique.html">Boutique</a>
+      <a href="/actualites.html">Actualités</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="user-btn" title="Mon compte">👤</button>
+      <a href="/panier.html" class="icon-btn" title="Mon panier">
+        🛒<span class="cart-badge" style="display:none">0</span>
+      </a>
+      <button class="hamburger icon-btn" onclick="toggleMobileMenu()">☰</button>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile menu -->
+<div id="mobile-menu" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5)" onclick="toggleMobileMenu()">
+  <div style="width:280px;height:100%;background:white;padding:24px;overflow-y:auto" onclick="e=>e.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+      <span style="font-family:var(--font-title);font-size:1.1rem;color:var(--rose-dark)">🧶 Tout en Aiguilles</span>
+      <button onclick="toggleMobileMenu()" style="border:none;background:none;font-size:1.3rem">✕</button>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:4px">
+      <a href="/" style="padding:12px 16px;border-radius:8px;font-weight:700">Accueil</a>
+      <a href="/boutique.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Boutique</a>
+      <a href="/actualites.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Actualités</a>
+      <a href="#contact" style="padding:12px 16px;border-radius:8px;font-weight:700">Contact</a>
+      <div style="height:1px;background:var(--border);margin:8px 0"></div>
+      <a href="/compte.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Mon compte</a>
+      <a href="/panier.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Mon panier 🛒</a>
+    </nav>
+  </div>
+</div>
+
+<!-- ════ HERO ════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-tag">🌸 Fait main avec amour en France</div>
+      <h1>Créations <em>crochet</em><br>& couture artisanales</h1>
+      <p>Doudous, peluches, tote bags, accessoires bébé… Chaque pièce est unique, imaginée et réalisée à la main par Victorine et sa maman.</p>
+      <div class="hero-actions">
+        <a href="/boutique.html" class="btn btn-primary btn-lg">Découvrir la boutique</a>
+        <a href="#categories" class="btn btn-secondary btn-lg">Voir les collections</a>
+      </div>
+    </div>
+    <div class="hero-floats">
+      <div class="hero-float">🐰</div>
+      <div class="hero-float">👜</div>
+      <div class="hero-float">🧶</div>
+      <div class="hero-float">🛁</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ VALEURS ════ -->
+<section class="section-sm" style="background:white;border-bottom:1px solid var(--border)">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center">
+      <div>
+        <div style="font-size:2rem;margin-bottom:8px">🤲</div>
+        <h4 style="font-size:.95rem;margin-bottom:4px">Fait main</h4>
+        <p style="font-size:.82rem">Chaque création est unique, réalisée à la main avec soin</p>
+      </div>
+      <div>
+        <div style="font-size:2rem;margin-bottom:8px">🇫🇷</div>
+        <h4 style="font-size:.95rem;margin-bottom:4px">Made in France</h4>
+        <p style="font-size:.82rem">Fabriqué avec amour dans notre atelier familial</p>
+      </div>
+      <div>
+        <div style="font-size:2rem;margin-bottom:8px">🌿</div>
+        <h4 style="font-size:.95rem;margin-bottom:4px">Matériaux doux</h4>
+        <p style="font-size:.82rem">Laines et tissus sélectionnés pour leur qualité et douceur</p>
+      </div>
+      <div>
+        <div style="font-size:2rem;margin-bottom:8px">🎁</div>
+        <h4 style="font-size:.95rem;margin-bottom:4px">Commandes perso</h4>
+        <p style="font-size:.82rem">Couleur, prénom brodé… chaque cadeau est sur-mesure</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ CATÉGORIES ════ -->
+<section class="section" id="categories">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-divider"><span class="section-tag">Collections</span></div>
+      <h2>Explorez nos créations</h2>
+      <p>Deux univers artisanaux, un même amour du fait main</p>
+    </div>
+    <div class="grid-2" style="gap:32px;max-width:800px;margin:0 auto">
+      <!-- Crochet -->
+      <a href="/boutique.html?type=crochet" style="text-decoration:none">
+        <div class="card" style="overflow:hidden;cursor:pointer">
+          <div style="height:200px;background:linear-gradient(135deg,var(--rose-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem">🧶</div>
+          <div style="padding:28px">
+            <h3 style="margin-bottom:8px">Univers Crochet</h3>
+            <p style="font-size:.9rem;margin-bottom:16px">Doudous, peluches, accessoires et déco au crochet. Créations tendres et colorées par Victorine.</p>
+            <span class="btn btn-primary btn-sm">Voir le crochet →</span>
+          </div>
+        </div>
+      </a>
+      <!-- Couture -->
+      <a href="/boutique.html?type=couture" style="text-decoration:none">
+        <div class="card" style="overflow:hidden;cursor:pointer">
+          <div style="height:200px;background:linear-gradient(135deg,var(--sage-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem">✂️</div>
+          <div style="padding:28px">
+            <h3 style="margin-bottom:8px">Univers Couture</h3>
+            <p style="font-size:.9rem;margin-bottom:16px">Tote bags, sorties de bain, bananes et lingettes cousus avec amour par la maman de Victorine.</p>
+            <span class="btn btn-sage btn-sm">Voir la couture →</span>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ════ PRODUITS PHARES ════ -->
+<section class="section" style="background:var(--rose-pale)">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-divider"><span class="section-tag">Coups de cœur</span></div>
+      <h2>Nos créations phares</h2>
+      <p>Les petites merveilles que tout le monde adore ✨</p>
+    </div>
+    <div id="featured-products" class="grid-4">
+      <div class="loading"><div class="spinner"></div> Chargement…</div>
+    </div>
+    <div class="text-center mt-lg">
+      <a href="/boutique.html" class="btn btn-primary btn-lg">Voir toute la boutique →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ════ ABOUT ════ -->
+<section class="section">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center">
+      <div style="background:linear-gradient(135deg,var(--rose-pale),var(--sage-pale));border-radius:var(--radius-xl);padding:48px;text-align:center">
+        <div style="font-size:6rem;margin-bottom:16px">🌸</div>
+        <p style="font-family:var(--font-title);font-style:italic;font-size:1.3rem;color:var(--rose-dark)">"Chaque point est un geste d'amour"</p>
+        <p style="font-size:.9rem;margin-top:12px">— Victorine, créatrice</p>
+      </div>
+      <div>
+        <div class="section-divider" style="justify-content:flex-start;margin-bottom:16px">
+          <span class="section-tag">Notre histoire</span>
+          <div style="flex:none;width:40px;height:1px;background:var(--rose)"></div>
+        </div>
+        <h2 style="margin-bottom:20px">Bonjour, je suis <em style="font-style:italic;color:var(--rose-dark)">Victorine</em> 🧶</h2>
+        <p style="margin-bottom:16px">Passionnée de crochet depuis toute petite, j'ai transformé ma passion en créations artisanales pour partager un peu de douceur et d'originalité.</p>
+        <p style="margin-bottom:16px">Ma maman me rejoint pour la partie couture — ensemble, nous créons des sorties de bain, tote bags et accessoires qui accompagnent le quotidien avec style et praticité.</p>
+        <p style="margin-bottom:28px">Chaque article est fait main, dans notre petit atelier familial, avec les meilleurs matériaux. Les commandes personnalisées sont les bienvenues !</p>
+        <div style="display:flex;gap:12px">
+          <a href="/boutique.html" class="btn btn-primary">Découvrir nos créations</a>
+          <a href="https://www.instagram.com/tout.en.aiguilles/" target="_blank" class="btn btn-secondary">Suivre sur Instagram</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ ACTUALITÉS ════ -->
+<section class="section" style="background:var(--sage-pale)">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-divider"><span class="section-tag">Le fil des nouvelles</span></div>
+      <h2>Actualités & Inspirations</h2>
+      <p>Les dernières nouvelles de l'atelier, des projets en cours et des inspirations</p>
+    </div>
+    <div id="news-grid" class="news-grid">
+      <div class="loading"><div class="spinner"></div> Chargement…</div>
+    </div>
+    <div class="text-center mt-lg">
+      <a href="/actualites.html" class="btn btn-secondary btn-lg">Lire toutes les actualités →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ════ CONTACT ════ -->
+<section class="section" id="contact">
+  <div class="container">
+    <div style="max-width:680px;margin:0 auto;text-align:center">
+      <div class="section-divider"><span class="section-tag">Contact</span></div>
+      <h2 style="margin-bottom:16px">Une question ? Un projet personnalisé ?</h2>
+      <p style="margin-bottom:40px">Vous avez une commande spéciale en tête, ou simplement envie d'en savoir plus ? Contactez-nous, nous répondons avec plaisir !</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+        <div style="background:var(--rose-pale);border-radius:var(--radius-lg);padding:24px">
+          <div style="font-size:1.8rem;margin-bottom:8px">📧</div>
+          <h4 style="margin-bottom:4px">Email</h4>
+          <a href="mailto:contact@toutenaiguilles.fr" style="color:var(--rose-dark);font-size:.9rem">contact@toutenaiguilles.fr</a>
+        </div>
+        <div style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:24px">
+          <div style="font-size:1.8rem;margin-bottom:8px">📸</div>
+          <h4 style="margin-bottom:4px">Instagram</h4>
+          <a href="https://www.instagram.com/tout.en.aiguilles/" target="_blank" style="color:var(--sage-dark);font-size:.9rem">@tout.en.aiguilles</a>
+        </div>
+      </div>
+      <div style="background:white;border-radius:var(--radius-xl);border:1px solid var(--border);padding:32px">
+        <h3 style="margin-bottom:24px">Envoyer un message</h3>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Prénom</label><input type="text" class="form-input" id="contact-name" placeholder="Marie"></div>
+          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="contact-email" placeholder="marie@email.fr"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Message</label><textarea class="form-textarea" id="contact-msg" placeholder="Bonjour, je souhaiterais commander un doudou personnalisé…"></textarea></div>
+        <button class="btn btn-primary btn-block" onclick="sendContact()">Envoyer le message 🌸</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ FOOTER ════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo">🧶 Tout en Aiguilles</div>
+        <p>Créations crochet et couture artisanales, faites main avec amour dans notre atelier familial en France.</p>
+        <div class="social-links">
+          <a href="https://www.instagram.com/tout.en.aiguilles/" target="_blank" class="social-link" title="Instagram">📸</a>
+          <a href="https://www.etsy.com/fr/shop/ToutEnAiguilles" target="_blank" class="social-link" title="Etsy">🛍️</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Boutique</h4>
+        <a href="/boutique.html?type=crochet">Univers Crochet</a>
+        <a href="/boutique.html?type=couture">Univers Couture</a>
+        <a href="/boutique.html">Tous les produits</a>
+      </div>
+      <div class="footer-col">
+        <h4>Mon compte</h4>
+        <a href="/compte.html">Mon espace</a>
+        <a href="/compte.html?tab=orders">Mes commandes</a>
+        <a href="/compte.html?tab=favorites">Mes favoris</a>
+        <a href="/panier.html">Mon panier</a>
+      </div>
+      <div class="footer-col">
+        <h4>Infos</h4>
+        <a href="/actualites.html">Actualités</a>
+        <a href="#contact">Contact</a>
+        <a href="#">Livraison & retours</a>
+        <a href="#">Mentions légales</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2024 Tout en Aiguilles — Tous droits réservés</span>
+      <span>Fait avec ❤️ par Victorine</span>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/main.js"></script>
+<script>
+function toggleMobileMenu() {
+  const m = document.getElementById('mobile-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+
+async function loadFeaturedProducts() {
+  try {
+    const products = await apiFetch('/products?featured=true&limit=8');
+    const container = document.getElementById('featured-products');
+    if (!products.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🧶</div><h3>Bientôt disponible</h3><p>Les créations arrivent prochainement !</p></div>';
+      return;
+    }
+    container.innerHTML = products.map(renderProductCard).join('');
+  } catch (e) {
+    document.getElementById('featured-products').innerHTML = '<p class="text-muted text-center">Impossible de charger les produits.</p>';
+  }
+}
+
+async function loadNews() {
+  try {
+    const articles = await apiFetch('/news?limit=3');
+    const grid = document.getElementById('news-grid');
+    if (!articles.length) {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📰</div><h3>Bientôt disponible</h3><p>Les actualités arrivent prochainement !</p></div>';
+      return;
+    }
+    grid.innerHTML = articles.map(a => `
+      <div class="card news-card" onclick="window.location='/actualites.html?slug=${a.slug}'">
+        <div class="news-card-img">
+          ${a.cover_image ? `<img src="${a.cover_image}" alt="${a.title}" loading="lazy">` : '🌸'}
+        </div>
+        <div class="news-card-body">
+          <div class="news-card-date">${formatDate(a.created_at)}</div>
+          <div class="news-card-title">${a.title}</div>
+          <p class="news-card-excerpt">${a.excerpt || ''}</p>
+        </div>
+      </div>`).join('');
+  } catch {}
+}
+
+function sendContact() {
+  const name = document.getElementById('contact-name').value.trim();
+  const email = document.getElementById('contact-email').value.trim();
+  const msg = document.getElementById('contact-msg').value.trim();
+  if (!name || !email || !msg) { Toast.show('Veuillez remplir tous les champs', 'error'); return; }
+  Toast.show('Message envoyé ! Nous vous répondrons vite 🌸', 'success');
+  document.getElementById('contact-name').value = '';
+  document.getElementById('contact-email').value = '';
+  document.getElementById('contact-msg').value = '';
+}
+
+loadFeaturedProducts();
+loadNews();
+</script>
+</body>
+</html>

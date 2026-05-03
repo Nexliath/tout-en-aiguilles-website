@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:3rem;margin-bottom:12px">🔐</div>
+      <h2 style="margin-bottom:8px">Espace admin</h2>
+      <p style="font-size:.875rem;color:var(--text-light)">Connectez-vous avec votre compte administrateur.</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" id="guard-email" class="form-input" placeholder="victorine@...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mot de passe</label>
+      <input type="password" id="guard-password" class="form-input" placeholder="••••••••">
+    </div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
+  </div>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
+    <nav class="admin-nav">
+      <a href="/admin/index.html" class="active">📊 Tableau de bord</a>
+      <a href="/admin/produits.html">🧶 Produits</a>
+      <a href="/admin/commandes.html">📦 Commandes</a>
+      <a href="/admin/actualites.html">📝 Actualités</a>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+      <a href="/" target="_blank">🌐 Voir le site</a>
+      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>Tableau de bord</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="admin-date" style="font-size:.85rem;color:var(--text-light)"></span>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="stat-products">—</div>
+        <div class="stat-label">🧶 Produits actifs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-orders">—</div>
+        <div class="stat-label">📦 Commandes totales</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-revenue">—</div>
+        <div class="stat-label">💰 Chiffre d'affaires</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-pending">—</div>
+        <div class="stat-label">⏳ Commandes en attente</div>
+      </div>
+    </div>
+
+    <!-- Recent orders -->
+    <div class="admin-panel">
+      <div class="admin-panel-title">📦 Dernières commandes</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>#</th><th>Client</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th><th>Action</th></tr>
+          </thead>
+          <tbody id="recent-orders-body">
+            <tr><td colspan="7" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px">
+        <a href="/admin/commandes.html" class="btn btn-secondary btn-sm">Voir toutes les commandes →</a>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px">
+      <div class="admin-panel">
+        <div class="admin-panel-title" style="font-size:1rem">Accès rapides</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <a href="/admin/produits.html" class="btn btn-primary btn-sm">+ Ajouter un produit</a>
+          <a href="/admin/actualites.html" class="btn btn-sage btn-sm">+ Écrire un article</a>
+          <a href="/admin/commandes.html" class="btn btn-secondary btn-sm">📦 Voir les commandes</a>
+        </div>
+      </div>
+      <div class="admin-panel">
+        <div class="admin-panel-title" style="font-size:1rem">Liens utiles</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:.875rem">
+          <a href="/" target="_blank" style="color:var(--rose-dark)">🌐 Voir la boutique en ligne</a>
+          <a href="https://dashboard.stripe.com" target="_blank" style="color:var(--rose-dark)">💳 Dashboard Stripe</a>
+          <a href="https://www.instagram.com/tout.en.aiguilles/" target="_blank" style="color:var(--rose-dark)">📸 Instagram</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+function checkAdmin() {
+  const guard   = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) {
+    content.style.display = 'none';
+    guard.style.display   = 'flex';
+  } else {
+    guard.style.display   = 'none';
+    content.style.display = '';
+    loadDashboard();
+  }
+}
+
+// Login depuis la garde admin
+document.getElementById('guard-btn').addEventListener('click', function() {
+  var email    = document.getElementById('guard-email').value.trim();
+  var password = document.getElementById('guard-password').value;
+  var errEl    = document.getElementById('guard-error');
+  var btn      = document.getElementById('guard-btn');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis'; errEl.style.display = ''; return; }
+  btn.disabled = true; btn.textContent = '…';
+  apiFetch('/auth/login', { method: 'POST', body: { email: email, password: password } })
+    .then(function(data) {
+      if (data.user.role !== 'admin') throw new Error('Ce compte n\'est pas administrateur.');
+      Auth.save(data.token, data.user);
+      checkAdmin();
+    })
+    .catch(function(e) {
+      errEl.textContent = e.message; errEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Se connecter →';
+    });
+});
+document.getElementById('guard-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('guard-btn').click();
+});
+
+async function loadDashboard() {
+  document.getElementById('admin-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  try {
+    const [products, orders] = await Promise.all([
+      apiFetch('/products/admin/all'),
+      apiFetch('/orders')
+    ]);
+
+    const active = products.filter(p => p.is_active);
+    const paid = orders.filter(o => ['paid','shipped','delivered'].includes(o.status));
+    const revenue = paid.reduce((s, o) => s + Number(o.total), 0);
+    const pending = orders.filter(o => o.status === 'pending' || o.status === 'paid');
+
+    document.getElementById('stat-products').textContent = active.length;
+    document.getElementById('stat-orders').textContent = orders.length;
+    document.getElementById('stat-revenue').textContent = revenue.toFixed(0) + ' €';
+    document.getElementById('stat-pending').textContent = pending.length;
+
+    const STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
+    const recent = orders.slice(0, 5);
+    document.getElementById('recent-orders-body').innerHTML = recent.length
+      ? recent.map(o => `<tr>
+          <td style="font-weight:700">#${o.id}</td>
+          <td>${o.first_name} ${o.last_name}</td>
+          <td>${o.items.length} article${o.items.length > 1 ? 's' : ''}</td>
+          <td style="font-weight:700;color:var(--rose-dark)">${Number(o.total).toFixed(2)} €</td>
+          <td><span class="order-status status-${o.status}">${STATUS[o.status] || o.status}</span></td>
+          <td style="font-size:.8rem;color:var(--text-light)">${formatDate(o.created_at)}</td>
+          <td><a href="/admin/commandes.html" class="btn btn-ghost btn-sm">Voir →</a></td>
+        </tr>`).join('')
+      : '<tr><td colspan="7" style="text-align:center;color:var(--text-light);padding:24px">Aucune commande pour l\'instant</td></tr>';
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+checkAdmin();
+</script>
+</body>
+</html>

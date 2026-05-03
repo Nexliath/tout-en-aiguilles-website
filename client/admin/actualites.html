@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Actualités — Admin Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .editor-toolbar { display:flex;gap:4px;padding:8px;background:var(--cream-dark);border-radius:8px 8px 0 0;border:1.5px solid var(--border);border-bottom:none;flex-wrap:wrap }
+    .editor-btn { padding:4px 10px;border-radius:4px;border:none;background:transparent;font-size:.85rem;cursor:pointer;font-weight:700 }
+    .editor-btn:hover { background:white }
+    #f-content { border-radius:0 0 8px 8px;min-height:200px }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
+    <nav class="admin-nav">
+      <a href="/admin/index.html">📊 Tableau de bord</a>
+      <a href="/admin/produits.html">🧶 Produits</a>
+      <a href="/admin/commandes.html">📦 Commandes</a>
+      <a href="/admin/actualites.html" class="active">📝 Actualités</a>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+      <a href="/" target="_blank">🌐 Voir le site</a>
+      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
+    </nav>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>Gestion des actualités</h1>
+      <button class="btn btn-primary btn-sm" onclick="showForm()">+ Écrire un article</button>
+    </div>
+
+    <!-- Article form -->
+    <div id="article-form-panel" style="display:none" class="admin-panel mb-lg">
+      <div class="admin-panel-title" id="art-form-title">Écrire un article</div>
+      <input type="hidden" id="edit-art-id">
+      <div class="form-group">
+        <label class="form-label">Titre *</label>
+        <input type="text" id="f-title" class="form-input" placeholder="Nouveautés de l'atelier…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Résumé <span style="font-weight:400;color:var(--text-light)">(affiché dans la liste)</span></label>
+        <input type="text" id="f-excerpt" class="form-input" placeholder="Un court texte d'accroche…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contenu de l'article *</label>
+        <div class="editor-toolbar">
+          <button class="editor-btn" onclick="fmt('bold')" title="Gras"><b>G</b></button>
+          <button class="editor-btn" onclick="fmt('italic')" title="Italique"><i>I</i></button>
+          <button class="editor-btn" onclick="fmt('insertUnorderedList')" title="Liste à puces">• Liste</button>
+          <button class="editor-btn" onclick="fmtBlock('h2')" title="Titre">H2</button>
+          <button class="editor-btn" onclick="fmtBlock('p')" title="Paragraphe">¶</button>
+          <button class="editor-btn" onclick="insertEmoji()" title="Emoji">😊</button>
+        </div>
+        <div id="f-content" class="form-textarea" contenteditable="true" style="outline:none;padding:12px 16px;border:1.5px solid var(--border);border-top:none;border-radius:0 0 8px 8px;min-height:200px"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Photo de couverture</label>
+        <input type="file" id="f-cover" accept="image/*" class="form-input">
+        <div id="current-cover" style="margin-top:8px"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="f-published" checked>
+          <span class="form-label" style="margin:0">✓ Publié (visible sur le site)</span>
+        </label>
+      </div>
+      <div id="art-form-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="saveArticle()">Publier l'article</button>
+        <button class="btn btn-ghost" onclick="hideForm()">Annuler</button>
+      </div>
+    </div>
+
+    <!-- Articles table -->
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Couverture</th><th>Titre</th><th>Résumé</th><th>Statut</th><th>Date</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="articles-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let allArticles = [];
+
+async function init() {
+  if (!Auth.isAdmin()) { window.location.href = '/admin/index.html'; return; }
+  loadArticles();
+}
+
+async function loadArticles() {
+  try {
+    allArticles = await apiFetch('/news/admin/all');
+    renderTable();
+  } catch (e) {
+    document.getElementById('articles-tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+  }
+}
+
+function renderTable() {
+  const tbody = document.getElementById('articles-tbody');
+  if (!allArticles.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-light)">Aucun article. <a href="#" onclick="showForm()" style="color:var(--rose-dark)">Écrire le premier →</a></td></tr>';
+    return;
+  }
+  tbody.innerHTML = allArticles.map(a => `
+    <tr>
+      <td>
+        ${a.cover_image
+          ? `<img src="${a.cover_image}" style="width:60px;height:40px;border-radius:6px;object-fit:cover">`
+          : '<div style="width:60px;height:40px;border-radius:6px;background:var(--rose-pale);display:flex;align-items:center;justify-content:center">🌸</div>'}
+      </td>
+      <td style="font-weight:700">${a.title}</td>
+      <td style="font-size:.8rem;color:var(--text-light);max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${a.excerpt || '—'}</td>
+      <td><span class="order-status ${a.published ? 'status-delivered' : 'status-pending'}">${a.published ? 'Publié' : 'Brouillon'}</span></td>
+      <td style="font-size:.8rem;color:var(--text-light)">${formatDate(a.created_at)}</td>
+      <td>
+        <div class="admin-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editArticle(${a.id})">✏️ Modifier</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteArticle(${a.id}, '${a.title.replace("'","\\'")}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function showForm(title = 'Écrire un article') {
+  document.getElementById('art-form-title').textContent = title;
+  document.getElementById('article-form-panel').style.display = '';
+  document.getElementById('article-form-panel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideForm() {
+  document.getElementById('article-form-panel').style.display = 'none';
+  document.getElementById('edit-art-id').value = '';
+  document.getElementById('f-title').value = '';
+  document.getElementById('f-excerpt').value = '';
+  document.getElementById('f-content').innerHTML = '';
+  document.getElementById('f-cover').value = '';
+  document.getElementById('f-published').checked = true;
+  document.getElementById('current-cover').innerHTML = '';
+  document.getElementById('art-form-error').style.display = 'none';
+}
+
+function editArticle(id) {
+  const a = allArticles.find(x => x.id === id);
+  if (!a) return;
+  showForm('Modifier l\'article');
+  document.getElementById('edit-art-id').value = id;
+  document.getElementById('f-title').value = a.title;
+  document.getElementById('f-excerpt').value = a.excerpt || '';
+  document.getElementById('f-content').innerHTML = a.content;
+  document.getElementById('f-published').checked = !!a.published;
+  if (a.cover_image) {
+    document.getElementById('current-cover').innerHTML = `<img src="${a.cover_image}" style="height:80px;border-radius:8px;object-fit:cover">`;
+  }
+}
+
+async function saveArticle() {
+  const id = document.getElementById('edit-art-id').value;
+  const title = document.getElementById('f-title').value.trim();
+  const content = document.getElementById('f-content').innerHTML.trim();
+  const errEl = document.getElementById('art-form-error');
+  errEl.style.display = 'none';
+
+  if (!title || !content || content === '<br>') {
+    errEl.textContent = 'Le titre et le contenu sont requis';
+    errEl.style.display = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('title',     title);
+  formData.append('excerpt',   document.getElementById('f-excerpt').value.trim());
+  formData.append('content',   content);
+  formData.append('published', document.getElementById('f-published').checked ? '1' : '0');
+  const cover = document.getElementById('f-cover').files[0];
+  if (cover) formData.append('cover_image', cover);
+
+  try {
+    if (id) {
+      await apiFetchForm(`/news/${id}`, formData, 'PUT');
+      Toast.show('Article mis à jour ✓', 'success');
+    } else {
+      await apiFetchForm('/news', formData, 'POST');
+      Toast.show('Article publié ✓', 'success');
+    }
+    hideForm();
+    loadArticles();
+  } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+async function deleteArticle(id, title) {
+  if (!confirm(`Supprimer l'article "${title}" ?`)) return;
+  try {
+    await apiFetch(`/news/${id}`, { method: 'DELETE' });
+    Toast.show('Article supprimé', 'success');
+    loadArticles();
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+// Rich text editor helpers
+function fmt(cmd) { document.execCommand(cmd, false, null); document.getElementById('f-content').focus(); }
+function fmtBlock(tag) { document.execCommand('formatBlock', false, tag); document.getElementById('f-content').focus(); }
+function insertEmoji() {
+  const emojis = ['🌸','🧶','✂️','🐰','🎁','💕','✨','🌿','🛁','👜'];
+  const e = emojis[Math.floor(Math.random() * emojis.length)];
+  document.execCommand('insertText', false, e);
+}
+
+init();
+</script>
+</body>
+</html>

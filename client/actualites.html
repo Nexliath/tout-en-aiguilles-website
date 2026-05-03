@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Actualités — Tout en Aiguilles</title>
+  <meta name="description" content="Les dernières nouvelles de l'atelier Tout en Aiguilles — projets, inspirations et nouveautés.">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
+    <nav class="nav">
+      <a href="/">Accueil</a>
+      <a href="/boutique.html">Boutique</a>
+      <a href="/actualites.html" class="active">Actualités</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="user-btn">👤</button>
+      <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
+    </div>
+  </div>
+</header>
+
+<!-- List view -->
+<div id="view-list">
+  <div class="page-hero">
+    <div class="container">
+      <div class="section-divider"><span class="section-tag">Le fil des nouvelles</span></div>
+      <h1>Actualités & Inspirations 📝</h1>
+      <p>Projets en cours, nouveautés, coulisses de l'atelier… Suivez l'aventure Tout en Aiguilles !</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div id="news-list" class="news-grid">
+        <div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Chargement…</div>
+      </div>
+      <div id="news-empty" class="empty-state" style="display:none">
+        <div class="empty-state-icon">📰</div>
+        <h3>Pas encore d'actualités</h3>
+        <p>Revenez bientôt, Victorine a plein de choses à partager !</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Article view -->
+<div id="view-article" style="display:none">
+  <div class="section">
+    <div class="container">
+      <div class="breadcrumb">
+        <a href="/">Accueil</a><span class="breadcrumb-sep">›</span>
+        <a href="/actualites.html" onclick="showList()">Actualités</a><span class="breadcrumb-sep">›</span>
+        <span id="article-bc">Article</span>
+      </div>
+      <div class="article-content">
+        <div id="article-loading" class="loading"><div class="spinner"></div></div>
+        <article id="article-body" style="display:none">
+          <p id="art-date" style="font-size:.8rem;color:var(--text-light);margin-bottom:8px"></p>
+          <h1 id="art-title" style="margin-bottom:24px"></h1>
+          <div class="article-cover" id="art-cover"><span>🌸</span></div>
+          <div class="article-body" id="art-content"></div>
+          <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <a href="/actualites.html" onclick="showList()" class="btn btn-secondary">← Retour aux actualités</a>
+            <a href="/boutique.html" class="btn btn-primary">Visiter la boutique →</a>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
+      <span>© 2024 Tout en Aiguilles</span>
+      <a href="/" style="color:rgba(255,255,255,.6)">Accueil</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/main.js"></script>
+<script>
+async function loadNewsList() {
+  try {
+    const articles = await apiFetch('/news?limit=20');
+    const grid = document.getElementById('news-list');
+    if (!articles.length) {
+      grid.style.display = 'none';
+      document.getElementById('news-empty').style.display = '';
+      return;
+    }
+    grid.innerHTML = articles.map(a => `
+      <div class="card news-card" onclick="openArticle('${a.slug}')">
+        <div class="news-card-img">
+          ${a.cover_image ? `<img src="${a.cover_image}" alt="${a.title}" loading="lazy" onerror="this.parentElement.innerHTML='🌸'">` : '🌸'}
+        </div>
+        <div class="news-card-body">
+          <div class="news-card-date">${formatDate(a.created_at)}</div>
+          <div class="news-card-title">${a.title}</div>
+          <p class="news-card-excerpt">${a.excerpt || ''}</p>
+          <span class="btn btn-secondary btn-sm" style="margin-top:12px">Lire l'article →</span>
+        </div>
+      </div>`).join('');
+  } catch {
+    document.getElementById('news-list').innerHTML = '<p class="text-muted" style="grid-column:1/-1">Impossible de charger les actualités.</p>';
+  }
+}
+
+async function openArticle(slug) {
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-article').style.display = '';
+  document.getElementById('article-loading').style.display = 'flex';
+  document.getElementById('article-body').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Update URL
+  history.pushState({ slug }, '', `/actualites.html?slug=${slug}`);
+
+  try {
+    const article = await apiFetch(`/news/${slug}`);
+    document.getElementById('article-bc').textContent = article.title;
+    document.getElementById('art-date').textContent = formatDate(article.created_at);
+    document.getElementById('art-title').textContent = article.title;
+    document.getElementById('art-content').innerHTML = article.content;
+    document.title = `${article.title} — Tout en Aiguilles`;
+
+    const cover = document.getElementById('art-cover');
+    if (article.cover_image) {
+      cover.innerHTML = `<img src="${article.cover_image}" alt="${article.title}">`;
+    }
+    document.getElementById('article-loading').style.display = 'none';
+    document.getElementById('article-body').style.display = '';
+  } catch {
+    document.getElementById('article-loading').innerHTML = '<p class="text-muted">Article introuvable.</p>';
+  }
+}
+
+function showList() {
+  document.getElementById('view-article').style.display = 'none';
+  document.getElementById('view-list').style.display = '';
+  history.pushState({}, '', '/actualites.html');
+  document.title = 'Actualités — Tout en Aiguilles';
+  return false;
+}
+
+// Init: check if slug in URL
+const params = new URLSearchParams(location.search);
+const slug = params.get('slug');
+if (slug) {
+  openArticle(slug);
+} else {
+  loadNewsList();
+}
+
+window.addEventListener('popstate', (e) => {
+  if (e.state?.slug) openArticle(e.state.slug);
+  else showList();
+});
+</script>
+</body>
+</html>
