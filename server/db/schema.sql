@@ -101,31 +101,39 @@ INSERT OR IGNORE INTO categories (name, slug, description, type) VALUES
   ('Bébé & Enfant', 'bebe-enfant', 'Sorties de bain, bavoirs et accessoires bébé cousus avec amour', 'couture'),
   ('Accessoires Couture', 'accessoires-couture', 'Bananes, pochettes, lingettes démaquillantes et plus encore', 'couture');
 
--- Produit exemple (doudou)
+-- Produits
 INSERT OR IGNORE INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured) VALUES
   ('Doudou Lapin Rose', 'doudou-lapin-rose',
    'Un adorable doudou lapin au crochet, tout doux et fait main avec amour. Parfait pour accompagner bébé dans ses aventures. Lavable en machine à 30°C. Taille : 25 cm environ.',
-   28.00, 5, 1, '["placeholder_lapin.jpg"]', '["bébé","cadeau","crochet"]', 1),
+   28.00, 5, 1, '["/assets/images/products/etsy_4418584618.jpg","/assets/images/products/etsy_4418575054.jpg"]', '["bébé","cadeau","crochet"]', 1),
 
   ('Doudou Ours Caramel', 'doudou-ours-caramel',
    'Un petit ours au crochet tout moelleux, réalisé en laine douce et hypoallergénique. Idéal comme cadeau de naissance.',
-   32.00, 3, 1, '["placeholder_ours.jpg"]', '["bébé","cadeau","crochet"]', 1),
+   32.00, 3, 1, '["/assets/images/products/etsy_4418569631.jpg","/assets/images/products/etsy_4418566211.jpg"]', '["bébé","cadeau","crochet"]', 1),
 
   ('Tote Bag Fleuri', 'tote-bag-fleuri',
    'Tote bag en coton imprimé fleuri, doublé intérieur, avec poche zippée. Solide et pratique pour le quotidien. Dimensions : 38x42 cm.',
-   22.00, 8, 4, '["placeholder_tote.jpg"]', '["couture","fleurs","pratique"]', 1),
+   22.00, 8, 4, '["/assets/images/products/etsy_4419653643.jpg","/assets/images/products/etsy_4468733462.jpg","/assets/images/products/etsy_4419641843.jpg"]', '["couture","fleurs","pratique"]', 1),
 
   ('Sortie de Bain Bébé', 'sortie-de-bain-bebe',
    'Cape de bain en éponge ultra-douce pour bébé, avec capuche oreilles de lapin. Broderie personnalisable sur commande.',
-   38.00, 4, 5, '["placeholder_bain.jpg"]', '["bébé","couture","cadeau naissance"]', 0),
+   38.00, 4, 5, '["/assets/images/products/etsy_4302914690.jpg"]', '["bébé","couture","cadeau naissance"]', 0),
 
   ('Lingettes Démaquillantes (lot de 7)', 'lingettes-demaquillantes',
    'Set de 7 lingettes démaquillantes lavables, en coton et éponge bambou. Zéro déchet et douces pour la peau.',
-   14.00, 15, 6, '["placeholder_lingettes.jpg"]', '["écologie","couture","beauté"]', 0),
+   14.00, 15, 6, '["/assets/images/products/etsy_1905764957.jpg","/assets/images/products/etsy_4302914690.jpg"]', '["écologie","couture","beauté"]', 0),
 
   ('Banane Zippée', 'banane-zippee',
    'Sac banane en tissu coton, avec fermeture éclair et anse réglable. Pratique pour les balades et sorties.',
-   26.00, 6, 6, '["placeholder_banane.jpg"]', '["couture","sac","pratique"]', 0);
+   26.00, 6, 6, '["/assets/images/products/etsy_4469248479.jpg","/assets/images/products/etsy_4469258910.jpg"]', '["couture","sac","pratique"]', 0);
+
+-- Mise à jour des images pour les produits existants (correction placeholders)
+UPDATE products SET images = '["/assets/images/products/etsy_4418584618.jpg","/assets/images/products/etsy_4418575054.jpg"]' WHERE slug = 'doudou-lapin-rose';
+UPDATE products SET images = '["/assets/images/products/etsy_4418569631.jpg","/assets/images/products/etsy_4418566211.jpg"]' WHERE slug = 'doudou-ours-caramel';
+UPDATE products SET images = '["/assets/images/products/etsy_4419653643.jpg","/assets/images/products/etsy_4468733462.jpg","/assets/images/products/etsy_4419641843.jpg"]' WHERE slug = 'tote-bag-fleuri';
+UPDATE products SET images = '["/assets/images/products/etsy_4302914690.jpg"]' WHERE slug = 'sortie-de-bain-bebe';
+UPDATE products SET images = '["/assets/images/products/etsy_1905764957.jpg","/assets/images/products/etsy_4302914690.jpg"]' WHERE slug = 'lingettes-demaquillantes';
+UPDATE products SET images = '["/assets/images/products/etsy_4469248479.jpg","/assets/images/products/etsy_4469258910.jpg"]' WHERE slug = 'banane-zippee';
 
 -- Article d'actualité de bienvenue
 INSERT OR IGNORE INTO news (title, slug, excerpt, content, published) VALUES
