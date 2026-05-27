@@ -10,8 +10,26 @@ CREATE TABLE IF NOT EXISTS users (
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'customer', -- 'customer' | 'admin'
+  email_verified INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Migration silencieuse : ajout email_verified si absent
+-- (pour les bases de données existantes avant cette fonctionnalité)
+CREATE TABLE IF NOT EXISTS _migrations (key TEXT PRIMARY KEY);
+INSERT OR IGNORE INTO _migrations (key) VALUES ('email_verified_col');
+
+-- Tokens de vérification d'email
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT UNIQUE NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Les admins créés via /api/setup sont auto-vérifiés
+UPDATE users SET email_verified = 1 WHERE role = 'admin' AND email_verified = 0;
 
 -- Catégories
 CREATE TABLE IF NOT EXISTS categories (
