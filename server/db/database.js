@@ -20,6 +20,16 @@ _db.exec('PRAGMA foreign_keys = ON');
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
 _db.exec(schema);
 
+// ─── Migrations sur base existante ──────────────────────────
+// ALTER TABLE ne peut pas être dans le schema (IF NOT EXISTS n'existe pas pour les colonnes)
+const migrations = [
+  "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
+  "UPDATE users SET email_verified = 1 WHERE role = 'admin'",
+];
+for (const sql of migrations) {
+  try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
+}
+
 // ─── Fix BigInt ──────────────────────────────────────────────
 // node:sqlite retourne les entiers en BigInt — on les convertit
 // automatiquement en Number pour être compatibles avec JSON et JWT
