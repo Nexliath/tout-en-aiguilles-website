@@ -231,7 +231,22 @@ async function doLogin() {
     Toast.show(`Bienvenue, ${user.first_name} ! 🌸`, 'success');
     document.getElementById('auth-modal').classList.remove('open');
     setTimeout(() => location.reload(), 500);
-  } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+  } catch (e) {
+    errEl.style.display = '';
+    // Email non vérifié → proposer de renvoyer le lien
+    if (e.message && e.message.includes('confirmer')) {
+      errEl.innerHTML = `${e.message} <a href="#" onclick="resendVerification('${email}');return false;" style="color:#c8937a;text-decoration:underline;display:block;margin-top:6px">Renvoyer l'email de confirmation</a>`;
+    } else {
+      errEl.textContent = e.message;
+    }
+  }
+}
+
+async function resendVerification(email) {
+  try {
+    await apiFetch('/auth/resend-verification', { method: 'POST', body: { email } });
+    Toast.show('📧 Email de confirmation renvoyé !', 'success');
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 async function doRegister() {
@@ -241,11 +256,28 @@ async function doRegister() {
   const password   = document.getElementById('reg-password').value;
   const errEl      = document.getElementById('reg-error');
   try {
-    const { token, user } = await apiFetch('/auth/register', { method: 'POST', body: { email, password, first_name, last_name } });
-    Auth.save(token, user);
-    Toast.show(`Bienvenue ${user.first_name} ! Votre compte est créé 🎉`, 'success');
-    document.getElementById('auth-modal').classList.remove('open');
-    setTimeout(() => location.reload(), 500);
+    const data = await apiFetch('/auth/register', { method: 'POST', body: { email, password, first_name, last_name } });
+
+    if (data.pending_verification) {
+      // Compte créé — email de confirmation envoyé
+      document.getElementById('auth-modal').classList.remove('open');
+      Toast.show('📧 Un email de confirmation vous a été envoyé !', 'success');
+      // Afficher un message persistant sur la page
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#fff;border:2px solid #c8937a;border-radius:12px;padding:20px 28px;z-index:9999;text-align:center;max-width:420px;box-shadow:0 4px 20px rgba(0,0,0,.12)';
+      banner.innerHTML = `<div style="font-size:2rem;margin-bottom:8px">📧</div><strong style="color:#5a3e2b">Vérifiez votre boîte mail !</strong><p style="color:#6b5547;margin:8px 0 0;font-size:.9rem">Cliquez sur le lien envoyé à <b>${email}</b> pour activer votre compte.</p>`;
+      document.body.appendChild(banner);
+      setTimeout(() => banner.remove(), 8000);
+      return;
+    }
+
+    // Connexion directe (fallback si email déjà vérifié)
+    if (data.token) {
+      Auth.save(data.token, data.user);
+      Toast.show(`Bienvenue ${data.user.first_name} ! 🎉`, 'success');
+      document.getElementById('auth-modal').classList.remove('open');
+      setTimeout(() => location.reload(), 500);
+    }
   } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
 }
 
