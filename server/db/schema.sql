@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS email_verification_tokens (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Les admins créés via /api/setup sont auto-vérifiés
-UPDATE users SET email_verified = 1 WHERE role = 'admin' AND email_verified = 0;
+-- Note: email_verified est ajouté via migration dans database.js (ALTER TABLE)
+-- pour compatibilité avec les bases de données existantes
 
 -- Catégories
 CREATE TABLE IF NOT EXISTS categories (
