@@ -3,9 +3,17 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024';
+
+// Chemin d'accès au backoffice — configurable via variable d'environnement
+// Valeur par défaut non-évidente, à remplacer dans Railway par ADMIN_PATH
+const ADMIN_PATH = process.env.ADMIN_PATH || 'atelier';
 
 // ─── Vérification node:sqlite ────────────────────────────────
 try {
@@ -25,31 +33,55 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGIN || '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
+app.use(cookieParser());
+
+// ─── Rate limiting — anti brute-force ───────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                   // max 20 tentatives par IP sur 15 min
+  message: { error: 'Trop de tentatives. Réessayez dans 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ─── Body parsing ───────────────────────────────────────────
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ─── Fichiers statiques ─────────────────────────────────────
+// ─── Bloquer l'ancien chemin /admin → 404 ───────────────────
+app.use('/admin', (req, res) => res.status(404).send('Not Found'));
+
+// ─── Backoffice protégé — chemin configurable ────────────────
+// Vérifie le cookie httpOnly posé lors du login admin
+// Sans cookie valide → 404 (pas de redirection, pas d'info)
+app.use(`/${ADMIN_PATH}`, (req, res, next) => {
+  const token = req.cookies?.tea_admin_sess;
+  if (!token) return res.status(404).send('Not Found');
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'admin') return res.status(404).send('Not Found');
+    next();
+  } catch {
+    return res.status(404).send('Not Found');
+  }
+}, express.static(path.join(__dirname, '../client/admin')));
+
+// ─── Fichiers statiques publics ──────────────────────────────
 app.use(express.static(path.join(__dirname, '../client')));
 
 // ─── Routes API ─────────────────────────────────────────────
-app.use('/api/auth',     require('./routes/auth'));
+app.use('/api/auth',     authLimiter, require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/news',     require('./routes/news'));
 app.use('/api/admin',    require('./routes/admin'));
 
 // ─── Setup premier lancement ────────────────────────────────
-// Crée un compte admin directement (disponible seulement s'il n'y a aucun admin)
 app.post('/api/setup', (req, res) => {
   const db = require('./db/database');
   const bcrypt = require('bcryptjs');
-  const jwt = require('jsonwebtoken');
-  const JWT_SECRET = process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024';
 
-  // Vérifier qu'il n'y a pas encore d'admin
   const existingAdmin = db.prepare("SELECT id FROM users WHERE role = 'admin'").get();
   if (existingAdmin) {
     return res.status(403).json({ error: 'Un compte admin existe déjà. Utilisez la page de connexion.' });
@@ -65,11 +97,9 @@ app.post('/api/setup', (req, res) => {
   const existing = db.prepare('SELECT id, role FROM users WHERE email = ?').get(email);
 
   if (existing) {
-    // L'email existe déjà → promouvoir en admin
     db.prepare("UPDATE users SET role = 'admin', password_hash = ? WHERE email = ?").run(hash, email);
     userId = existing.id;
   } else {
-    // Créer un nouveau compte admin
     const result = db.prepare(
       "INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES (?, ?, ?, ?, 'admin')"
     ).run(email, hash, first_name, last_name);
@@ -107,7 +137,7 @@ app.listen(PORT, async () => {
 
   console.log(`\n🧶 Tout en Aiguilles — Serveur démarré`);
   console.log(`   → Site     : http://localhost:${PORT}`);
-  console.log(`   → Admin    : http://localhost:${PORT}/admin/`);
+  console.log(`   → Admin    : http://localhost:${PORT}/${ADMIN_PATH}/`);
   console.log(`   → API      : http://localhost:${PORT}/api/health`);
 
   if (admins === 0) {
