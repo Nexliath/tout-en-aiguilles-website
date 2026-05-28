@@ -36,6 +36,20 @@ const migrations = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(product_id, user_id)
   )`,
+  // Migration photos d'avis
+  `CREATE TABLE IF NOT EXISTS review_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+    photo_url TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+  // Migration avatar utilisateur
+  "ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT NULL",
+  // Migration pseudo utilisateur
+  "ALTER TABLE users ADD COLUMN username TEXT DEFAULT NULL",
+  // Pseudos pré-définis pour les comptes existants connus
+  "UPDATE users SET username = 'Nexliath' WHERE lower(first_name) = 'victor' AND lower(last_name) = 'garnier' AND username IS NULL",
+  "UPDATE users SET username = 'Vixtorine' WHERE lower(first_name) = 'victorine' AND lower(last_name) = 'richard' AND username IS NULL",
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
