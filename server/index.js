@@ -39,6 +39,7 @@ app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/news',     require('./routes/news'));
+app.use('/api/admin',    require('./routes/admin'));
 
 // ─── Setup premier lancement ────────────────────────────────
 // Crée un compte admin directement (disponible seulement s'il n'y a aucun admin)
