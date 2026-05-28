@@ -66,7 +66,15 @@
         <aside>
           <div class="account-sidebar">
             <div class="account-avatar">
-              <div class="avatar-circle" id="avatar-initials">VG</div>
+              <!-- Avatar cliquable pour changer la photo -->
+              <div style="position:relative;display:inline-block;cursor:pointer" title="Changer ma photo de profil" onclick="document.getElementById('avatar-file-input').click()">
+                <div class="avatar-circle" id="avatar-circle" style="position:relative;overflow:hidden">
+                  <span id="avatar-initials-text">VG</span>
+                  <img id="avatar-img" src="" alt="avatar" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none">
+                </div>
+                <div style="position:absolute;bottom:0;right:0;background:var(--rose-dark);color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:.85rem;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.2)">📷</div>
+              </div>
+              <input type="file" id="avatar-file-input" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
               <div style="font-family:var(--font-title);font-size:1.1rem;font-weight:600" id="account-name">Prénom Nom</div>
               <div style="font-size:.8rem;color:var(--text-light);margin-top:4px" id="account-email">email</div>
             </div>
@@ -107,6 +115,11 @@
                   <label class="form-label">Nom</label>
                   <input type="text" id="profile-lname" class="form-input">
                 </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pseudo</label>
+                <input type="text" id="profile-username" class="form-input" placeholder="MonPseudo123">
+                <p class="form-hint">Nom d'affichage visible par les autres</p>
               </div>
               <div class="form-group">
                 <label class="form-label">Email</label>
@@ -161,6 +174,52 @@ const STATUS_LABELS = {
   delivered: 'Livrée', cancelled: 'Annulée'
 };
 
+// Compression image côté client pour avatar
+function compressImage(file, maxW, maxH, quality) {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW / w, maxH / h);
+        w = Math.round(w * ratio); h = Math.round(h * ratio);
+      }
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    };
+    img.src = url;
+  });
+}
+
+async function uploadAvatar(input) {
+  if (!input.files[0]) return;
+  try {
+    // Compresser à 400×400 max, qualité 0.82 → ~80-120 KB
+    const compressed = await compressImage(input.files[0], 400, 400, 0.82);
+    const fd = new FormData();
+    fd.append('avatar', compressed, 'avatar.jpg');
+    const data = await apiFetchForm('/auth/avatar', fd);
+
+    // Afficher le nouvel avatar
+    const img = document.getElementById('avatar-img');
+    img.src = data.avatar_url + '?t=' + Date.now();
+    img.style.display = 'block';
+    document.getElementById('avatar-initials-text').style.display = 'none';
+
+    // Mettre à jour le cache utilisateur
+    const user = Auth.getUser();
+    if (user) Auth.save(Auth.getToken(), { ...user, avatar_url: data.avatar_url });
+
+    Toast.show('📸 Photo de profil mise à jour !', 'success');
+  } catch (e) { Toast.show(e.message || 'Erreur upload', 'error'); }
+  input.value = '';
+}
+
 async function initAccount() {
   if (!Auth.isLoggedIn()) {
     document.getElementById('not-logged-in').style.display = '';
@@ -173,10 +232,19 @@ async function initAccount() {
     document.getElementById('account-greeting').textContent = `Bonjour, ${user.first_name} 🌸`;
     document.getElementById('account-name').textContent = `${user.first_name} ${user.last_name}`;
     document.getElementById('account-email').textContent = user.email;
-    document.getElementById('avatar-initials').textContent = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
     document.getElementById('profile-fname').value = user.first_name;
     document.getElementById('profile-lname').value = user.last_name;
     document.getElementById('profile-email').value = user.email;
+    document.getElementById('profile-username').value = user.username || '';
+
+    // Avatar
+    if (user.avatar_url) {
+      document.getElementById('avatar-img').src = user.avatar_url;
+      document.getElementById('avatar-img').style.display = 'block';
+      document.getElementById('avatar-initials-text').style.display = 'none';
+    } else {
+      document.getElementById('avatar-initials-text').textContent = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+    }
   } catch {}
 
   // Check URL tab
@@ -242,13 +310,18 @@ async function loadFavorites() {
 async function saveProfile() {
   const first_name = document.getElementById('profile-fname').value.trim();
   const last_name  = document.getElementById('profile-lname').value.trim();
+  const username   = document.getElementById('profile-username').value.trim();
   try {
-    await apiFetch('/auth/me', { method: 'PUT', body: { first_name, last_name } });
+    await apiFetch('/auth/me', { method: 'PUT', body: { first_name, last_name, username } });
     const user = Auth.getUser();
-    Auth.save(Auth.getToken(), { ...user, first_name, last_name });
+    Auth.save(Auth.getToken(), { ...user, first_name, last_name, username });
     document.getElementById('account-name').textContent = `${first_name} ${last_name}`;
     document.getElementById('account-greeting').textContent = `Bonjour, ${first_name} 🌸`;
-    document.getElementById('avatar-initials').textContent = `${first_name[0]}${last_name[0]}`.toUpperCase();
+    // Rafraîchir initiales seulement si pas de photo
+    const img = document.getElementById('avatar-img');
+    if (!img || img.style.display === 'none') {
+      document.getElementById('avatar-initials-text').textContent = `${first_name[0]}${last_name[0]}`.toUpperCase();
+    }
     document.getElementById('profile-success').style.display = '';
     setTimeout(() => document.getElementById('profile-success').style.display = 'none', 3000);
   } catch (e) { Toast.show(e.message, 'error'); }
