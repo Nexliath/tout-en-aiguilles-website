@@ -640,6 +640,15 @@ p  { color: var(--text-light); }
 }
 .mobile-nav-divider { height: 1px; background: var(--border); margin: 8px 0; }
 
+/* ─── Mobile filter bar ─────────────────────────────────────── */
+.mobile-filter-bar { display: none; }
+.filter-panel-header { display: none; }
+.filter-sheet-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 200;
+}
+.filter-sheet-overlay.open { display: block; }
+
 /* ─── Carousel (produits phares mobile) ─────────────────────── */
 .carousel-outer { overflow: hidden; }
 #featured-products.carousel-active {
@@ -803,6 +812,83 @@ p  { color: var(--text-light); }
 
   /* Carousel dots visible on mobile */
   .carousel-dots { display: flex; }
+
+  /* ── Mobile filter bar ── */
+  .mobile-filter-bar {
+    display: flex; align-items: center; gap: 10px;
+    position: sticky; top: var(--header-h);
+    background: var(--cream); z-index: 50;
+    padding: 10px 0 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .mobile-search-wrap {
+    flex: 1; position: relative;
+  }
+  .mobile-search-icon {
+    position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); font-size: .85rem; pointer-events: none;
+  }
+  .mobile-search-field {
+    width: 100%; padding: 9px 12px 9px 32px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: white; font-size: .875rem;
+    font-family: var(--font-body); color: var(--text);
+    transition: border-color var(--transition);
+  }
+  .mobile-search-field:focus { outline: none; border-color: var(--rose); }
+  .mobile-filter-toggle {
+    white-space: nowrap; padding: 9px 14px;
+    background: white; border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: .875rem;
+    font-family: var(--font-body); color: var(--text);
+    font-weight: 600; display: flex; align-items: center; gap: 6px;
+    transition: all var(--transition);
+  }
+  .mobile-filter-toggle.has-filters {
+    border-color: var(--rose-dark);
+    background: var(--rose-pale); color: var(--rose-dark);
+  }
+  .filter-badge {
+    background: var(--rose-dark); color: white;
+    border-radius: 50%; width: 18px; height: 18px;
+    font-size: .68rem; display: flex;
+    align-items: center; justify-content: center; font-weight: 700;
+  }
+
+  /* ── Filter bottom sheet ── */
+  .filters-panel {
+    position: fixed !important; bottom: 0; left: 0; right: 0;
+    top: auto !important; height: 80vh;
+    background: white; border-radius: 24px 24px 0 0;
+    padding: 0 20px 32px; overflow-y: auto;
+    z-index: 201;
+    transform: translateY(100%);
+    transition: transform 0.32s cubic-bezier(0.32,0.72,0,1);
+    box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  }
+  .filters-panel.open { transform: translateY(0); }
+  .filter-panel-header {
+    display: block; position: sticky; top: 0;
+    background: white; padding: 12px 0 16px; z-index: 1;
+    border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  .filter-panel-handle {
+    width: 40px; height: 4px; background: var(--border);
+    border-radius: 2px; margin: 0 auto 12px;
+  }
+  .filter-apply-btn {
+    background: var(--rose-dark); color: white;
+    border: none; border-radius: 8px; padding: 8px 16px;
+    font-size: .875rem; font-family: var(--font-body); font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Hide desktop search inside panel on mobile (mobile bar replaces it) */
+  .filter-search-desktop { display: none !important; }
+
+  /* Hide sidebar on mobile (it's a bottom sheet now) */
+  .shop-layout { display: block !important; }
 }
 
 @media (max-width: 480px) {
