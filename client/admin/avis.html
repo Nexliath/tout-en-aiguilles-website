@@ -80,13 +80,14 @@
               <th>Client</th>
               <th>Note</th>
               <th>Commentaire</th>
+              <th>Photos</th>
               <th>Statut</th>
               <th>Date</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="reviews-body">
-            <tr><td colspan="8" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            <tr><td colspan="9" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -175,7 +176,7 @@ function starsHtml(rating) {
 function renderReviews(reviews) {
   const tbody = document.getElementById('reviews-body');
   if (!reviews.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:24px">Aucun avis</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-light);padding:24px">Aucun avis</td></tr>';
     return;
   }
   tbody.innerHTML = reviews.map(r => `
@@ -186,8 +187,13 @@ function renderReviews(reviews) {
       <td style="font-size:1rem;letter-spacing:1px" title="${r.rating}/5">${starsHtml(r.rating)}</td>
       <td style="font-size:.82rem;color:var(--text);max-width:200px">
         ${r.comment
-          ? `<span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${r.comment.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`
+          ? `<span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word">${r.comment.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`
           : '<span style="color:var(--text-light)">—</span>'}
+      </td>
+      <td>
+        ${r.photos && r.photos.length > 0
+          ? r.photos.map(p => `<img src="${p}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;margin:2px;border:1px solid var(--border)" onclick="window.open('${p}','_blank')" alt="photo">`).join('')
+          : '<span style="color:var(--text-light);font-size:.8rem">—</span>'}
       </td>
       <td>
         ${r.is_approved
