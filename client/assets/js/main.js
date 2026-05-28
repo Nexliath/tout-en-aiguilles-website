@@ -173,11 +173,29 @@ function openAuthModal() {
         <!-- Register -->
         <div id="tab-register" style="display:none">
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Prénom</label><input id="reg-fname" type="text" class="form-input" placeholder="Marie"></div>
-            <div class="form-group"><label class="form-label">Nom</label><input id="reg-lname" type="text" class="form-input" placeholder="Dupont"></div>
+            <div class="form-group"><label class="form-label">Prénom *</label><input id="reg-fname" type="text" class="form-input" placeholder="Marie"></div>
+            <div class="form-group"><label class="form-label">Nom *</label><input id="reg-lname" type="text" class="form-input" placeholder="Dupont"></div>
           </div>
-          <div class="form-group"><label class="form-label">Email</label><input id="reg-email" type="email" class="form-input" placeholder="votre@email.fr"></div>
-          <div class="form-group"><label class="form-label">Mot de passe</label><input id="reg-password" type="password" class="form-input" placeholder="Au moins 6 caractères"></div>
+          <div class="form-group">
+            <label class="form-label">Pseudo *</label>
+            <input id="reg-username" type="text" class="form-input" placeholder="MonPseudo123">
+            <p style="font-size:.75rem;color:var(--text-light);margin-top:4px">Votre nom d'affichage visible par les autres</p>
+          </div>
+          <div class="form-group"><label class="form-label">Email *</label><input id="reg-email" type="email" class="form-input" placeholder="votre@email.fr"></div>
+          <div class="form-group">
+            <label class="form-label">Mot de passe *</label>
+            <input id="reg-password" type="password" class="form-input" placeholder="Au moins 8 caractères">
+            <div id="pw-strength-bar" style="height:5px;border-radius:4px;margin-top:6px;background:#e9e9e9;overflow:hidden">
+              <div id="pw-strength-fill" style="height:100%;width:0;border-radius:4px;transition:width .3s,background .3s"></div>
+            </div>
+            <div id="pw-strength-label" style="font-size:.75rem;margin-top:4px;color:var(--text-light)"></div>
+            <div style="font-size:.72rem;color:var(--text-light);margin-top:4px">8 car. min · 1 majuscule · 1 chiffre · 1 caractère spécial (!@#$…)</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirmer le mot de passe *</label>
+            <input id="reg-confirm" type="password" class="form-input" placeholder="Répétez votre mot de passe">
+            <div id="pw-match-label" style="font-size:.75rem;margin-top:4px"></div>
+          </div>
           <div id="reg-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
           <button class="btn btn-primary btn-block" id="modal-register-btn">Créer mon compte</button>
         </div>
@@ -202,6 +220,16 @@ function openAuthModal() {
     document.getElementById('reg-password').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') doRegister();
     });
+    document.getElementById('reg-confirm').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doRegister();
+    });
+
+    // Jauge de force du mot de passe
+    document.getElementById('reg-password').addEventListener('input', function() {
+      updatePasswordStrength(this.value);
+      updatePasswordMatch();
+    });
+    document.getElementById('reg-confirm').addEventListener('input', updatePasswordMatch);
 
     // Tabs
     modal.querySelectorAll('.modal-tab').forEach(function(tab) {
@@ -249,14 +277,60 @@ async function resendVerification(email) {
   } catch (e) { Toast.show(e.message, 'error'); }
 }
 
+// ─── Jauge force mot de passe ─────────────────────────────────
+function getPasswordStrength(pw) {
+  if (!pw) return { score: 0, label: '', color: '' };
+  var score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  if (score <= 1) return { score, label: 'Très faible', color: '#d9534f', pct: 15 };
+  if (score === 2) return { score, label: 'Faible', color: '#e67e22', pct: 35 };
+  if (score === 3) return { score, label: 'Moyen', color: '#f0ad4e', pct: 60 };
+  if (score === 4) return { score, label: 'Fort', color: '#5cb85c', pct: 80 };
+  return { score, label: 'Très fort 💪', color: '#27ae60', pct: 100 };
+}
+
+function updatePasswordStrength(pw) {
+  var fill  = document.getElementById('pw-strength-fill');
+  var label = document.getElementById('pw-strength-label');
+  if (!fill || !label) return;
+  var s = getPasswordStrength(pw);
+  fill.style.width = (pw ? s.pct + '%' : '0');
+  fill.style.background = s.color;
+  label.textContent = pw ? s.label : '';
+  label.style.color = s.color;
+}
+
+function updatePasswordMatch() {
+  var pw  = document.getElementById('reg-password') ? document.getElementById('reg-password').value : '';
+  var pw2 = document.getElementById('reg-confirm')  ? document.getElementById('reg-confirm').value  : '';
+  var el  = document.getElementById('pw-match-label');
+  if (!el || !pw2) { if (el) el.textContent = ''; return; }
+  if (pw === pw2) { el.textContent = '✓ Les mots de passe correspondent'; el.style.color = '#27ae60'; }
+  else            { el.textContent = '✗ Les mots de passe ne correspondent pas'; el.style.color = '#d9534f'; }
+}
+
 async function doRegister() {
   const first_name = document.getElementById('reg-fname').value.trim();
   const last_name  = document.getElementById('reg-lname').value.trim();
+  const username   = document.getElementById('reg-username').value.trim();
   const email      = document.getElementById('reg-email').value.trim();
   const password   = document.getElementById('reg-password').value;
+  const confirm    = document.getElementById('reg-confirm').value;
   const errEl      = document.getElementById('reg-error');
+  errEl.style.display = 'none';
+
+  // Validations client
+  if (!username) { errEl.textContent = 'Le pseudo est obligatoire'; errEl.style.display = ''; return; }
+  if (password !== confirm) { errEl.textContent = 'Les mots de passe ne correspondent pas'; errEl.style.display = ''; return; }
+  const s = getPasswordStrength(password);
+  if (s.score < 4) { errEl.textContent = 'Mot de passe trop faible : 8 car. min, 1 majuscule, 1 chiffre, 1 caractère spécial'; errEl.style.display = ''; return; }
+
   try {
-    const data = await apiFetch('/auth/register', { method: 'POST', body: { email, password, first_name, last_name } });
+    const data = await apiFetch('/auth/register', { method: 'POST', body: { email, password, first_name, last_name, username } });
 
     if (data.pending_verification) {
       // Compte créé — email de confirmation envoyé
