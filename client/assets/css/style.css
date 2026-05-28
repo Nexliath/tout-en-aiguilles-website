@@ -605,6 +605,41 @@ p  { color: var(--text-light); }
 .empty-state h3 { font-family: var(--font-title); margin-bottom: 8px; color: var(--text); }
 .divider { height: 1px; background: var(--border); margin: 24px 0; }
 
+/* ─── Mobile nav drawer ──────────────────────────────────────── */
+.mobile-nav-overlay {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(58,46,40,.55); backdrop-filter: blur(2px);
+}
+.mobile-nav-overlay.open { display: block; }
+.mobile-nav-panel {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  width: 280px; max-width: 85vw;
+  background: white; padding: 20px 24px;
+  box-shadow: -4px 0 32px rgba(0,0,0,.15);
+  display: flex; flex-direction: column;
+  animation: navSlideIn .25s ease;
+  overflow-y: auto;
+}
+@keyframes navSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.mobile-nav-close {
+  align-self: flex-end; width: 36px; height: 36px;
+  border-radius: 10px; border: none; background: var(--cream-dark);
+  color: var(--text); font-size: 1.2rem;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  margin-bottom: 8px;
+}
+.mobile-nav-links { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.mobile-nav-links a {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 12px; border-radius: 10px;
+  font-size: .95rem; font-weight: 700; color: var(--text);
+  transition: background var(--transition);
+}
+.mobile-nav-links a:hover, .mobile-nav-links a.active {
+  background: var(--rose-pale); color: var(--rose-dark);
+}
+.mobile-nav-divider { height: 1px; background: var(--border); margin: 8px 0; }
+
 /* ─── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .grid-4    { grid-template-columns: repeat(3, 1fr); }
@@ -614,29 +649,63 @@ p  { color: var(--text-light); }
   .stats-grid  { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
+  /* Navigation */
   .nav { display: none; }
   .hamburger {
     display: flex; align-items: center; justify-content: center;
     width: 40px; height: 40px; border-radius: 10px; border: none;
     background: var(--cream-dark); font-size: 1.2rem; color: var(--text);
   }
+
+  /* Layout */
+  .container { padding: 0 16px; }
+  .section    { padding: 48px 0; }
+  .section-sm { padding: 28px 0; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .news-grid { grid-template-columns: 1fr; }
   .shop-layout, .cart-layout, .account-layout { grid-template-columns: 1fr; }
-  .filters-panel { position: static; }
-  .cart-sidebar  { position: static; }
+  .filters-panel  { position: static; }
+  .cart-sidebar   { position: static; }
   .account-sidebar { position: static; }
-  .footer-grid { grid-template-columns: 1fr; }
-  .admin-layout { grid-template-columns: 1fr; }
-  .admin-sidebar { position: static; height: auto; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .form-row { grid-template-columns: 1fr; }
+  .footer-grid    { grid-template-columns: 1fr; }
+  .footer-bottom  { flex-direction: column; gap: 10px; text-align: center; }
+  .admin-layout   { grid-template-columns: 1fr; }
+  .admin-sidebar  { position: static; height: auto; }
+  .stats-grid     { grid-template-columns: repeat(2, 1fr); }
+  .form-row       { grid-template-columns: 1fr; }
+
+  /* Hero */
+  .hero { min-height: 70vh; }
+  .hero-content { max-width: 100%; }
+  .hero h1 { font-size: clamp(1.6rem, 7vw, 2.8rem); }
+  .page-hero { padding: 40px 0 28px; }
+
+  /* Toast */
+  .toast-container { left: 12px; right: 12px; bottom: 12px; align-items: stretch; }
+  .toast { justify-content: center; }
+
+  /* Account */
+  .account-panel { padding: 20px 16px; }
+
+  /* Cart */
+  .cart-item { flex-wrap: wrap; }
 }
 @media (max-width: 480px) {
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .hero-actions { flex-direction: column; }
-  .btn-lg { padding: 14px 28px; }
-  .modal { padding: 24px; }
+  .btn-lg { padding: 14px 28px; width: 100%; justify-content: center; }
+  .modal { padding: 20px 16px; border-radius: var(--radius-lg); }
+  .modal-overlay { padding: 12px; }
+  .section { padding: 36px 0; }
+  .section-header { margin-bottom: 28px; }
+
+  /* Product gallery — thumbs passent en bas sur mobile */
+  .product-gallery-mobile { flex-direction: column-reverse !important; }
+  .gallery-thumbs-mobile  { flex-direction: row !important; overflow-x: auto; }
+
+  /* Footer */
+  .footer-grid { gap: 24px; }
+  .social-links { justify-content: center; }
 }
 
 /* ─── Floral decoration ──────────────────────────────────────── */
