@@ -119,7 +119,38 @@ router.post('/login', (req, res) => {
 
   const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
   const { password_hash, ...safe } = user;
+
+  // Cookie httpOnly pour l'accès au backoffice (admin uniquement)
+  if (user.role === 'admin') {
+    res.cookie('tea_admin_sess', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours
+    });
+  }
+
   res.json({ token, user: safe });
+});
+
+// ─── POST /api/auth/admin-cookie — pose le cookie depuis un token existant ──
+// Permet aux admins déjà connectés (localStorage) de récupérer le cookie
+router.post('/admin-cookie', (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Token requis' });
+  try {
+    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+    res.cookie('tea_admin_sess', auth.slice(7), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    res.json({ ok: true });
+  } catch {
+    res.status(401).json({ error: 'Token invalide' });
+  }
 });
 
 // ─── GET /api/auth/me ───────────────────────────────────────
