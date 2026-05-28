@@ -280,8 +280,10 @@ router.put('/password', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!bcrypt.compareSync(current_password, user.password_hash))
     return res.status(401).json({ error: 'Mot de passe actuel incorrect' });
-  if (new_password.length < 6)
-    return res.status(400).json({ error: 'Le nouveau mot de passe doit faire au moins 6 caractères' });
+  if (new_password.length < 8)
+    return res.status(400).json({ error: 'Le nouveau mot de passe doit faire au moins 8 caractères' });
+  if (!/[A-Z]/.test(new_password) || !/[0-9]/.test(new_password) || !/[^A-Za-z0-9]/.test(new_password))
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins une majuscule, un chiffre et un caractère spécial' });
   const hash = bcrypt.hashSync(new_password, 10);
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.id);
   res.json({ success: true });
