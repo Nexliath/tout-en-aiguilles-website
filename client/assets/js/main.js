@@ -362,7 +362,14 @@ function initHeader() {
   if (userBtn) {
     if (Auth.isLoggedIn()) {
       const u = Auth.getUser();
-      userBtn.innerHTML = `<span style="font-size:.9rem;font-weight:700;color:var(--rose-dark)">${u.first_name[0]}${u.last_name[0]}</span>`;
+      if (u && u.avatar_url) {
+        userBtn.innerHTML = `<img src="${u.avatar_url}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;display:block" alt="${u.first_name}">`;
+        userBtn.style.padding = '0';
+        userBtn.style.overflow = 'hidden';
+        userBtn.style.borderRadius = '50%';
+      } else {
+        userBtn.innerHTML = `<span style="font-size:.9rem;font-weight:700;color:var(--rose-dark)">${u.first_name[0]}${u.last_name[0]}</span>`;
+      }
       userBtn.onclick = () => window.location.href = '/compte.html';
     } else {
       userBtn.onclick = openAuthModal;
