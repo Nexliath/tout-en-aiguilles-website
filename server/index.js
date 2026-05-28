@@ -67,6 +67,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/news',     require('./routes/news'));
 app.use('/api/admin',    require('./routes/admin'));
+app.use('/api/reviews',  require('./routes/reviews'));
 
 // ─── Setup premier lancement ────────────────────────────────
 app.post('/api/setup', (req, res) => {
