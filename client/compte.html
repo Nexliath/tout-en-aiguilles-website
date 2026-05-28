@@ -133,15 +133,17 @@
 
           <!-- Security tab -->
           <div id="tab-security" class="account-panel" style="display:none">
+
+            <!-- Changer le mot de passe -->
             <div class="account-panel-title">🔒 Changer de mot de passe</div>
-            <div style="max-width:400px">
+            <div style="max-width:400px;margin-bottom:48px">
               <div class="form-group">
                 <label class="form-label">Mot de passe actuel</label>
                 <input type="password" id="pw-current" class="form-input">
               </div>
               <div class="form-group">
                 <label class="form-label">Nouveau mot de passe</label>
-                <input type="password" id="pw-new" class="form-input" placeholder="Au moins 6 caractères">
+                <input type="password" id="pw-new" class="form-input" placeholder="Au moins 8 caractères">
               </div>
               <div class="form-group">
                 <label class="form-label">Confirmer le nouveau mot de passe</label>
@@ -151,6 +153,32 @@
               <div id="pw-success" class="form-hint" style="display:none;color:var(--sage-dark);margin-bottom:12px">✓ Mot de passe modifié !</div>
               <button class="btn btn-primary" onclick="changePassword()">Modifier le mot de passe</button>
             </div>
+
+            <!-- Changer l'adresse email -->
+            <div style="border-top:1px solid var(--border);padding-top:32px">
+              <div class="account-panel-title" style="margin-bottom:8px">📧 Changer d'adresse email</div>
+              <p style="font-size:.875rem;color:var(--text-light);margin-bottom:20px">
+                Un lien de confirmation sera envoyé à votre <strong>nouvelle adresse</strong>. Le changement ne prendra effet qu'après avoir cliqué sur ce lien. Vous devrez ensuite vous reconnecter.
+              </p>
+              <div style="max-width:400px">
+                <div class="form-group">
+                  <label class="form-label">Adresse email actuelle</label>
+                  <input type="email" id="email-current-display" class="form-input" disabled style="opacity:.6">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Nouvelle adresse email</label>
+                  <input type="email" id="email-new" class="form-input" placeholder="nouvelle@email.fr">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Confirmer votre mot de passe</label>
+                  <input type="password" id="email-password" class="form-input" placeholder="Votre mot de passe actuel">
+                </div>
+                <div id="email-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+                <div id="email-success" style="display:none;color:var(--sage-dark);font-size:.875rem;padding:10px 14px;background:var(--sage-pale);border-radius:8px;margin-bottom:12px"></div>
+                <button class="btn btn-primary" onclick="requestEmailChange()">Envoyer le lien de confirmation →</button>
+              </div>
+            </div>
+
           </div>
         </main>
       </div>
@@ -236,6 +264,9 @@ async function initAccount() {
     document.getElementById('profile-lname').value = user.last_name;
     document.getElementById('profile-email').value = user.email;
     document.getElementById('profile-username').value = user.username || '';
+    // Remplir aussi le champ email dans l'onglet sécurité
+    const emailDisp = document.getElementById('email-current-display');
+    if (emailDisp) emailDisp.value = user.email;
 
     // Avatar
     if (user.avatar_url) {
@@ -247,8 +278,20 @@ async function initAccount() {
     }
   } catch {}
 
-  // Check URL tab
+  // Gestion des redirections depuis confirm-email-change
   const params = new URLSearchParams(location.search);
+  if (params.get('email_changed') === '1') {
+    Toast.show('✅ Email modifié ! Veuillez vous reconnecter avec votre nouvelle adresse.', 'success');
+    setTimeout(() => Auth.logout(), 2500);
+    return;
+  }
+  if (params.get('email_error') === 'invalid') {
+    Toast.show('❌ Lien de confirmation invalide ou déjà utilisé.', 'error');
+  }
+  if (params.get('email_error') === 'expired') {
+    Toast.show('⏰ Lien expiré. Refaites une demande de changement d\'email.', 'error');
+  }
+
   const tab = params.get('tab');
   if (tab) {
     const link = document.querySelector(`[data-tab="${tab}"]`);
@@ -325,6 +368,24 @@ async function saveProfile() {
     document.getElementById('profile-success').style.display = '';
     setTimeout(() => document.getElementById('profile-success').style.display = 'none', 3000);
   } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+async function requestEmailChange() {
+  const new_email = document.getElementById('email-new').value.trim();
+  const password  = document.getElementById('email-password').value;
+  const errEl     = document.getElementById('email-error');
+  const succEl    = document.getElementById('email-success');
+  errEl.style.display = 'none'; succEl.style.display = 'none';
+
+  if (!new_email || !password) { errEl.textContent = 'Nouvelle adresse email et mot de passe requis'; errEl.style.display = ''; return; }
+
+  try {
+    const data = await apiFetch('/auth/change-email', { method: 'POST', body: { new_email, password } });
+    succEl.textContent = '📧 ' + data.message;
+    succEl.style.display = '';
+    document.getElementById('email-new').value = '';
+    document.getElementById('email-password').value = '';
+  } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
 }
 
 async function changePassword() {
