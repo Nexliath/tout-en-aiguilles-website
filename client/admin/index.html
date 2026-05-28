@@ -33,11 +33,11 @@
   <aside class="admin-sidebar">
     <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
     <nav class="admin-nav">
-      <a href="/admin/index.html" class="active">📊 Tableau de bord</a>
-      <a href="/admin/produits.html">🧶 Produits</a>
-      <a href="/admin/commandes.html">📦 Commandes</a>
-      <a href="/admin/actualites.html">📝 Actualités</a>
-      <a href="/admin/utilisateurs.html">👥 Utilisateurs</a>
+      <a href="/atelier/index.html" class="active">📊 Tableau de bord</a>
+      <a href="/atelier/produits.html">🧶 Produits</a>
+      <a href="/atelier/commandes.html">📦 Commandes</a>
+      <a href="/atelier/actualites.html">📝 Actualités</a>
+      <a href="/atelier/utilisateurs.html">👥 Utilisateurs</a>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
       <a href="/" target="_blank">🌐 Voir le site</a>
       <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
@@ -87,7 +87,7 @@
         </table>
       </div>
       <div style="margin-top:16px">
-        <a href="/admin/commandes.html" class="btn btn-secondary btn-sm">Voir toutes les commandes →</a>
+        <a href="/atelier/commandes.html" class="btn btn-secondary btn-sm">Voir toutes les commandes →</a>
       </div>
     </div>
 
@@ -96,9 +96,9 @@
       <div class="admin-panel">
         <div class="admin-panel-title" style="font-size:1rem">Accès rapides</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <a href="/admin/produits.html" class="btn btn-primary btn-sm">+ Ajouter un produit</a>
-          <a href="/admin/actualites.html" class="btn btn-sage btn-sm">+ Écrire un article</a>
-          <a href="/admin/commandes.html" class="btn btn-secondary btn-sm">📦 Voir les commandes</a>
+          <a href="/atelier/produits.html" class="btn btn-primary btn-sm">+ Ajouter un produit</a>
+          <a href="/atelier/actualites.html" class="btn btn-sage btn-sm">+ Écrire un article</a>
+          <a href="/atelier/commandes.html" class="btn btn-secondary btn-sm">📦 Voir les commandes</a>
         </div>
       </div>
       <div class="admin-panel">
@@ -181,7 +181,7 @@ async function loadDashboard() {
           <td style="font-weight:700;color:var(--rose-dark)">${Number(o.total).toFixed(2)} €</td>
           <td><span class="order-status status-${o.status}">${STATUS[o.status] || o.status}</span></td>
           <td style="font-size:.8rem;color:var(--text-light)">${formatDate(o.created_at)}</td>
-          <td><a href="/admin/commandes.html" class="btn btn-ghost btn-sm">Voir →</a></td>
+          <td><a href="/atelier/commandes.html" class="btn btn-ghost btn-sm">Voir →</a></td>
         </tr>`).join('')
       : '<tr><td colspan="7" style="text-align:center;color:var(--text-light);padding:24px">Aucune commande pour l\'instant</td></tr>';
   } catch (e) {
