@@ -153,6 +153,10 @@ p  { color: var(--text-light); }
 
 /* Product Card */
 .product-card { position: relative; }
+.card-full-link { display: none; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.product-card-bottom { display: flex; flex-direction: column; }
+.card-add-btn { position: relative; z-index: 2; }
+.card-fav-btn { position: relative; z-index: 2; }
 .product-card-img {
   aspect-ratio: 1; overflow: hidden;
   background: var(--cream-dark);
@@ -729,21 +733,39 @@ p  { color: var(--text-light); }
     padding: 10px 12px;
   }
   #products-grid .product-card-name { font-size: .88rem; -webkit-line-clamp: 2; }
-  #products-grid .product-card-price { font-size: 1rem; margin-bottom: 4px; }
-  #products-grid .product-card-tags { display: -webkit-flex; display: flex; margin-bottom: 6px; }
-  #products-grid .product-card-footer { gap: 6px; }
-  /* Compact icon-only add button on mobile list view */
+  #products-grid .product-card-price { font-size: 1rem; margin-bottom: 6px; }
+  /* Toute la card est cliquable */
+  #products-grid .card-full-link { display: block; }
+  /* Tags + boutons sur la même ligne */
+  #products-grid .product-card-bottom {
+    -webkit-flex-direction: row; flex-direction: row;
+    -webkit-align-items: center; align-items: center;
+    gap: 6px;
+  }
+  #products-grid .product-card-tags {
+    display: -webkit-flex; display: flex;
+    -webkit-flex: 1; flex: 1;
+    margin-bottom: 0;
+  }
+  #products-grid .product-card-footer {
+    -webkit-flex-shrink: 0; flex-shrink: 0;
+    gap: 4px;
+  }
+  /* Bouton panier — cercle blanc discret */
   #products-grid .card-add-btn {
     -webkit-flex: 0 0 auto; flex: 0 0 auto;
-    width: 36px; height: 36px;
+    width: 34px; height: 34px;
     padding: 0;
     border-radius: 50%;
     display: -webkit-flex; display: flex;
     align-items: center; justify-content: center;
-    font-size: 1rem;
+    font-size: .95rem;
+    background: white;
+    color: var(--rose-dark);
+    border-color: var(--border);
   }
   #products-grid .card-add-btn .btn-label { display: none; }
-  #products-grid .card-add-btn .btn-icon { font-size: 1rem; }
+  #products-grid .card-add-btn .btn-icon { font-size: .95rem; }
   #products-grid .out-of-stock,
   #products-grid .badge-new { font-size: .65rem; top: 6px; }
 }
