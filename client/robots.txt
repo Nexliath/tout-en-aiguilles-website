@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Ne pas indexer les pages privées
+Disallow: /compte.html
+Disallow: /panier.html
+Disallow: /commande-confirmee.html
+Disallow: /verify-email.html
+Disallow: /setup.html
+Disallow: /api/
+
+Sitemap: https://tout-en-aiguilles.com/sitemap.xml
