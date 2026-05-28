@@ -90,6 +90,18 @@ CREATE TABLE IF NOT EXISTS orders (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Avis / Commentaires produits
+CREATE TABLE IF NOT EXISTS reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+  comment TEXT,
+  is_approved INTEGER NOT NULL DEFAULT 0, -- 0 = en attente, 1 = approuvé
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(product_id, user_id) -- un avis par utilisateur par produit
+);
+
 -- Articles / Actualités
 CREATE TABLE IF NOT EXISTS news (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
