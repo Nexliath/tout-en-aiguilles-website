@@ -26,28 +26,75 @@ try {
 }
 
 // ─── Middleware de sécurité ─────────────────────────────────
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://tout-en-aiguilles.com';
+
 app.use(helmet({
-  contentSecurityPolicy: false  // Désactivé en dev — à réactiver en production
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",          // requis pour les scripts inline existants
+        "https://www.googletagmanager.com",
+        "https://www.google-analytics.com",
+        "https://js.stripe.com",
+        "https://cdn.jsdelivr.net",
+      ],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "https://www.google-analytics.com", "https://api.stripe.com"],
+      frameSrc: ["https://js.stripe.com"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // évite les conflits avec Stripe/GTM
 }));
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || '*',
+  origin: (origin, callback) => {
+    // Autoriser les requêtes sans origin (Postman, apps mobiles) et l'origine configurée
+    if (!origin || origin === ALLOWED_ORIGIN || origin === 'https://www.tout-en-aiguilles.com') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
 }));
 app.use(cookieParser());
 
-// ─── Rate limiting — anti brute-force ───────────────────────
+// ─── Rate limiting ───────────────────────────────────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // max 20 tentatives par IP sur 15 min
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   message: { error: 'Trop de tentatives. Réessayez dans 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const reviewLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 10,                   // max 10 avis par heure par IP
+  message: { error: 'Trop d\'avis soumis. Réessayez dans une heure.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const checkoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: 'Trop de requêtes. Réessayez dans 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // ─── Body parsing ───────────────────────────────────────────
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // ─── Bloquer l'ancien chemin /admin → 404 ───────────────────
 // Les scanners cherchent /admin — ils ne trouveront rien
@@ -62,12 +109,13 @@ app.use(`/${ADMIN_PATH}`, express.static(path.join(__dirname, '../client/admin')
 app.use(express.static(path.join(__dirname, '../client')));
 
 // ─── Routes API ─────────────────────────────────────────────
-app.use('/api/auth',     authLimiter, require('./routes/auth'));
-app.use('/api/products', require('./routes/products'));
-app.use('/api/orders',   require('./routes/orders'));
-app.use('/api/news',     require('./routes/news'));
-app.use('/api/admin',    require('./routes/admin'));
-app.use('/api/reviews',  require('./routes/reviews'));
+app.use('/api/auth',            authLimiter, require('./routes/auth'));
+app.use('/api/products',        require('./routes/products'));
+app.use('/api/orders/checkout', checkoutLimiter);
+app.use('/api/orders',          require('./routes/orders'));
+app.use('/api/news',            require('./routes/news'));
+app.use('/api/admin',           require('./routes/admin'));
+app.use('/api/reviews',         reviewLimiter, require('./routes/reviews'));
 
 // ─── Setup premier lancement ────────────────────────────────
 app.post('/api/setup', (req, res) => {
@@ -103,23 +151,24 @@ app.post('/api/setup', (req, res) => {
   res.json({ token, user, message: 'Compte administrateur créé avec succès !' });
 });
 
-// ─── Admin path (pour le lien dans le header) ───────────────
+// ─── Admin path (pour le lien dans le header — réservé aux admins) ──────────
 app.get('/api/admin-path', (req, res) => {
-  res.json({ path: ADMIN_PATH });
+  // Vérifier que l'utilisateur est admin avant de révéler le chemin
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Non autorisé' });
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
+    res.json({ path: ADMIN_PATH });
+  } catch {
+    res.status(401).json({ error: 'Token invalide' });
+  }
 });
 
-// ─── Health check ───────────────────────────────────────────
+// ─── Health check (minimal — ne pas exposer les données sensibles) ──────────
 app.get('/api/health', (req, res) => {
-  const db = require('./db/database');
-  const users    = db.prepare('SELECT COUNT(*) as n FROM users').get().n;
-  const products = db.prepare('SELECT COUNT(*) as n FROM products WHERE is_active = 1').get().n;
-  const admins   = db.prepare("SELECT COUNT(*) as n FROM users WHERE role = 'admin'").get().n;
-  res.json({
-    status: 'ok', version: '1.0.0',
-    db: { users, products, admins },
-    setup_needed: admins === 0,
-    setup_url: admins === 0 ? '/setup.html' : null
-  });
+  res.json({ status: 'ok', version: '1.0.0' });
 });
 
 // ─── SPA fallback ───────────────────────────────────────────
