@@ -80,17 +80,30 @@ app.post('/api/setup', (req, res) => {
   res.json({ token, user, message: 'Compte administrateur créé avec succès !' });
 });
 
-// ─── Test email config (temporaire) ─────────────────────────
-app.get('/api/test-email', (req, res) => {
-  res.json({
-    smtp_host:      process.env.SMTP_HOST      || '❌ NON DÉFINI',
-    smtp_port:      process.env.SMTP_PORT      || '❌ NON DÉFINI',
-    smtp_user:      process.env.SMTP_USER      || '❌ NON DÉFINI',
-    smtp_pass_set:  !!process.env.SMTP_PASS,
-    smtp_from:      process.env.SMTP_FROM      || '❌ NON DÉFINI',
-    base_url:       process.env.BASE_URL       || '❌ NON DÉFINI',
-    configured:     !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+// ─── Test email (temporaire) ────────────────────────────────
+app.get('/api/test-email', async (req, res) => {
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000,
   });
+  try {
+    await transporter.verify();
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to: process.env.SMTP_USER,
+      subject: 'Test email — Tout en Aiguilles',
+      text: 'Si vous recevez cet email, Brevo fonctionne correctement !',
+    });
+    res.json({ success: true, message: 'Email envoyé à ' + process.env.SMTP_USER });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, code: err.code });
+  }
 });
 
 // ─── Health check ───────────────────────────────────────────
