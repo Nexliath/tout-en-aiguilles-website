@@ -50,6 +50,10 @@ const migrations = [
   // Pseudos pré-définis pour les comptes existants connus
   "UPDATE users SET username = 'Nexliath' WHERE lower(first_name) = 'victor' AND lower(last_name) = 'garnier' AND username IS NULL",
   "UPDATE users SET username = 'Vixtorine' WHERE lower(first_name) = 'victorine' AND lower(last_name) = 'richard' AND username IS NULL",
+  // Changement d'email sécurisé
+  "ALTER TABLE users ADD COLUMN pending_email TEXT DEFAULT NULL",
+  "ALTER TABLE users ADD COLUMN email_change_token TEXT DEFAULT NULL",
+  "ALTER TABLE users ADD COLUMN email_change_expires_at DATETIME DEFAULT NULL",
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
