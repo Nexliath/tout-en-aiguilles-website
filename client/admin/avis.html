@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avis — Admin Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:3rem;margin-bottom:12px">🔐</div>
+      <h2 style="margin-bottom:8px">Espace admin</h2>
+      <p style="font-size:.875rem;color:var(--text-light)">Connectez-vous avec votre compte administrateur.</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" id="guard-email" class="form-input" placeholder="victorine@...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mot de passe</label>
+      <input type="password" id="guard-password" class="form-input" placeholder="••••••••">
+    </div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
+  </div>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
+    <nav class="admin-nav">
+      <a href="index.html">📊 Tableau de bord</a>
+      <a href="produits.html">🧶 Produits</a>
+      <a href="commandes.html">📦 Commandes</a>
+      <a href="actualites.html">📝 Actualités</a>
+      <a href="utilisateurs.html">👥 Utilisateurs</a>
+      <a href="avis.html" class="active">⭐ Avis</a>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+      <a href="/" target="_blank">🌐 Voir le site</a>
+      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>⭐ Avis clients</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="pending-count" style="font-size:.85rem;color:var(--text-light)"></span>
+        <select id="filter-select" class="form-input" style="padding:6px 12px;font-size:.85rem;width:auto" onchange="applyFilter()">
+          <option value="all">Tous les avis</option>
+          <option value="pending">En attente</option>
+          <option value="approved">Approuvés</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="admin-panel">
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Produit</th>
+              <th>Client</th>
+              <th>Note</th>
+              <th>Commentaire</th>
+              <th>Statut</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="reviews-body">
+            <tr><td colspan="8" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal confirmation suppression -->
+<div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:16px;padding:32px;max-width:380px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <h3 style="margin:0 0 12px">Supprimer cet avis ?</h3>
+    <p style="color:var(--text-light);margin:0 0 24px;font-size:.9rem">Cette action est irréversible.</p>
+    <div style="display:flex;gap:12px">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Annuler</button>
+      <button id="delete-confirm-btn" class="btn" style="background:#d9534f;color:white">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let allReviews = [];
+let deleteTarget = null;
+
+function checkAdmin() {
+  const guard   = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) {
+    content.style.display = 'none';
+    guard.style.display   = 'flex';
+  } else {
+    guard.style.display   = 'none';
+    content.style.display = '';
+    loadReviews();
+  }
+}
+
+document.getElementById('guard-btn').addEventListener('click', function() {
+  var email    = document.getElementById('guard-email').value.trim();
+  var password = document.getElementById('guard-password').value;
+  var errEl    = document.getElementById('guard-error');
+  var btn      = document.getElementById('guard-btn');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis'; errEl.style.display = ''; return; }
+  btn.disabled = true; btn.textContent = '…';
+  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
+    .then(data => {
+      if (data.user.role !== 'admin') throw new Error('Ce compte n\'est pas administrateur.');
+      Auth.save(data.token, data.user);
+      checkAdmin();
+    })
+    .catch(e => {
+      errEl.textContent = e.message; errEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Se connecter →';
+    });
+});
+document.getElementById('guard-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('guard-btn').click();
+});
+
+async function loadReviews() {
+  try {
+    allReviews = await apiFetch('/reviews/admin');
+    const pending = allReviews.filter(r => !r.is_approved).length;
+    document.getElementById('pending-count').textContent =
+      pending > 0 ? `${pending} en attente de modération` : 'Tous les avis sont modérés';
+    applyFilter();
+  } catch (e) {
+    document.getElementById('reviews-body').innerHTML =
+      `<tr><td colspan="8" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
+  }
+}
+
+function applyFilter() {
+  const filter = document.getElementById('filter-select').value;
+  let filtered = allReviews;
+  if (filter === 'pending')  filtered = allReviews.filter(r => !r.is_approved);
+  if (filter === 'approved') filtered = allReviews.filter(r =>  r.is_approved);
+  renderReviews(filtered);
+}
+
+function starsHtml(rating) {
+  return '⭐'.repeat(rating) + '☆'.repeat(5 - rating);
+}
+
+function renderReviews(reviews) {
+  const tbody = document.getElementById('reviews-body');
+  if (!reviews.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:24px">Aucun avis</td></tr>';
+    return;
+  }
+  tbody.innerHTML = reviews.map(r => `
+    <tr id="review-row-${r.id}">
+      <td style="color:var(--text-light);font-size:.8rem">#${r.id}</td>
+      <td style="font-size:.85rem;font-weight:600;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.product_name}</td>
+      <td style="font-size:.85rem">${r.first_name} ${r.last_name}<br><span style="font-size:.75rem;color:var(--text-light)">${r.email}</span></td>
+      <td style="font-size:1rem;letter-spacing:1px" title="${r.rating}/5">${starsHtml(r.rating)}</td>
+      <td style="font-size:.82rem;color:var(--text);max-width:200px">
+        ${r.comment
+          ? `<span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${r.comment.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`
+          : '<span style="color:var(--text-light)">—</span>'}
+      </td>
+      <td>
+        ${r.is_approved
+          ? '<span class="order-status status-paid" style="font-size:.75rem">✅ Approuvé</span>'
+          : '<span class="order-status status-pending" style="font-size:.75rem">⏳ En attente</span>'}
+      </td>
+      <td style="font-size:.8rem;color:var(--text-light)">${formatDate(r.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${!r.is_approved
+            ? `<button class="btn btn-sage btn-sm" onclick="approveReview(${r.id})">✅ Approuver</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="rejectReview(${r.id})">↩ Rejeter</button>`}
+          <button class="btn btn-sm" style="background:#f8d7da;color:#d9534f;border:none" onclick="confirmDelete(${r.id})">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function approveReview(id) {
+  try {
+    await apiFetch(`/reviews/${id}/approve`, { method: 'PUT' });
+    Toast.show('✅ Avis approuvé et publié !', 'success');
+    loadReviews();
+  } catch (e) {
+    Toast.show(e.message, 'error');
+  }
+}
+
+async function rejectReview(id) {
+  try {
+    await apiFetch(`/reviews/${id}/reject`, { method: 'PUT' });
+    Toast.show('↩ Avis repassé en attente', 'success');
+    loadReviews();
+  } catch (e) {
+    Toast.show(e.message, 'error');
+  }
+}
+
+function confirmDelete(id) {
+  deleteTarget = id;
+  document.getElementById('delete-modal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  deleteTarget = null;
+  document.getElementById('delete-modal').style.display = 'none';
+}
+
+document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
+  if (!deleteTarget) return;
+  try {
+    await apiFetch(`/reviews/${deleteTarget}`, { method: 'DELETE' });
+    closeDeleteModal();
+    Toast.show('✅ Avis supprimé', 'success');
+    loadReviews();
+  } catch (e) {
+    Toast.show(e.message, 'error');
+    closeDeleteModal();
+  }
+});
+
+checkAdmin();
+</script>
+</body>
+</html>
