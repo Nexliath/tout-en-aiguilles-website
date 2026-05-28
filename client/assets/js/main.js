@@ -4,6 +4,18 @@
 
 const API = '/api';
 
+// ─── Mobile nav ──────────────────────────────────────────────
+function openMobileNav() {
+  const nav = document.getElementById('mobile-nav');
+  if (nav) { nav.classList.add('open'); document.body.style.overflow = 'hidden'; }
+}
+function closeMobileNav() {
+  const nav = document.getElementById('mobile-nav');
+  if (nav) { nav.classList.remove('open'); document.body.style.overflow = ''; }
+}
+// Fermer avec la touche Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileNav(); });
+
 // ─── Auth ────────────────────────────────────────────────────
 const Auth = {
   getToken: () => localStorage.getItem('tea_token'),
