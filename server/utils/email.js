@@ -177,4 +177,95 @@ async function sendEmailChangeConfirmation(toEmail, firstName, token, baseUrl) {
   return { sent: true };
 }
 
-module.exports = { sendVerificationEmail, sendEmailChangeConfirmation };
+// ─── Email de contact (formulaire → tout.en.aiguilles@gmail.com) ──
+async function sendContactEmail(visitorName, visitorEmail, message) {
+  const CONTACT_DEST = process.env.CONTACT_EMAIL || 'tout.en.aiguilles@gmail.com';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#fdf8f5;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f5;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#c8937a,#e8b89a);padding:36px 40px;text-align:center;">
+            <div style="font-size:32px;margin-bottom:8px;">💌</div>
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:1px;">Nouveau message reçu</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #f0e8e0;">
+                  <span style="color:#9e8070;font-size:13px;">De</span><br>
+                  <strong style="color:#5a3e2b;">${visitorName}</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #f0e8e0;">
+                  <span style="color:#9e8070;font-size:13px;">Email</span><br>
+                  <a href="mailto:${visitorEmail}" style="color:#c8937a;">${visitorEmail}</a>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:16px 0;">
+                  <span style="color:#9e8070;font-size:13px;">Message</span><br>
+                  <p style="color:#5a3e2b;line-height:1.7;margin:8px 0 0;white-space:pre-wrap;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                </td>
+              </tr>
+            </table>
+            <div style="margin-top:24px;text-align:center;">
+              <a href="mailto:${visitorEmail}?subject=Re: votre message sur Tout en Aiguilles"
+                 style="display:inline-block;background:#c8937a;color:#fff;text-decoration:none;
+                        padding:12px 28px;border-radius:8px;font-size:15px;font-family:Georgia,serif;">
+                ✉️ Répondre à ${visitorName}
+              </a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#fdf8f5;padding:20px 40px;text-align:center;">
+            <p style="color:#b8a090;font-size:12px;margin:0;">© 2026 Tout en Aiguilles — L'art du fil, à chaque maille.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  if (!process.env.BREVO_API_KEY) {
+    console.log('\n📧 [MODE DÉMO — CONTACT NON ENVOYÉ]');
+    console.log(`   De : ${visitorName} <${visitorEmail}>`);
+    console.log(`   Message : ${message}\n`);
+    return { demo: true };
+  }
+
+  const senderEmail = process.env.SMTP_FROM
+    ? process.env.SMTP_FROM.match(/<(.+)>/)?.[1] || process.env.SMTP_FROM
+    : process.env.SMTP_USER || 'noreply@toutenaiguilles.fr';
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': process.env.BREVO_API_KEY },
+    body: JSON.stringify({
+      sender: { name: 'Tout en Aiguilles — Formulaire', email: senderEmail },
+      to: [{ email: CONTACT_DEST, name: 'Tout en Aiguilles' }],
+      replyTo: { email: visitorEmail, name: visitorName },
+      subject: `💌 Message de ${visitorName} — Tout en Aiguilles`,
+      htmlContent: html,
+      textContent: `Nouveau message de ${visitorName} (${visitorEmail}) :\n\n${message}`,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Brevo API error ${response.status}: ${err}`);
+  }
+  return { sent: true };
+}
+
+module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendContactEmail };
