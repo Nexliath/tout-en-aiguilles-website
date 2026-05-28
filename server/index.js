@@ -80,6 +80,18 @@ app.post('/api/setup', (req, res) => {
   res.json({ token, user, message: 'Compte administrateur créé avec succès !' });
 });
 
+// ─── Test email (temporaire — à supprimer après diagnostic) ─
+app.get('/api/test-email', async (req, res) => {
+  const { sendVerificationEmail } = require('./utils/email');
+  const to = req.query.to || process.env.SMTP_USER;
+  try {
+    const result = await sendVerificationEmail(to, 'Test', 'TOKEN_TEST_123', process.env.BASE_URL || 'http://localhost:3000');
+    res.json({ success: true, result, smtp: { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER, from: process.env.SMTP_FROM, configured: !!process.env.SMTP_HOST } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, smtp: { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER, from: process.env.SMTP_FROM, configured: !!process.env.SMTP_HOST } });
+  }
+});
+
 // ─── Health check ───────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   const db = require('./db/database');
