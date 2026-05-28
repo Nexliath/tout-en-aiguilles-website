@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
+  <!-- End Google Tag Manager -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Produit — Tout en Aiguilles</title>
@@ -52,7 +59,20 @@
     }
     .review-stars { font-size: .95rem; letter-spacing: 1px; }
     .review-meta { font-size: .78rem; color: var(--text-light); margin-top: 4px; }
-    .review-comment { margin-top: 8px; font-size: .9rem; color: var(--text); line-height: 1.6; }
+    .review-comment {
+      margin-top: 8px; font-size: .9rem; color: var(--text); line-height: 1.6;
+      word-wrap: break-word; overflow-wrap: break-word; white-space: pre-wrap;
+    }
+    .review-photos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .review-photo {
+      width: 80px; height: 80px; object-fit: cover; border-radius: 8px; cursor: pointer;
+      border: 1px solid var(--border); transition: transform .15s;
+    }
+    .review-photo:hover { transform: scale(1.06); }
+    .photo-preview-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .photo-thumb-remove { position: absolute; top: -6px; right: -6px; background: #d9534f; color: white;
+      border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer;
+      font-size: .65rem; padding: 0; line-height: 1; }
     .review-form-wrap {
       background: var(--cream); border-radius: 16px; padding: 24px;
       margin-bottom: 28px; border: 1px solid var(--border);
@@ -60,6 +80,10 @@
   </style>
 </head>
 <body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
 
 <header class="site-header">
   <div class="header-inner">
@@ -312,6 +336,69 @@ function showNotFound() {
 }
 
 // ─── Avis & Notes ───────────────────────────────────────────
+
+// Compression image côté client
+function compressImage(file, maxW, maxH, quality) {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW / w, maxH / h);
+        w = Math.round(w * ratio); h = Math.round(h * ratio);
+      }
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    };
+    img.src = url;
+  });
+}
+
+// Gestion photos sélectionnées
+let selectedPhotos = [];
+
+function handlePhotoSelect(input) {
+  Array.from(input.files).forEach(f => {
+    if (selectedPhotos.length < 3) selectedPhotos.push(f);
+  });
+  input.value = '';
+  renderPhotoPreviews();
+}
+
+function removePhoto(idx) {
+  selectedPhotos.splice(idx, 1);
+  renderPhotoPreviews();
+}
+
+function renderPhotoPreviews() {
+  const area = document.getElementById('photo-preview-area');
+  if (!area) return;
+  area.innerHTML = selectedPhotos.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    return `<div style="position:relative;display:inline-block">
+      <img src="${url}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border)">
+      <button type="button" class="photo-thumb-remove" onclick="removePhoto(${i})">✕</button>
+    </div>`;
+  }).join('');
+  // Masquer le bouton quand 3 photos atteintes
+  const addBtn = document.getElementById('photo-add-btn');
+  if (addBtn) addBtn.style.display = selectedPhotos.length >= 3 ? 'none' : '';
+}
+
+// Lightbox simple
+function openLightbox(src) {
+  const lb = document.createElement('div');
+  lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  lb.onclick = () => document.body.removeChild(lb);
+  lb.innerHTML = `<img src="${src}" style="max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 8px 48px rgba(0,0,0,.6)" alt="Photo">`;
+  document.body.appendChild(lb);
+}
+
 function starsHtml(rating, size = '1rem') {
   const full = Math.round(rating);
   return '⭐'.repeat(full) + '☆'.repeat(5 - full);
@@ -375,6 +462,15 @@ function renderReviewForm() {
         <label class="form-label">Commentaire <span style="font-weight:400;color:var(--text-light)">(optionnel)</span></label>
         <textarea id="review-comment" class="form-input" rows="3" placeholder="Partagez votre expérience avec ce produit…" style="resize:vertical"></textarea>
       </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">📸 Photos <span style="font-weight:400;color:var(--text-light)">(max 3 — optionnel)</span></label>
+        <input type="file" id="review-photos-input" accept="image/*" multiple style="display:none" onchange="handlePhotoSelect(this)">
+        <div id="photo-preview-area" class="photo-preview-wrap"></div>
+        <button type="button" class="btn btn-secondary btn-sm" id="photo-add-btn" onclick="document.getElementById('review-photos-input').click()">
+          📷 Ajouter des photos
+        </button>
+        <p style="font-size:.75rem;color:var(--text-light);margin-top:6px">Les photos seront visibles après validation de votre avis</p>
+      </div>
       <div id="review-form-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:8px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
       <button class="btn btn-primary" id="review-submit-btn" onclick="submitReview()">Envoyer mon avis →</button>
     </div>`;
@@ -392,14 +488,23 @@ async function submitReview() {
   }
 
   const comment = document.getElementById('review-comment').value.trim();
-  btn.disabled = true; btn.textContent = '…';
+  btn.disabled = true; btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:white;border-radius:50%;animation:spin .8s linear infinite"></span> Envoi…';
 
   try {
-    await apiFetch('/reviews', {
-      method: 'POST',
-      body: { product_id: currentProduct.id, rating: selectedRating, comment }
-    });
+    const fd = new FormData();
+    fd.append('product_id', currentProduct.id);
+    fd.append('rating', selectedRating);
+    fd.append('comment', comment);
+
+    // Compresser et ajouter les photos
+    for (let i = 0; i < selectedPhotos.length; i++) {
+      const compressed = await compressImage(selectedPhotos[i], 1200, 1200, 0.8);
+      fd.append('photos', compressed, `photo_${i}.jpg`);
+    }
+
+    await apiFetchForm('/reviews', fd);
     Toast.show('✅ Avis envoyé ! Il sera visible après validation.', 'success');
+    selectedPhotos = [];
     document.getElementById('review-form-area').innerHTML = `
       <div style="background:var(--sage-pale);border-radius:12px;padding:16px;margin-bottom:20px;color:var(--sage-dark);font-size:.9rem">
         ✅ Merci pour votre avis ! Il sera publié après vérification de notre équipe.
@@ -449,6 +554,10 @@ async function loadReviews(productId) {
           <span style="font-size:1.4rem">${r.rating >= 4 ? '😍' : r.rating >= 3 ? '🙂' : '😐'}</span>
         </div>
         ${r.comment ? `<div class="review-comment">${r.comment.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+        ${r.photos && r.photos.length > 0 ? `
+          <div class="review-photos">
+            ${r.photos.map(p => `<img src="${p}" class="review-photo" onclick="openLightbox('${p}')" alt="Photo du produit reçu">`).join('')}
+          </div>` : ''}
       </div>
     `).join('');
   } catch (e) {
