@@ -1,20 +1,47 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
+// ─── Config upload photos d'avis ────────────────────────────
+const reviewStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../../client/assets/images/reviews');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `review_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+  }
+});
+const upload = multer({
+  storage: reviewStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB par photo (le client compresse déjà)
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
+    cb(null, true);
+  }
+});
+
 // ─── GET /api/reviews?product_id=X ──────────────────────────
-// Public : retourne les avis approuvés pour un produit
+// Public : retourne les avis approuvés + leurs photos pour un produit
 router.get('/', (req, res) => {
   const { product_id } = req.query;
   if (!product_id) return res.status(400).json({ error: 'product_id requis' });
 
   const reviews = db.prepare(`
     SELECT r.id, r.rating, r.comment, r.created_at,
-           u.first_name, u.last_name
+           u.first_name, u.last_name,
+           GROUP_CONCAT(rp.photo_url) AS photos_raw
     FROM reviews r
     JOIN users u ON u.id = r.user_id
+    LEFT JOIN review_photos rp ON rp.review_id = r.id
     WHERE r.product_id = ? AND r.is_approved = 1
+    GROUP BY r.id
     ORDER BY r.created_at DESC
   `).all(product_id);
 
@@ -23,12 +50,18 @@ router.get('/', (req, res) => {
     FROM reviews WHERE product_id = ? AND is_approved = 1
   `).get(product_id);
 
-  res.json({ reviews, stats: { count: stats.count, average: stats.average || 0 } });
+  const parsed = reviews.map(r => ({
+    ...r,
+    photos: r.photos_raw ? r.photos_raw.split(',') : [],
+    photos_raw: undefined
+  }));
+
+  res.json({ reviews: parsed, stats: { count: stats.count, average: stats.average || 0 } });
 });
 
 // ─── POST /api/reviews ──────────────────────────────────────
-// Authentifié : poster un avis (un seul par utilisateur par produit)
-router.post('/', requireAuth, (req, res) => {
+// Authentifié : poster un avis avec jusqu'à 3 photos
+router.post('/', requireAuth, upload.array('photos', 3), (req, res) => {
   const { product_id, rating, comment } = req.body;
   const user_id = req.user.id;
 
@@ -48,41 +81,58 @@ router.post('/', requireAuth, (req, res) => {
     'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES (?, ?, ?, ?)'
   ).run(product_id, user_id, r, comment?.trim() || null);
 
+  const reviewId = result.lastInsertRowid;
+
+  // Enregistrer les photos si présentes
+  if (req.files && req.files.length > 0) {
+    const insertPhoto = db.prepare('INSERT INTO review_photos (review_id, photo_url) VALUES (?, ?)');
+    for (const file of req.files) {
+      insertPhoto.run(reviewId, `/assets/images/reviews/${file.filename}`);
+    }
+  }
+
   res.status(201).json({
-    id: result.lastInsertRowid,
+    id: reviewId,
     message: 'Avis enregistré ! Il sera visible après validation.',
     pending: true
   });
 });
 
 // ─── GET /api/reviews/admin ─────────────────────────────────
-// Admin : tous les avis (approuvés + en attente)
+// Admin : tous les avis avec photos
 router.get('/admin', requireAdmin, (req, res) => {
   const reviews = db.prepare(`
     SELECT r.id, r.rating, r.comment, r.is_approved, r.created_at,
            u.first_name, u.last_name, u.email,
-           p.name AS product_name, p.id AS product_id
+           p.name AS product_name, p.id AS product_id,
+           GROUP_CONCAT(rp.photo_url) AS photos_raw
     FROM reviews r
     JOIN users u ON u.id = r.user_id
     JOIN products p ON p.id = r.product_id
+    LEFT JOIN review_photos rp ON rp.review_id = r.id
+    GROUP BY r.id
     ORDER BY r.is_approved ASC, r.created_at DESC
   `).all();
-  res.json(reviews);
+
+  const parsed = reviews.map(r => ({
+    ...r,
+    photos: r.photos_raw ? r.photos_raw.split(',') : [],
+    photos_raw: undefined
+  }));
+
+  res.json(parsed);
 });
 
 // ─── PUT /api/reviews/:id/approve ──────────────────────────
-// Admin : approuver un avis
 router.put('/:id/approve', requireAdmin, (req, res) => {
   const { id } = req.params;
   const review = db.prepare('SELECT id FROM reviews WHERE id = ?').get(id);
   if (!review) return res.status(404).json({ error: 'Avis introuvable' });
-
   db.prepare('UPDATE reviews SET is_approved = 1 WHERE id = ?').run(id);
   res.json({ message: 'Avis approuvé' });
 });
 
 // ─── PUT /api/reviews/:id/reject ───────────────────────────
-// Admin : rejeter (remettre en attente) un avis
 router.put('/:id/reject', requireAdmin, (req, res) => {
   const { id } = req.params;
   db.prepare('UPDATE reviews SET is_approved = 0 WHERE id = ?').run(id);
@@ -90,11 +140,17 @@ router.put('/:id/reject', requireAdmin, (req, res) => {
 });
 
 // ─── DELETE /api/reviews/:id ────────────────────────────────
-// Admin : supprimer un avis
 router.delete('/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
   const review = db.prepare('SELECT id FROM reviews WHERE id = ?').get(id);
   if (!review) return res.status(404).json({ error: 'Avis introuvable' });
+
+  // Supprimer les fichiers photos du disque
+  const photos = db.prepare('SELECT photo_url FROM review_photos WHERE review_id = ?').all(id);
+  for (const p of photos) {
+    const filePath = path.join(__dirname, '../../client', p.photo_url);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
 
   db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
   res.json({ message: 'Avis supprimé' });
