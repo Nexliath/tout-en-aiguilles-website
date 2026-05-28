@@ -29,6 +29,34 @@
       .product-gallery { grid-template-columns: 1fr; }
       .gallery-thumbs { flex-direction: row; }
     }
+
+    /* ── Avis & Notes ── */
+    .reviews-section { margin-top: 64px; }
+    .reviews-header { display: flex; align-items: center; gap: 20px; margin-bottom: 32px; flex-wrap: wrap; }
+    .avg-badge {
+      background: var(--rose-pale); border-radius: 16px; padding: 12px 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .avg-score { font-size: 2rem; font-weight: 800; color: var(--rose-dark); }
+    .avg-stars { font-size: 1.2rem; letter-spacing: 2px; }
+    .avg-count { font-size: .8rem; color: var(--text-light); }
+    .star-selector { display: flex; gap: 4px; }
+    .star-selector span {
+      font-size: 1.8rem; cursor: pointer; transition: transform .1s, filter .1s;
+      user-select: none; filter: grayscale(1);
+    }
+    .star-selector span.active, .star-selector span.hover { filter: none; transform: scale(1.15); }
+    .review-card {
+      background: white; border-radius: 14px; padding: 18px 20px;
+      border: 1px solid var(--border); margin-bottom: 12px;
+    }
+    .review-stars { font-size: .95rem; letter-spacing: 1px; }
+    .review-meta { font-size: .78rem; color: var(--text-light); margin-top: 4px; }
+    .review-comment { margin-top: 8px; font-size: .9rem; color: var(--text); line-height: 1.6; }
+    .review-form-wrap {
+      background: var(--cream); border-radius: 16px; padding: 24px;
+      margin-bottom: 28px; border: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -120,6 +148,30 @@
         </div>
       </div>
 
+      <!-- Section Avis -->
+      <div class="reviews-section" id="reviews-section">
+
+        <!-- En-tête avec note moyenne -->
+        <div class="reviews-header">
+          <h2 style="margin:0">Vos avis ⭐</h2>
+          <div id="avg-badge" class="avg-badge" style="display:none">
+            <div>
+              <div class="avg-score" id="avg-score">—</div>
+              <div class="avg-stars" id="avg-stars"></div>
+            </div>
+            <div class="avg-count" id="avg-count"></div>
+          </div>
+          <div id="no-reviews-badge" style="font-size:.875rem;color:var(--text-light)">Aucun avis pour l'instant — soyez le premier !</div>
+        </div>
+
+        <!-- Formulaire d'avis -->
+        <div id="review-form-area"></div>
+
+        <!-- Liste des avis -->
+        <div id="reviews-list"></div>
+
+      </div>
+
       <!-- Related products -->
       <div style="margin-top:80px">
         <h2 style="margin-bottom:32px;text-align:center">Vous aimerez aussi ✨</h2>
@@ -169,6 +221,8 @@ async function loadProduct() {
     currentProduct = product;
     renderProduct(product);
     loadRelated(product);
+    loadReviews(product.id);
+    renderReviewForm();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('product-detail').style.display = '';
     document.title = `${product.name} — Tout en Aiguilles`;
@@ -250,6 +304,156 @@ async function loadRelated(product) {
       ? related.map(renderProductCard).join('')
       : '<p class="text-muted text-center" style="grid-column:1/-1">Pas d\'articles similaires pour l\'instant.</p>';
   } catch {}
+}
+
+function showNotFound() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('not-found').style.display = '';
+}
+
+// ─── Avis & Notes ───────────────────────────────────────────
+function starsHtml(rating, size = '1rem') {
+  const full = Math.round(rating);
+  return '⭐'.repeat(full) + '☆'.repeat(5 - full);
+}
+
+let selectedRating = 0;
+
+function renderStarSelector() {
+  return `
+    <div class="star-selector" id="star-selector">
+      ${[1,2,3,4,5].map(n => `<span data-v="${n}" onclick="setRating(${n})" onmouseover="hoverRating(${n})" onmouseout="unhoverRating()">⭐</span>`).join('')}
+    </div>
+  `;
+}
+
+function setRating(n) {
+  selectedRating = n;
+  updateStarSelector(n);
+}
+
+function hoverRating(n) {
+  document.querySelectorAll('#star-selector span').forEach((s, i) => {
+    s.classList.toggle('hover', i < n);
+    s.classList.toggle('active', false);
+  });
+}
+
+function unhoverRating() {
+  updateStarSelector(selectedRating);
+}
+
+function updateStarSelector(n) {
+  document.querySelectorAll('#star-selector span').forEach((s, i) => {
+    s.classList.toggle('active', i < n);
+    s.classList.toggle('hover', false);
+  });
+}
+
+function renderReviewForm() {
+  const user = Auth.getUser();
+  const area = document.getElementById('review-form-area');
+  if (!area) return;
+
+  if (!Auth.isLoggedIn()) {
+    area.innerHTML = `
+      <div class="review-form-wrap" style="text-align:center">
+        <p style="color:var(--text-light);margin-bottom:12px">Connectez-vous pour laisser un avis ✍️</p>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('user-btn').click()">Se connecter</button>
+      </div>`;
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="review-form-wrap">
+      <div style="font-weight:700;margin-bottom:12px;font-size:1rem">Laisser un avis</div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:.85rem;color:var(--text-light);margin-bottom:6px">Votre note *</div>
+        ${renderStarSelector()}
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Commentaire <span style="font-weight:400;color:var(--text-light)">(optionnel)</span></label>
+        <textarea id="review-comment" class="form-input" rows="3" placeholder="Partagez votre expérience avec ce produit…" style="resize:vertical"></textarea>
+      </div>
+      <div id="review-form-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:8px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+      <button class="btn btn-primary" id="review-submit-btn" onclick="submitReview()">Envoyer mon avis →</button>
+    </div>`;
+}
+
+async function submitReview() {
+  const errEl = document.getElementById('review-form-error');
+  const btn = document.getElementById('review-submit-btn');
+  errEl.style.display = 'none';
+
+  if (!selectedRating) {
+    errEl.textContent = 'Veuillez sélectionner une note (1 à 5 étoiles).';
+    errEl.style.display = '';
+    return;
+  }
+
+  const comment = document.getElementById('review-comment').value.trim();
+  btn.disabled = true; btn.textContent = '…';
+
+  try {
+    await apiFetch('/reviews', {
+      method: 'POST',
+      body: { product_id: currentProduct.id, rating: selectedRating, comment }
+    });
+    Toast.show('✅ Avis envoyé ! Il sera visible après validation.', 'success');
+    document.getElementById('review-form-area').innerHTML = `
+      <div style="background:var(--sage-pale);border-radius:12px;padding:16px;margin-bottom:20px;color:var(--sage-dark);font-size:.9rem">
+        ✅ Merci pour votre avis ! Il sera publié après vérification de notre équipe.
+      </div>`;
+    loadReviews(currentProduct.id);
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+    btn.disabled = false; btn.textContent = 'Envoyer mon avis →';
+  }
+}
+
+async function loadReviews(productId) {
+  try {
+    const data = await apiFetch(`/reviews?product_id=${productId}`);
+    const { reviews, stats } = data;
+
+    // Badge note moyenne
+    const badge = document.getElementById('avg-badge');
+    const noBadge = document.getElementById('no-reviews-badge');
+
+    if (stats.count > 0) {
+      document.getElementById('avg-score').textContent = stats.average.toFixed(1);
+      document.getElementById('avg-stars').textContent = starsHtml(stats.average);
+      document.getElementById('avg-count').textContent = `${stats.count} avis`;
+      badge.style.display = 'flex';
+      noBadge.style.display = 'none';
+    } else {
+      badge.style.display = 'none';
+      noBadge.style.display = '';
+    }
+
+    // Liste des avis
+    const list = document.getElementById('reviews-list');
+    if (!reviews.length) {
+      list.innerHTML = '';
+      return;
+    }
+
+    list.innerHTML = reviews.map(r => `
+      <div class="review-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div class="review-stars">${starsHtml(r.rating)}</div>
+            <div class="review-meta">${r.first_name} ${r.last_name.charAt(0)}. — ${formatDate(r.created_at)}</div>
+          </div>
+          <span style="font-size:1.4rem">${r.rating >= 4 ? '😍' : r.rating >= 3 ? '🙂' : '😐'}</span>
+        </div>
+        ${r.comment ? `<div class="review-comment">${r.comment.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error('Erreur chargement avis:', e);
+  }
 }
 
 function showNotFound() {
