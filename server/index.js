@@ -126,6 +126,46 @@ app.post('/api/contact', contactLimiter, async (req, res) => {
   }
 });
 
+// ─── Sitemap XML dynamique ───────────────────────────────────
+app.get('/sitemap.xml', (req, res) => {
+  const db = require('./db/database');
+  const BASE = 'https://tout-en-aiguilles.com';
+  const today = new Date().toISOString().split('T')[0];
+
+  const staticPages = [
+    { url: '/',              priority: '1.0', changefreq: 'weekly'  },
+    { url: '/boutique.html', priority: '0.9', changefreq: 'daily'   },
+    { url: '/actualites.html',priority:'0.7', changefreq: 'weekly'  },
+  ];
+
+  const products = db.prepare(
+    "SELECT slug, updated_at FROM products WHERE is_active = 1 ORDER BY updated_at DESC"
+  ).all();
+
+  const urls = [
+    ...staticPages.map(p => `
+  <url>
+    <loc>${BASE}${p.url}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority}</priority>
+  </url>`),
+    ...products.map(p => `
+  <url>
+    <loc>${BASE}/produit.html?slug=${p.slug}</loc>
+    <lastmod>${(p.updated_at || today).split('T')[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`),
+  ];
+
+  res.header('Content-Type', 'application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('')}
+</urlset>`);
+});
+
 // ─── Setup premier lancement ────────────────────────────────
 app.post('/api/setup', (req, res) => {
   const db = require('./db/database');
