@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Utilisateurs — Admin Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:3rem;margin-bottom:12px">🔐</div>
+      <h2 style="margin-bottom:8px">Espace admin</h2>
+      <p style="font-size:.875rem;color:var(--text-light)">Connectez-vous avec votre compte administrateur.</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" id="guard-email" class="form-input" placeholder="victorine@...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mot de passe</label>
+      <input type="password" id="guard-password" class="form-input" placeholder="••••••••">
+    </div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
+  </div>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
+    <nav class="admin-nav">
+      <a href="/admin/index.html">📊 Tableau de bord</a>
+      <a href="/admin/produits.html">🧶 Produits</a>
+      <a href="/admin/commandes.html">📦 Commandes</a>
+      <a href="/admin/actualites.html">📝 Actualités</a>
+      <a href="/admin/utilisateurs.html" class="active">👥 Utilisateurs</a>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+      <a href="/" target="_blank">🌐 Voir le site</a>
+      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>👥 Utilisateurs</h1>
+      <div id="user-count" style="font-size:.85rem;color:var(--text-light)"></div>
+    </div>
+
+    <div class="admin-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="admin-panel-title" style="margin:0">Liste des comptes</div>
+        <input type="text" id="search-input" class="form-input" placeholder="🔍 Rechercher..." style="max-width:220px;padding:8px 12px;font-size:.875rem">
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nom</th>
+              <th>Email</th>
+              <th>Statut email</th>
+              <th>Rôle</th>
+              <th>Inscrit le</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-body">
+            <tr><td colspan="7" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal confirmation suppression -->
+<div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:16px;padding:32px;max-width:380px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <h3 style="margin:0 0 12px">Supprimer ce compte ?</h3>
+    <p id="delete-modal-text" style="color:var(--text-light);margin:0 0 24px;font-size:.9rem"></p>
+    <div style="display:flex;gap:12px">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Annuler</button>
+      <button id="delete-confirm-btn" class="btn" style="background:#d9534f;color:white">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let allUsers = [];
+let deleteTarget = null;
+
+function checkAdmin() {
+  const guard   = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) {
+    content.style.display = 'none';
+    guard.style.display   = 'flex';
+  } else {
+    guard.style.display   = 'none';
+    content.style.display = '';
+    loadUsers();
+  }
+}
+
+document.getElementById('guard-btn').addEventListener('click', function() {
+  var email    = document.getElementById('guard-email').value.trim();
+  var password = document.getElementById('guard-password').value;
+  var errEl    = document.getElementById('guard-error');
+  var btn      = document.getElementById('guard-btn');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis'; errEl.style.display = ''; return; }
+  btn.disabled = true; btn.textContent = '…';
+  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
+    .then(data => {
+      if (data.user.role !== 'admin') throw new Error('Ce compte n\'est pas administrateur.');
+      Auth.save(data.token, data.user);
+      checkAdmin();
+    })
+    .catch(e => {
+      errEl.textContent = e.message; errEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Se connecter →';
+    });
+});
+document.getElementById('guard-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('guard-btn').click();
+});
+
+async function loadUsers() {
+  try {
+    allUsers = await apiFetch('/admin/users');
+    document.getElementById('user-count').textContent = `${allUsers.length} compte${allUsers.length > 1 ? 's' : ''}`;
+    renderUsers(allUsers);
+  } catch (e) {
+    document.getElementById('users-body').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
+  }
+}
+
+function renderUsers(users) {
+  const me = Auth.getUser();
+  const tbody = document.getElementById('users-body');
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-light);padding:24px">Aucun utilisateur</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(u => `
+    <tr id="user-row-${u.id}">
+      <td style="color:var(--text-light);font-size:.8rem">#${u.id}</td>
+      <td style="font-weight:600">${u.first_name} ${u.last_name}${u.id === me?.id ? ' <span style="font-size:.7rem;color:var(--rose-dark)">(vous)</span>' : ''}</td>
+      <td style="font-size:.875rem">${u.email}</td>
+      <td>
+        ${u.email_verified
+          ? '<span style="color:#5a9e6f;font-size:.8rem;font-weight:600">✅ Vérifié</span>'
+          : '<span style="color:#c8937a;font-size:.8rem;font-weight:600">⏳ En attente</span>'}
+      </td>
+      <td>
+        <span class="order-status ${u.role === 'admin' ? 'status-paid' : 'status-pending'}" style="font-size:.75rem">
+          ${u.role === 'admin' ? '🛡️ Admin' : '👤 Utilisateur'}
+        </span>
+      </td>
+      <td style="font-size:.8rem;color:var(--text-light)">${formatDate(u.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${u.id !== me?.id ? `
+            ${u.role === 'admin'
+              ? `<button class="btn btn-secondary btn-sm" onclick="changeRole(${u.id}, 'user')">Rétrograder</button>`
+              : `<button class="btn btn-primary btn-sm" onclick="changeRole(${u.id}, 'admin')">Promouvoir admin</button>`}
+            <button class="btn btn-sm" style="background:#f8d7da;color:#d9534f;border:none" onclick="confirmDelete(${u.id}, '${u.first_name} ${u.last_name}')">🗑️</button>
+          ` : '<span style="font-size:.8rem;color:var(--text-light)">—</span>'}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function changeRole(userId, newRole) {
+  try {
+    await apiFetch(`/admin/users/${userId}/role`, { method: 'PUT', body: { role: newRole } });
+    Toast.show(newRole === 'admin' ? '✅ Compte promu admin !' : '✅ Rôle retiré', 'success');
+    loadUsers();
+  } catch (e) {
+    Toast.show(e.message, 'error');
+  }
+}
+
+function confirmDelete(userId, name) {
+  deleteTarget = userId;
+  document.getElementById('delete-modal-text').textContent =
+    `Voulez-vous vraiment supprimer le compte de ${name} ? Cette action est irréversible.`;
+  document.getElementById('delete-modal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  deleteTarget = null;
+  document.getElementById('delete-modal').style.display = 'none';
+}
+
+document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
+  if (!deleteTarget) return;
+  try {
+    await apiFetch(`/admin/users/${deleteTarget}`, { method: 'DELETE' });
+    closeDeleteModal();
+    Toast.show('✅ Compte supprimé', 'success');
+    loadUsers();
+  } catch (e) {
+    Toast.show(e.message, 'error');
+    closeDeleteModal();
+  }
+});
+
+// Recherche en temps réel
+document.getElementById('search-input').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  const filtered = allUsers.filter(u =>
+    u.first_name.toLowerCase().includes(q) ||
+    u.last_name.toLowerCase().includes(q) ||
+    u.email.toLowerCase().includes(q)
+  );
+  renderUsers(filtered);
+});
+
+checkAdmin();
+</script>
+</body>
+</html>
