@@ -17,11 +17,11 @@
   <aside class="admin-sidebar">
     <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
     <nav class="admin-nav">
-      <a href="/admin/index.html">📊 Tableau de bord</a>
-      <a href="/admin/produits.html">🧶 Produits</a>
-      <a href="/admin/commandes.html">📦 Commandes</a>
-      <a href="/admin/actualites.html" class="active">📝 Actualités</a>
-      <a href="/admin/utilisateurs.html">👥 Utilisateurs</a>
+      <a href="/atelier/index.html">📊 Tableau de bord</a>
+      <a href="/atelier/produits.html">🧶 Produits</a>
+      <a href="/atelier/commandes.html">📦 Commandes</a>
+      <a href="/atelier/actualites.html" class="active">📝 Actualités</a>
+      <a href="/atelier/utilisateurs.html">👥 Utilisateurs</a>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
       <a href="/" target="_blank">🌐 Voir le site</a>
       <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
@@ -95,7 +95,7 @@
 let allArticles = [];
 
 async function init() {
-  if (!Auth.isAdmin()) { window.location.href = '/admin/index.html'; return; }
+  if (!Auth.isAdmin()) { window.location.href = '/atelier/index.html'; return; }
   loadArticles();
 }
 
