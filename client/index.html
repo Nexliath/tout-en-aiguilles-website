@@ -150,7 +150,7 @@
 <!-- ════ VALEURS ════ -->
 <section class="section-sm" style="background:white;border-bottom:1px solid var(--border)">
   <div class="container">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center">
+    <div class="values-grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center">
       <div>
         <div style="font-size:2rem;margin-bottom:8px">🤲</div>
         <h4 style="font-size:.95rem;margin-bottom:4px">Fait main</h4>
@@ -218,8 +218,11 @@
       <h2>Nos créations phares</h2>
       <p>Les petites merveilles que tout le monde adore ✨</p>
     </div>
-    <div id="featured-products" class="grid-4">
-      <div class="loading"><div class="spinner"></div> Chargement…</div>
+    <div class="carousel-outer">
+      <div id="featured-products" class="grid-4">
+        <div class="loading"><div class="spinner"></div> Chargement…</div>
+      </div>
+      <div id="featured-dots" class="carousel-dots"></div>
     </div>
     <div class="text-center mt-lg">
       <a href="/boutique.html" class="btn btn-primary btn-lg">Voir toute la boutique →</a>
@@ -230,8 +233,8 @@
 <!-- ════ ABOUT ════ -->
 <section class="section">
   <div class="container">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center">
-      <div style="background:linear-gradient(135deg,var(--rose-pale),var(--sage-pale));border-radius:var(--radius-xl);padding:48px;text-align:center">
+    <div class="about-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center">
+      <div class="about-quote" style="background:linear-gradient(135deg,var(--rose-pale),var(--sage-pale));border-radius:var(--radius-xl);padding:48px;text-align:center">
         <div style="font-size:6rem;margin-bottom:16px">🌸</div>
         <p style="font-family:var(--font-title);font-style:italic;font-size:1.3rem;color:var(--rose-dark)">"Chaque point est un geste d'amour"</p>
         <p style="font-size:.9rem;margin-top:12px">— Victorine, créatrice</p>
@@ -278,7 +281,7 @@
       <div class="section-divider"><span class="section-tag">Contact</span></div>
       <h2 style="margin-bottom:16px">Une question ? Un projet personnalisé ?</h2>
       <p style="margin-bottom:40px">Vous avez une commande spéciale en tête, ou simplement envie d'en savoir plus ? Contactez-nous, nous répondons avec plaisir !</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+      <div class="contact-info-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
         <div style="background:var(--rose-pale);border-radius:var(--radius-lg);padding:24px">
           <div style="font-size:1.8rem;margin-bottom:8px">📧</div>
           <h4 style="margin-bottom:4px">Email</h4>
@@ -316,24 +319,30 @@
         </div>
       </div>
       <div class="footer-col">
-        <h4>Boutique</h4>
-        <a href="/boutique.html?type=crochet">Univers Crochet</a>
-        <a href="/boutique.html?type=couture">Univers Couture</a>
-        <a href="/boutique.html">Tous les produits</a>
+        <h4 class="footer-toggle" onclick="toggleFooterCol(this)">Boutique <span class="footer-arrow">▾</span></h4>
+        <div class="footer-links">
+          <a href="/boutique.html?type=crochet">Univers Crochet</a>
+          <a href="/boutique.html?type=couture">Univers Couture</a>
+          <a href="/boutique.html">Tous les produits</a>
+        </div>
       </div>
       <div class="footer-col">
-        <h4>Mon compte</h4>
-        <a href="/compte.html">Mon espace</a>
-        <a href="/compte.html?tab=orders">Mes commandes</a>
-        <a href="/compte.html?tab=favorites">Mes favoris</a>
-        <a href="/panier.html">Mon panier</a>
+        <h4 class="footer-toggle" onclick="toggleFooterCol(this)">Mon compte <span class="footer-arrow">▾</span></h4>
+        <div class="footer-links">
+          <a href="/compte.html">Mon espace</a>
+          <a href="/compte.html?tab=orders">Mes commandes</a>
+          <a href="/compte.html?tab=favorites">Mes favoris</a>
+          <a href="/panier.html">Mon panier</a>
+        </div>
       </div>
       <div class="footer-col">
-        <h4>Infos</h4>
-        <a href="/actualites.html">Actualités</a>
-        <a href="#contact">Contact</a>
-        <a href="#">Livraison & retours</a>
-        <a href="#">Mentions légales</a>
+        <h4 class="footer-toggle" onclick="toggleFooterCol(this)">Infos <span class="footer-arrow">▾</span></h4>
+        <div class="footer-links">
+          <a href="/actualites.html">Actualités</a>
+          <a href="#contact">Contact</a>
+          <a href="#">Livraison & retours</a>
+          <a href="#">Mentions légales</a>
+        </div>
       </div>
     </div>
     <div class="footer-bottom">
@@ -348,6 +357,52 @@
 function openMobileNav()  { document.getElementById('mobile-nav').classList.add('open'); document.body.style.overflow='hidden'; }
 function closeMobileNav() { document.getElementById('mobile-nav').classList.remove('open'); document.body.style.overflow=''; }
 
+// Footer accordion
+function toggleFooterCol(h4) {
+  if (window.innerWidth > 768) return;
+  h4.closest('.footer-col').classList.toggle('open');
+}
+
+// Carousel init
+function initCarousel(container) {
+  if (window.innerWidth > 768) return;
+  container.classList.add('carousel-active');
+  const cards = Array.from(container.querySelectorAll('.product-card'));
+  if (!cards.length) return;
+
+  // Build dots
+  const dotsEl = document.getElementById('featured-dots');
+  dotsEl.innerHTML = '';
+  cards.forEach((card, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', 'Produit ' + (i + 1));
+    dot.onclick = () => card.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    dotsEl.appendChild(dot);
+  });
+
+  // Update active dot on scroll
+  let scrollTimer;
+  container.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const cardW = cards[0].offsetWidth + 16;
+      const idx = Math.min(Math.round(container.scrollLeft / cardW), cards.length - 1);
+      dotsEl.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    }, 50);
+  }, { passive: true });
+
+  // Auto-advance every 4s (wraps around)
+  let current = 0;
+  const autoplay = setInterval(() => {
+    current = (current + 1) % cards.length;
+    const cardW = cards[0].offsetWidth + 16;
+    container.scrollTo({ left: current * cardW, behavior: 'smooth' });
+  }, 4000);
+  // Stop autoplay on manual swipe
+  container.addEventListener('touchstart', () => clearInterval(autoplay), { once: true, passive: true });
+}
+
 async function loadFeaturedProducts() {
   try {
     const products = await apiFetch('/products?featured=true&limit=8');
@@ -357,6 +412,7 @@ async function loadFeaturedProducts() {
       return;
     }
     container.innerHTML = products.map(renderProductCard).join('');
+    initCarousel(container);
   } catch (e) {
     document.getElementById('featured-products').innerHTML = '<p class="text-muted text-center">Impossible de charger les produits.</p>';
   }
