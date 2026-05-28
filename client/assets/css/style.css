@@ -716,7 +716,7 @@ p  { color: var(--text-light); }
     min-height: 130px;
     border-radius: var(--radius);
   }
-  #products-grid .product-card > a:first-child {
+  #products-grid .product-card > a:not(.card-full-link) {
     display: block;
     position: relative;
   }
@@ -734,8 +734,8 @@ p  { color: var(--text-light); }
   }
   #products-grid .product-card-name { font-size: .88rem; -webkit-line-clamp: 2; }
   #products-grid .product-card-price { font-size: 1rem; margin-bottom: 6px; }
-  /* Toute la card est cliquable */
-  #products-grid .card-full-link { display: block; }
+  /* Toute la card est cliquable — position absolute forcée pour rester hors flux */
+  #products-grid .card-full-link { display: block; position: absolute; inset: 0; }
   /* Tags + boutons sur la même ligne */
   #products-grid .product-card-bottom {
     -webkit-flex-direction: row; flex-direction: row;
