@@ -12,6 +12,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Utilisateurs — Admin Tout en Aiguilles</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .sort-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 10px; font-size: .78rem; cursor: pointer; color: var(--text-light);
+      transition: all .15s; white-space: nowrap;
+    }
+    .sort-btn:hover, .sort-btn.active { background: var(--rose-pale); color: var(--rose-dark); border-color: var(--rose-dark); }
+    .sort-btn.active::after { content: ' ↕'; }
+    .sort-btn.asc::after  { content: ' ↑'; }
+    .sort-btn.desc::after { content: ' ↓'; }
+    .filter-chip {
+      background: var(--cream); border: 1px solid var(--border); border-radius: 20px;
+      padding: 4px 12px; font-size: .78rem; cursor: pointer; color: var(--text-light); transition: all .15s;
+    }
+    .filter-chip.active { background: var(--rose-pale); color: var(--rose-dark); border-color: var(--rose-dark); font-weight: 600; }
+    .user-avatar-sm {
+      width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+      border: 2px solid var(--border); flex-shrink: 0;
+    }
+    .user-avatar-initials {
+      width: 34px; height: 34px; border-radius: 50%; background: var(--rose-pale);
+      color: var(--rose-dark); display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 700; flex-shrink: 0; border: 2px solid var(--border);
+    }
+  </style>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -26,14 +51,8 @@
       <h2 style="margin-bottom:8px">Espace admin</h2>
       <p style="font-size:.875rem;color:var(--text-light)">Connectez-vous avec votre compte administrateur.</p>
     </div>
-    <div class="form-group">
-      <label class="form-label">Email</label>
-      <input type="email" id="guard-email" class="form-input" placeholder="victorine@...">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Mot de passe</label>
-      <input type="password" id="guard-password" class="form-input" placeholder="••••••••">
-    </div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" id="guard-email" class="form-input" placeholder="victorine@..."></div>
+    <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" id="guard-password" class="form-input" placeholder="••••••••"></div>
     <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
     <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
   </div>
@@ -64,17 +83,47 @@
     </div>
 
     <div class="admin-panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="admin-panel-title" style="margin:0">Liste des comptes</div>
-        <input type="text" id="search-input" class="form-input" placeholder="🔍 Rechercher..." style="max-width:220px;padding:8px 12px;font-size:.875rem">
+      <!-- ── Barre de contrôles ── -->
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px">
+
+        <!-- Recherche -->
+        <input type="text" id="search-input" class="form-input"
+          placeholder="🔍 Nom, pseudo, email…"
+          style="max-width:220px;padding:7px 12px;font-size:.875rem;flex-shrink:0">
+
+        <!-- Filtres rôle -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="filter-chip active" data-filter="role" data-val="">Tous les rôles</button>
+          <button class="filter-chip" data-filter="role" data-val="admin">🛡️ Admins</button>
+          <button class="filter-chip" data-filter="role" data-val="user">👤 Utilisateurs</button>
+        </div>
+
+        <!-- Filtres statut email -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="filter-chip active" data-filter="email" data-val="">Tous statuts</button>
+          <button class="filter-chip" data-filter="email" data-val="1">✅ Vérifiés</button>
+          <button class="filter-chip" data-filter="email" data-val="0">⏳ En attente</button>
+        </div>
       </div>
 
+      <!-- ── Tri ── -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+        <span style="font-size:.78rem;color:var(--text-light);font-weight:600;margin-right:4px">Trier :</span>
+        <button class="sort-btn desc active" data-sort="date">📅 Inscription</button>
+        <button class="sort-btn" data-sort="name">👤 Nom A→Z</button>
+        <button class="sort-btn" data-sort="role">🛡️ Rôle</button>
+        <button class="sort-btn" data-sort="email_status">✅ Statut email</button>
+        <span id="results-label" style="margin-left:auto;font-size:.8rem;color:var(--text-light)"></span>
+      </div>
+
+      <!-- ── Tableau ── -->
       <div class="admin-table-wrap">
         <table class="admin-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>Nom</th>
+              <th>Utilisateur</th>
+              <th>Pseudo</th>
               <th>Email</th>
               <th>Statut email</th>
               <th>Rôle</th>
@@ -83,7 +132,7 @@
             </tr>
           </thead>
           <tbody id="users-body">
-            <tr><td colspan="7" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            <tr><td colspan="8" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -107,7 +156,11 @@
 <script>
 let allUsers = [];
 let deleteTarget = null;
+let sortState = { key: 'date', dir: 'desc' };
+let filterRole = '';
+let filterEmail = '';
 
+// ─── Auth guard ───────────────────────────────────────────
 function checkAdmin() {
   const guard   = document.getElementById('admin-guard');
   const content = document.getElementById('admin-content');
@@ -144,29 +197,78 @@ document.getElementById('guard-password').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('guard-btn').click();
 });
 
+// ─── Chargement ───────────────────────────────────────────
 async function loadUsers() {
   try {
     allUsers = await apiFetch('/admin/users');
     document.getElementById('user-count').textContent = `${allUsers.length} compte${allUsers.length > 1 ? 's' : ''}`;
-    renderUsers(allUsers);
+    applyFiltersAndSort();
   } catch (e) {
     document.getElementById('users-body').innerHTML =
-      `<tr><td colspan="7" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
+      `<tr><td colspan="8" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
   }
 }
 
+// ─── Filtres + tri ────────────────────────────────────────
+function applyFiltersAndSort() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+
+  let list = allUsers.filter(u => {
+    const matchSearch = !q
+      || u.first_name.toLowerCase().includes(q)
+      || u.last_name.toLowerCase().includes(q)
+      || u.email.toLowerCase().includes(q)
+      || (u.username || '').toLowerCase().includes(q);
+    const matchRole  = !filterRole  || u.role === filterRole;
+    const matchEmail = filterEmail === '' || String(u.email_verified) === filterEmail;
+    return matchSearch && matchRole && matchEmail;
+  });
+
+  // Tri
+  list = list.sort((a, b) => {
+    let va, vb;
+    if (sortState.key === 'date')  { va = new Date(a.created_at); vb = new Date(b.created_at); }
+    if (sortState.key === 'name')  { va = (a.last_name + a.first_name).toLowerCase(); vb = (b.last_name + b.first_name).toLowerCase(); }
+    if (sortState.key === 'role')  { va = a.role; vb = b.role; }
+    if (sortState.key === 'email_status') { va = a.email_verified; vb = b.email_verified; }
+    if (va < vb) return sortState.dir === 'asc' ? -1 : 1;
+    if (va > vb) return sortState.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  document.getElementById('results-label').textContent = `${list.length} résultat${list.length > 1 ? 's' : ''}`;
+  renderUsers(list);
+}
+
+// ─── Rendu tableau ────────────────────────────────────────
 function renderUsers(users) {
   const me = Auth.getUser();
   const tbody = document.getElementById('users-body');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-light);padding:24px">Aucun utilisateur</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:32px">Aucun utilisateur trouvé</td></tr>';
     return;
   }
-  tbody.innerHTML = users.map(u => `
+  tbody.innerHTML = users.map(u => {
+    const initials = `${u.first_name[0]}${u.last_name[0]}`.toUpperCase();
+    const avatarHtml = u.avatar_url
+      ? `<img src="${u.avatar_url}" class="user-avatar-sm" alt="${initials}">`
+      : `<div class="user-avatar-initials">${initials}</div>`;
+
+    return `
     <tr id="user-row-${u.id}">
       <td style="color:var(--text-light);font-size:.8rem">#${u.id}</td>
-      <td style="font-weight:600">${u.first_name} ${u.last_name}${u.id === me?.id ? ' <span style="font-size:.7rem;color:var(--rose-dark)">(vous)</span>' : ''}</td>
-      <td style="font-size:.875rem">${u.email}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${avatarHtml}
+          <div>
+            <div style="font-weight:600;font-size:.9rem">${u.first_name} ${u.last_name}${u.id === me?.id ? ' <span style="font-size:.7rem;color:var(--rose-dark)">(vous)</span>' : ''}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:.85rem;color:${u.username ? 'var(--text)' : 'var(--text-light)'}">
+        ${u.username ? `<span style="background:var(--cream);border-radius:20px;padding:2px 10px;font-size:.8rem">@${u.username}</span>` : '<span style="font-size:.78rem">—</span>'}
+      </td>
+      <td style="font-size:.85rem">${u.email}</td>
       <td>
         ${u.email_verified
           ? '<span style="color:#5a9e6f;font-size:.8rem;font-weight:600">✅ Vérifié</span>'
@@ -188,18 +290,17 @@ function renderUsers(users) {
           ` : '<span style="font-size:.8rem;color:var(--text-light)">—</span>'}
         </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
+// ─── Actions ──────────────────────────────────────────────
 async function changeRole(userId, newRole) {
   try {
     await apiFetch(`/admin/users/${userId}/role`, { method: 'PUT', body: { role: newRole } });
     Toast.show(newRole === 'admin' ? '✅ Compte promu admin !' : '✅ Rôle retiré', 'success');
     loadUsers();
-  } catch (e) {
-    Toast.show(e.message, 'error');
-  }
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 function confirmDelete(userId, name) {
@@ -221,21 +322,38 @@ document.getElementById('delete-confirm-btn').addEventListener('click', async ()
     closeDeleteModal();
     Toast.show('✅ Compte supprimé', 'success');
     loadUsers();
-  } catch (e) {
-    Toast.show(e.message, 'error');
-    closeDeleteModal();
-  }
+  } catch (e) { Toast.show(e.message, 'error'); closeDeleteModal(); }
 });
 
-// Recherche en temps réel
-document.getElementById('search-input').addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  const filtered = allUsers.filter(u =>
-    u.first_name.toLowerCase().includes(q) ||
-    u.last_name.toLowerCase().includes(q) ||
-    u.email.toLowerCase().includes(q)
-  );
-  renderUsers(filtered);
+// ─── Listeners contrôles ──────────────────────────────────
+document.getElementById('search-input').addEventListener('input', applyFiltersAndSort);
+
+// Filtres par chips
+document.querySelectorAll('.filter-chip').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const group = this.dataset.filter;
+    document.querySelectorAll(`.filter-chip[data-filter="${group}"]`).forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    if (group === 'role')  filterRole  = this.dataset.val;
+    if (group === 'email') filterEmail = this.dataset.val;
+    applyFiltersAndSort();
+  });
+});
+
+// Tri par colonnes
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const key = this.dataset.sort;
+    if (sortState.key === key) {
+      sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortState.key = key;
+      sortState.dir = key === 'date' ? 'desc' : 'asc';
+    }
+    document.querySelectorAll('.sort-btn').forEach(b => { b.classList.remove('active','asc','desc'); });
+    this.classList.add('active', sortState.dir);
+    applyFiltersAndSort();
+  });
 });
 
 checkAdmin();
