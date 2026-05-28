@@ -104,26 +104,24 @@
       <a href="/panier.html" class="icon-btn" title="Mon panier">
         🛒<span class="cart-badge" style="display:none">0</span>
       </a>
-      <button class="hamburger icon-btn" onclick="toggleMobileMenu()">☰</button>
+      <button class="hamburger icon-btn" onclick="openMobileNav()" aria-label="Menu">☰</button>
     </div>
   </div>
 </header>
 
-<!-- Mobile menu -->
-<div id="mobile-menu" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5)" onclick="toggleMobileMenu()">
-  <div style="width:280px;height:100%;background:white;padding:24px;overflow-y:auto" onclick="e=>e.stopPropagation()">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-      <span style="font-family:var(--font-title);font-size:1.1rem;color:var(--rose-dark)">🧶 Tout en Aiguilles</span>
-      <button onclick="toggleMobileMenu()" style="border:none;background:none;font-size:1.3rem">✕</button>
-    </div>
-    <nav style="display:flex;flex-direction:column;gap:4px">
-      <a href="/" style="padding:12px 16px;border-radius:8px;font-weight:700">Accueil</a>
-      <a href="/boutique.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Boutique</a>
-      <a href="/actualites.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Actualités</a>
-      <a href="#contact" style="padding:12px 16px;border-radius:8px;font-weight:700">Contact</a>
-      <div style="height:1px;background:var(--border);margin:8px 0"></div>
-      <a href="/compte.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Mon compte</a>
-      <a href="/panier.html" style="padding:12px 16px;border-radius:8px;font-weight:700">Mon panier 🛒</a>
+<!-- Mobile nav -->
+<div class="mobile-nav-overlay" id="mobile-nav" onclick="closeMobileNav()">
+  <div class="mobile-nav-panel" onclick="event.stopPropagation()">
+    <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
+    <div style="font-family:var(--font-title);font-size:1.05rem;color:var(--rose-dark);margin-bottom:8px">🧶 Tout en Aiguilles</div>
+    <nav class="mobile-nav-links">
+      <a href="/" class="active">🏠 Accueil</a>
+      <a href="/boutique.html">🛍️ Boutique</a>
+      <a href="/actualites.html">📰 Actualités</a>
+      <a href="#contact">✉️ Contact</a>
+      <div class="mobile-nav-divider"></div>
+      <a href="/compte.html">👤 Mon compte</a>
+      <a href="/panier.html">🛒 Mon panier</a>
     </nav>
   </div>
 </div>
@@ -347,10 +345,8 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
-function toggleMobileMenu() {
-  const m = document.getElementById('mobile-menu');
-  m.style.display = m.style.display === 'none' ? 'block' : 'none';
-}
+function openMobileNav()  { document.getElementById('mobile-nav').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeMobileNav() { document.getElementById('mobile-nav').classList.remove('open'); document.body.style.overflow=''; }
 
 async function loadFeaturedProducts() {
   try {
