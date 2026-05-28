@@ -41,18 +41,69 @@
     }
     .gallery-thumb.active { border-color: var(--rose-dark); }
     .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Main image + carousel */
     .gallery-main {
-      aspect-ratio: 1; border-radius: var(--radius-xl); overflow: hidden;
-      background: var(--cream-dark); display: flex; align-items: center;
-      justify-content: center; font-size: 6rem;
+      position: relative; aspect-ratio: 1; border-radius: var(--radius-xl); overflow: hidden;
+      background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 6rem;
     }
-    .gallery-main img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-carousel {
+      display: flex; width: 100%; height: 100%;
+      overflow: hidden;
+    }
+    .gallery-slide {
+      flex: 0 0 100%; width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .gallery-slide img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Dot indicators — overlaid inside image */
+    .gallery-dots {
+      position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 6px; z-index: 2;
+    }
+    .gallery-dot {
+      width: 7px; height: 7px; border-radius: 50%; border: none; padding: 0;
+      background: rgba(255,255,255,.55); cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.3);
+      transition: background .2s, transform .2s;
+    }
+    .gallery-dot.active { background: white; transform: scale(1.35); }
+
     .product-info { padding: 0 0 0 40px; }
+
     @media (max-width: 768px) {
       .product-layout { grid-template-columns: 1fr !important; }
       .product-info { padding: 0; }
-      .product-gallery { grid-template-columns: 1fr; }
-      .gallery-thumbs { flex-direction: row; }
+      .product-gallery { grid-template-columns: 1fr !important; gap: 0; }
+
+      /* Thumbnails hidden — replaced by dots inside image */
+      .gallery-thumbs { display: none !important; }
+
+      /* Smaller image on mobile */
+      .gallery-main {
+        aspect-ratio: unset !important;
+        height: 58vw; max-height: 300px;
+        border-radius: var(--radius-lg) !important;
+        margin-bottom: 12px;
+      }
+
+      /* Carousel swipeable on mobile */
+      .gallery-carousel {
+        overflow-x: scroll;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .gallery-carousel::-webkit-scrollbar { display: none; }
+      .gallery-slide { scroll-snap-align: start; }
+
+      /* Product info compact on mobile */
+      #prod-name { font-size: 1.3rem !important; margin-bottom: 8px !important; }
+      #prod-price { font-size: 1.5rem !important; }
+      .product-info > div[style*="background:var(--cream)"] { padding: 14px !important; margin-bottom: 16px !important; }
+      .product-info > div[style*="margin-top:24px"] { margin-top: 14px !important; padding: 12px !important; }
+      .product-info > div[style*="margin-top:12px"] { margin-top: 8px !important; padding: 12px !important; }
     }
 
     /* ── Avis & Notes ── */
@@ -374,11 +425,26 @@ function renderProduct(p) {
   const mainEl = document.getElementById('main-img');
 
   if (images.length > 0) {
+    // Desktop thumbnails
     thumbsEl.innerHTML = images.map((img, i) => `
       <div class="gallery-thumb ${i === 0 ? 'active' : ''}" onclick="setMainImg('${img}', this)">
         <img src="${img}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🧶'">
       </div>`).join('');
-    mainEl.innerHTML = `<img id="main-img-el" src="${images[0]}" alt="${p.name}" onerror="this.parentElement.innerHTML='🧶'">`;
+
+    // Carousel slides
+    const slides = images.map((img, i) => `
+      <div class="gallery-slide">
+        <img src="${img}" alt="${p.name}" loading="${i === 0 ? 'eager' : 'lazy'}" onerror="this.parentElement.innerHTML='🧶'">
+      </div>`).join('');
+
+    // Dot indicators (only if multiple images)
+    const dots = images.length > 1 ? `
+      <div class="gallery-dots" id="gallery-dots">
+        ${images.map((_, i) => `<button class="gallery-dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})"></button>`).join('')}
+      </div>` : '';
+
+    mainEl.innerHTML = `<div class="gallery-carousel" id="gallery-carousel">${slides}</div>${dots}`;
+    initGalleryCarousel();
   } else {
     thumbsEl.innerHTML = `<div class="gallery-thumb active">🧶</div>`;
     mainEl.innerHTML = '<span>🧶</span>';
@@ -389,11 +455,39 @@ function renderProduct(p) {
   if (Favorites.has(p.id)) favBtn.classList.add('active'), favBtn.textContent = '❤️';
 }
 
+// ── Gallery carousel ─────────────────────────────────────────
+function goToSlide(idx) {
+  const carousel = document.getElementById('gallery-carousel');
+  if (!carousel) return;
+  carousel.scrollTo({ left: idx * carousel.offsetWidth, behavior: 'smooth' });
+  updateGalleryDots(idx);
+  document.querySelectorAll('.gallery-thumb').forEach((t, i) => t.classList.toggle('active', i === idx));
+}
+
+function updateGalleryDots(idx) {
+  const dots = document.getElementById('gallery-dots');
+  if (!dots) return;
+  dots.querySelectorAll('.gallery-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+}
+
+function initGalleryCarousel() {
+  const carousel = document.getElementById('gallery-carousel');
+  if (!carousel) return;
+  let timer;
+  carousel.addEventListener('scroll', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const idx = Math.round(carousel.scrollLeft / Math.max(1, carousel.offsetWidth));
+      updateGalleryDots(idx);
+      document.querySelectorAll('.gallery-thumb').forEach((t, i) => t.classList.toggle('active', i === idx));
+    }, 60);
+  }, { passive: true });
+}
+
 function setMainImg(src, thumb) {
-  document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
-  thumb.classList.add('active');
-  const main = document.getElementById('main-img-el');
-  if (main) main.src = src;
+  const thumbs = Array.from(document.querySelectorAll('.gallery-thumb'));
+  const idx = thumbs.indexOf(thumb);
+  goToSlide(idx >= 0 ? idx : 0);
 }
 
 function changeQty(delta) {
