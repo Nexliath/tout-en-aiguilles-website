@@ -294,12 +294,18 @@ function initHeader() {
       userBtn.onclick = openAuthModal;
     }
   }
-  // Lien Admin dans la nav si l'utilisateur est administrateur
+  // Lien Admin dans la nav + pose silencieuse du cookie httpOnly pour l'accès backoffice
   if (Auth.isAdmin()) {
+    // Rafraîchir le cookie admin (nécessaire pour l'accès au backoffice côté serveur)
+    fetch('/api/auth/admin-cookie', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + Auth.getToken() }
+    }).catch(() => {});
+
     const nav = document.querySelector('.nav');
     if (nav && !nav.querySelector('.admin-nav-link')) {
       const adminLink = document.createElement('a');
-      adminLink.href = '/admin/';
+      adminLink.href = '/atelier/';
       adminLink.className = 'admin-nav-link';
       adminLink.textContent = '⚙️ Admin';
       adminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:6px;padding:4px 10px;font-size:.85rem';
