@@ -430,6 +430,7 @@ function renderProductCard(p) {
 
   return `
     <div class="card product-card" data-id="${p.id}">
+      <a class="card-full-link" href="/produit.html?id=${p.id}" aria-label="Voir ${p.name}"></a>
       <a href="/produit.html?id=${p.id}">
         <div class="product-card-img">${img}${placeholder}</div>
         ${!inStock ? '<span class="out-of-stock">Rupture de stock</span>' : ''}
@@ -441,14 +442,16 @@ function renderProductCard(p) {
           <div class="product-card-name">${p.name}</div>
         </a>
         <div class="product-card-price">${p.price.toFixed(2)} €</div>
-        ${tags ? `<div class="product-card-tags">${tags}</div>` : ''}
-        <div class="product-card-footer">
-          <button class="btn btn-primary btn-sm card-add-btn" data-pid="${p.id}" ${!inStock ? 'disabled' : ''}>
-            <span class="btn-icon">🛒</span><span class="btn-label"> Ajouter</span>
-          </button>
-          <button class="favorite-btn ${isFav ? 'active' : ''} card-fav-btn" data-pid="${p.id}" title="${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">
-            ${isFav ? '❤️' : '🤍'}
-          </button>
+        <div class="product-card-bottom">
+          ${tags ? `<div class="product-card-tags">${tags}</div>` : ''}
+          <div class="product-card-footer">
+            <button class="btn btn-primary btn-sm card-add-btn" data-pid="${p.id}" ${!inStock ? 'disabled' : ''}>
+              <span class="btn-icon">🛒</span><span class="btn-label"> Ajouter</span>
+            </button>
+            <button class="favorite-btn ${isFav ? 'active' : ''} card-fav-btn" data-pid="${p.id}" title="${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">
+              ${isFav ? '❤️' : '🤍'}
+            </button>
+          </div>
         </div>
       </div>
     </div>`;
