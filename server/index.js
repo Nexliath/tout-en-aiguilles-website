@@ -29,27 +29,8 @@ try {
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://tout-en-aiguilles.com';
 
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",          // requis pour les scripts inline existants
-        "https://www.googletagmanager.com",
-        "https://www.google-analytics.com",
-        "https://js.stripe.com",
-        "https://cdn.jsdelivr.net",
-      ],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "https://www.google-analytics.com", "https://api.stripe.com"],
-      frameSrc: ["https://js.stripe.com"],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: [],
-    },
-  },
-  crossOriginEmbedderPolicy: false, // évite les conflits avec Stripe/GTM
+  contentSecurityPolicy: false,      // Requiert un audit page par page — ne pas activer à la légère
+  crossOriginEmbedderPolicy: false,
 }));
 
 app.use(cors({
