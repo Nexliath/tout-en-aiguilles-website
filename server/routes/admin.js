@@ -7,7 +7,7 @@ const router = express.Router();
 // ─── GET /api/admin/users — liste tous les utilisateurs ─────
 router.get('/users', requireAdmin, (req, res) => {
   const users = db.prepare(
-    'SELECT id, email, first_name, last_name, role, email_verified, created_at FROM users ORDER BY created_at DESC'
+    'SELECT id, email, first_name, last_name, username, role, email_verified, avatar_url, created_at FROM users ORDER BY created_at DESC'
   ).all();
   res.json(users);
 });
