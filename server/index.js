@@ -72,6 +72,14 @@ const checkoutLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 5,                    // max 5 messages par heure par IP (anti-spam)
+  message: { error: 'Trop de messages envoyés. Réessayez dans une heure.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ─── Body parsing ───────────────────────────────────────────
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '2mb' }));
@@ -97,6 +105,26 @@ app.use('/api/orders',          require('./routes/orders'));
 app.use('/api/news',            require('./routes/news'));
 app.use('/api/admin',           require('./routes/admin'));
 app.use('/api/reviews',         reviewLimiter, require('./routes/reviews'));
+
+// ─── Formulaire de contact ───────────────────────────────────
+app.post('/api/contact', contactLimiter, async (req, res) => {
+  const { name, email, message } = req.body;
+  if (!name?.trim() || !email?.trim() || !message?.trim())
+    return res.status(400).json({ error: 'Tous les champs sont requis' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ error: 'Adresse email invalide' });
+  if (message.trim().length > 2000)
+    return res.status(400).json({ error: 'Message trop long (2000 caractères max)' });
+
+  try {
+    const { sendContactEmail } = require('./utils/email');
+    await sendContactEmail(name.trim(), email.trim(), message.trim());
+    res.json({ success: true, message: 'Message envoyé !' });
+  } catch (err) {
+    console.error('Erreur envoi contact:', err.message);
+    res.status(500).json({ error: 'Erreur lors de l\'envoi. Réessayez ou contactez-nous par email.' });
+  }
+});
 
 // ─── Setup premier lancement ────────────────────────────────
 app.post('/api/setup', (req, res) => {
