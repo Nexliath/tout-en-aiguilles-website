@@ -31,9 +31,26 @@
     <div class="header-actions">
       <button class="icon-btn" id="user-btn">👤</button>
       <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
+      <button class="hamburger icon-btn" onclick="openMobileNav()" aria-label="Menu">☰</button>
     </div>
   </div>
 </header>
+
+<div class="mobile-nav-overlay" id="mobile-nav" onclick="closeMobileNav()">
+  <div class="mobile-nav-panel" onclick="event.stopPropagation()">
+    <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
+    <div style="font-family:var(--font-title);font-size:1.05rem;color:var(--rose-dark);margin-bottom:8px">🧶 Tout en Aiguilles</div>
+    <nav class="mobile-nav-links">
+      <a href="/">🏠 Accueil</a>
+      <a href="/boutique.html">🛍️ Boutique</a>
+      <a href="/actualites.html">📰 Actualités</a>
+      <a href="/#contact">✉️ Contact</a>
+      <div class="mobile-nav-divider"></div>
+      <a href="/compte.html" class="active">👤 Mon compte</a>
+      <a href="/panier.html">🛒 Mon panier</a>
+    </nav>
+  </div>
+</div>
 
 <!-- Not logged in -->
 <div id="not-logged-in" style="display:none">
