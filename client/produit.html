@@ -73,6 +73,10 @@
     .product-info { padding: 0 0 0 40px; }
 
     @media (max-width: 768px) {
+      /* Breadcrumb collé au header */
+      .produit-main { padding: 14px 0 60px !important; }
+      .breadcrumb { margin-bottom: 12px; font-size: .8rem; }
+
       .product-layout { grid-template-columns: 1fr !important; }
       .product-info { padding: 0; }
       .product-gallery { grid-template-columns: 1fr !important; gap: 0; }
@@ -80,23 +84,31 @@
       /* Thumbnails hidden — replaced by dots inside image */
       .gallery-thumbs { display: none !important; }
 
-      /* Smaller image on mobile */
+      /* Image pleine largeur, ratio 1:1 préservé, coins moins arrondis */
       .gallery-main {
-        aspect-ratio: unset !important;
-        height: 58vw; max-height: 300px;
+        aspect-ratio: 1 / 1;
         border-radius: var(--radius-lg) !important;
         margin-bottom: 12px;
+        max-height: 88vw;
       }
 
-      /* Carousel swipeable on mobile */
+      /* Carousel swipeable sur mobile — prefixes cross-browser */
       .gallery-carousel {
         overflow-x: scroll;
+        -webkit-scroll-snap-type: x mandatory;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
+        display: -webkit-box;
+        display: flex;
       }
       .gallery-carousel::-webkit-scrollbar { display: none; }
-      .gallery-slide { scroll-snap-align: start; }
+      .gallery-slide {
+        -webkit-scroll-snap-align: start;
+        scroll-snap-align: start;
+        -webkit-flex: 0 0 100%;
+        flex: 0 0 100%;
+      }
 
       /* Product info compact on mobile */
       #prod-name { font-size: 1.3rem !important; margin-bottom: 8px !important; }
@@ -187,7 +199,7 @@
   </div>
 </div>
 
-<main style="padding: 32px 0 80px">
+<main class="produit-main" style="padding: 32px 0 80px">
   <div class="container">
     <!-- Breadcrumb -->
     <div class="breadcrumb">
