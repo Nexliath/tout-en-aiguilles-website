@@ -396,7 +396,7 @@ function initHeader() {
       adminLink.textContent = '⚙️ Admin';
       adminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:6px;padding:4px 10px;font-size:.85rem';
       // Récupérer le chemin admin depuis le serveur (suit automatiquement la variable ADMIN_PATH)
-      fetch('/api/admin-path').then(r => r.json()).then(d => {
+      apiFetch('/admin-path').then(d => {
         adminLink.href = '/' + d.path + '/';
       }).catch(() => { adminLink.href = '/gestion-tea/'; });
       nav.appendChild(adminLink);
