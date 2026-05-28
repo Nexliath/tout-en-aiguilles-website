@@ -25,6 +25,17 @@ _db.exec(schema);
 const migrations = [
   "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
   "UPDATE users SET email_verified = 1 WHERE role = 'admin'",
+  // Migration reviews table (pour bases existantes créées avant cette fonctionnalité)
+  `CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    comment TEXT,
+    is_approved INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(product_id, user_id)
+  )`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
