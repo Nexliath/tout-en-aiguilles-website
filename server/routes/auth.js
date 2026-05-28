@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
-const { sendVerificationEmail } = require('../utils/email');
+const { sendVerificationEmail, sendEmailChangeConfirmation } = require('../utils/email');
 
 // ─── Config upload avatar ────────────────────────────────────
 const avatarStorage = multer.diskStorage({
@@ -203,6 +203,59 @@ router.put('/me', requireAuth, (req, res) => {
   }
   db.prepare('UPDATE users SET first_name = ?, last_name = ?, username = ? WHERE id = ?').run(first_name, last_name, usernameClean, req.user.id);
   res.json({ success: true });
+});
+
+// ─── POST /api/auth/change-email ───────────────────────────
+// Demande de changement d'email (envoie un lien de confirmation à la NOUVELLE adresse)
+router.post('/change-email', requireAuth, (req, res) => {
+  const { new_email, password } = req.body;
+  if (!new_email || !password) return res.status(400).json({ error: 'Nouvel email et mot de passe requis' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+  if (!bcrypt.compareSync(password, user.password_hash))
+    return res.status(401).json({ error: 'Mot de passe incorrect' });
+
+  if (new_email.toLowerCase() === user.email.toLowerCase())
+    return res.status(400).json({ error: 'C\'est déjà votre adresse email actuelle' });
+
+  const existing = db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').get(new_email);
+  if (existing) return res.status(409).json({ error: 'Cette adresse email est déjà utilisée' });
+
+  const token = generateToken();
+  const expiresAt = tokenExpiresAt();
+
+  db.prepare('UPDATE users SET pending_email = ?, email_change_token = ?, email_change_expires_at = ? WHERE id = ?')
+    .run(new_email, token, expiresAt, req.user.id);
+
+  res.json({ message: `Un lien de confirmation a été envoyé à ${new_email}. Cliquez dessus pour valider le changement.` });
+
+  // Envoi asynchrone à la NOUVELLE adresse
+  sendEmailChangeConfirmation(new_email, user.first_name, token, BASE_URL)
+    .catch(err => console.error('Erreur envoi email changement:', err.message));
+});
+
+// ─── GET /api/auth/confirm-email-change?token=xxx ──────────
+// Confirmation du changement d'email via le lien reçu
+router.get('/confirm-email-change', (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.redirect('/compte.html?email_error=invalid');
+
+  const user = db.prepare('SELECT * FROM users WHERE email_change_token = ?').get(token);
+  if (!user) return res.redirect('/compte.html?email_error=invalid');
+
+  if (new Date(user.email_change_expires_at) < new Date()) {
+    db.prepare('UPDATE users SET pending_email = NULL, email_change_token = NULL, email_change_expires_at = NULL WHERE id = ?').run(user.id);
+    return res.redirect('/compte.html?email_error=expired');
+  }
+
+  const newEmail = user.pending_email;
+  db.prepare('UPDATE users SET email = ?, pending_email = NULL, email_change_token = NULL, email_change_expires_at = NULL WHERE id = ?')
+    .run(newEmail, user.id);
+
+  // L'utilisateur doit se reconnecter avec son nouvel email
+  res.redirect('/compte.html?email_changed=1');
 });
 
 // ─── POST /api/auth/avatar ──────────────────────────────────
