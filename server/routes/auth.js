@@ -2,9 +2,33 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
 const { sendVerificationEmail } = require('../utils/email');
+
+// ─── Config upload avatar ────────────────────────────────────
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../../client/assets/images/avatars');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `avatar_u${req.user ? req.user.id : 'x'}_${Date.now()}${ext}`);
+  }
+});
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 1 * 1024 * 1024 }, // 1 MB max (le client compresse déjà à ~200 KB)
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
+    cb(null, true);
+  }
+});
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024';
@@ -25,12 +49,14 @@ function sendEmailAsync(email, firstName, token) {
 
 // ─── POST /api/auth/register ────────────────────────────────
 router.post('/register', (req, res) => {
-  const { email, password, first_name, last_name } = req.body;
+  const { email, password, first_name, last_name, username } = req.body;
 
   if (!email || !password || !first_name || !last_name)
     return res.status(400).json({ error: 'Tous les champs sont requis' });
-  if (password.length < 6)
-    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères' });
+  if (password.length < 8)
+    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères' });
+  if (!/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password))
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins une majuscule, un chiffre et un caractère spécial' });
 
   const existing = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(email);
 
@@ -47,11 +73,18 @@ router.post('/register', (req, res) => {
     return res.status(409).json({ error: 'Cet email est déjà utilisé' });
   }
 
+  // Vérifier unicité du pseudo si fourni
+  const usernameClean = username?.trim() || null;
+  if (usernameClean) {
+    const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(usernameClean);
+    if (existingUsername) return res.status(409).json({ error: 'Ce pseudo est déjà utilisé' });
+  }
+
   // Créer le compte (non vérifié)
   const hash = bcrypt.hashSync(password, 10);
   const result = db.prepare(
-    'INSERT INTO users (email, password_hash, first_name, last_name, email_verified) VALUES (?, ?, ?, ?, 0)'
-  ).run(email, hash, first_name, last_name);
+    'INSERT INTO users (email, password_hash, first_name, last_name, username, email_verified) VALUES (?, ?, ?, ?, ?, 0)'
+  ).run(email, hash, first_name, last_name, usernameClean);
 
   const token = generateToken();
   db.prepare('INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES (?, ?, ?)').run(result.lastInsertRowid, token, tokenExpiresAt());
@@ -155,16 +188,37 @@ router.post('/admin-cookie', (req, res) => {
 
 // ─── GET /api/auth/me ───────────────────────────────────────
 router.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT id, email, first_name, last_name, role, email_verified, created_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, email, first_name, last_name, username, role, email_verified, created_at, avatar_url FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
   res.json(user);
 });
 
 // ─── PUT /api/auth/me ───────────────────────────────────────
 router.put('/me', requireAuth, (req, res) => {
-  const { first_name, last_name } = req.body;
-  db.prepare('UPDATE users SET first_name = ?, last_name = ? WHERE id = ?').run(first_name, last_name, req.user.id);
+  const { first_name, last_name, username } = req.body;
+  const usernameClean = username?.trim() || null;
+  if (usernameClean) {
+    const conflict = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(usernameClean, req.user.id);
+    if (conflict) return res.status(409).json({ error: 'Ce pseudo est déjà utilisé' });
+  }
+  db.prepare('UPDATE users SET first_name = ?, last_name = ?, username = ? WHERE id = ?').run(first_name, last_name, usernameClean, req.user.id);
   res.json({ success: true });
+});
+
+// ─── POST /api/auth/avatar ──────────────────────────────────
+router.post('/avatar', requireAuth, uploadAvatar.single('avatar'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Fichier image requis' });
+
+  // Supprimer l'ancien avatar si présent
+  const user = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(req.user.id);
+  if (user && user.avatar_url) {
+    const oldPath = path.join(__dirname, '../../client', user.avatar_url);
+    if (fs.existsSync(oldPath)) { try { fs.unlinkSync(oldPath); } catch {} }
+  }
+
+  const avatarUrl = `/assets/images/avatars/${req.file.filename}`;
+  db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.user.id);
+  res.json({ avatar_url: avatarUrl, message: 'Photo de profil mise à jour !' });
 });
 
 // ─── PUT /api/auth/password ─────────────────────────────────
