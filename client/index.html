@@ -322,15 +322,35 @@ async function loadNews() {
   } catch {}
 }
 
-function sendContact() {
+async function sendContact() {
   const name = document.getElementById('contact-name').value.trim();
   const email = document.getElementById('contact-email').value.trim();
   const msg = document.getElementById('contact-msg').value.trim();
   if (!name || !email || !msg) { Toast.show('Veuillez remplir tous les champs', 'error'); return; }
-  Toast.show('Message envoyé ! Nous vous répondrons vite 🌸', 'success');
-  document.getElementById('contact-name').value = '';
-  document.getElementById('contact-email').value = '';
-  document.getElementById('contact-msg').value = '';
+
+  const btn = document.querySelector('[onclick="sendContact()"]');
+  const originalText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi en cours…'; }
+
+  try {
+    const res = await apiFetch('/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, message: msg })
+    });
+    if (res.success) {
+      Toast.show('Message envoyé ! Nous vous répondrons vite 🌸', 'success');
+      document.getElementById('contact-name').value = '';
+      document.getElementById('contact-email').value = '';
+      document.getElementById('contact-msg').value = '';
+    } else {
+      Toast.show(res.error || 'Erreur lors de l\'envoi', 'error');
+    }
+  } catch {
+    Toast.show('Erreur réseau. Réessayez ou écrivez-nous directement.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
+  }
 }
 
 loadFeaturedProducts();
