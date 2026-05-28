@@ -50,22 +50,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── Bloquer l'ancien chemin /admin → 404 ───────────────────
+// Les scanners cherchent /admin — ils ne trouveront rien
 app.use('/admin', (req, res) => res.status(404).send('Not Found'));
 
-// ─── Backoffice protégé — chemin configurable ────────────────
-// Vérifie le cookie httpOnly posé lors du login admin
-// Sans cookie valide → 404 (pas de redirection, pas d'info)
-app.use(`/${ADMIN_PATH}`, (req, res, next) => {
-  const token = req.cookies?.tea_admin_sess;
-  if (!token) return res.status(404).send('Not Found');
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== 'admin') return res.status(404).send('Not Found');
-    next();
-  } catch {
-    return res.status(404).send('Not Found');
-  }
-}, express.static(path.join(__dirname, '../client/admin')));
+// ─── Backoffice — chemin non-évident configurable ────────────
+// Servi depuis client/admin/, accessible uniquement via /${ADMIN_PATH}/
+// Protection réelle : formulaire de garde + APIs requireAdmin + rate limiting
+app.use(`/${ADMIN_PATH}`, express.static(path.join(__dirname, '../client/admin')));
 
 // ─── Fichiers statiques publics ──────────────────────────────
 app.use(express.static(path.join(__dirname, '../client')));
