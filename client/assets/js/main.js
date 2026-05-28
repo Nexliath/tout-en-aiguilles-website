@@ -294,21 +294,18 @@ function initHeader() {
       userBtn.onclick = openAuthModal;
     }
   }
-  // Lien Admin dans la nav + pose silencieuse du cookie httpOnly pour l'accès backoffice
+  // Lien Admin dans la nav (admin uniquement) — chemin récupéré depuis le serveur
   if (Auth.isAdmin()) {
-    // Rafraîchir le cookie admin (nécessaire pour l'accès au backoffice côté serveur)
-    fetch('/api/auth/admin-cookie', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + Auth.getToken() }
-    }).catch(() => {});
-
     const nav = document.querySelector('.nav');
     if (nav && !nav.querySelector('.admin-nav-link')) {
       const adminLink = document.createElement('a');
-      adminLink.href = '/atelier/';
       adminLink.className = 'admin-nav-link';
       adminLink.textContent = '⚙️ Admin';
       adminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:6px;padding:4px 10px;font-size:.85rem';
+      // Récupérer le chemin admin depuis le serveur (suit automatiquement la variable ADMIN_PATH)
+      fetch('/api/admin-path').then(r => r.json()).then(d => {
+        adminLink.href = '/' + d.path + '/';
+      }).catch(() => { adminLink.href = '/gestion-tea/'; });
       nav.appendChild(adminLink);
     }
   }
