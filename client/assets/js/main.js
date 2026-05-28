@@ -294,6 +294,18 @@ function initHeader() {
       userBtn.onclick = openAuthModal;
     }
   }
+  // Lien Admin dans la nav si l'utilisateur est administrateur
+  if (Auth.isAdmin()) {
+    const nav = document.querySelector('.nav');
+    if (nav && !nav.querySelector('.admin-nav-link')) {
+      const adminLink = document.createElement('a');
+      adminLink.href = '/admin/';
+      adminLink.className = 'admin-nav-link';
+      adminLink.textContent = '⚙️ Admin';
+      adminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:6px;padding:4px 10px;font-size:.85rem';
+      nav.appendChild(adminLink);
+    }
+  }
   // Highlight active nav
   document.querySelectorAll('.nav a').forEach(a => {
     if (a.href === location.href || location.pathname.startsWith(a.pathname) && a.pathname !== '/') {
