@@ -424,6 +424,9 @@ function renderProductCard(p) {
   const placeholder = `<div class="product-card-placeholder" ${img ? 'style="display:none"' : ''}>🧶</div>`;
   const isFav = Favorites.has(p.id);
   const inStock = p.stock > 0;
+  const tags = Array.isArray(p.tags) && p.tags.length > 0
+    ? p.tags.slice(0, 3).map(t => `<span class="product-card-tag">${t}</span>`).join('')
+    : '';
 
   return `
     <div class="card product-card" data-id="${p.id}">
@@ -438,9 +441,10 @@ function renderProductCard(p) {
           <div class="product-card-name">${p.name}</div>
         </a>
         <div class="product-card-price">${p.price.toFixed(2)} €</div>
+        ${tags ? `<div class="product-card-tags">${tags}</div>` : ''}
         <div class="product-card-footer">
-          <button class="btn btn-primary btn-sm card-add-btn" style="flex:1" data-pid="${p.id}" ${!inStock ? 'disabled' : ''}>
-            ${inStock ? '🛒 Ajouter' : 'Indisponible'}
+          <button class="btn btn-primary btn-sm card-add-btn" data-pid="${p.id}" ${!inStock ? 'disabled' : ''}>
+            <span class="btn-icon">🛒</span><span class="btn-label"> Ajouter</span>
           </button>
           <button class="favorite-btn ${isFav ? 'active' : ''} card-fav-btn" data-pid="${p.id}" title="${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">
             ${isFav ? '❤️' : '🤍'}
