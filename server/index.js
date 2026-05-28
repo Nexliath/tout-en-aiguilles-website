@@ -102,6 +102,11 @@ app.post('/api/setup', (req, res) => {
   res.json({ token, user, message: 'Compte administrateur créé avec succès !' });
 });
 
+// ─── Admin path (pour le lien dans le header) ───────────────
+app.get('/api/admin-path', (req, res) => {
+  res.json({ path: ADMIN_PATH });
+});
+
 // ─── Health check ───────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   const db = require('./db/database');
