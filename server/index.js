@@ -80,16 +80,17 @@ app.post('/api/setup', (req, res) => {
   res.json({ token, user, message: 'Compte administrateur créé avec succès !' });
 });
 
-// ─── Test email (temporaire — à supprimer après diagnostic) ─
-app.get('/api/test-email', async (req, res) => {
-  const { sendVerificationEmail } = require('./utils/email');
-  const to = req.query.to || process.env.SMTP_USER;
-  try {
-    const result = await sendVerificationEmail(to, 'Test', 'TOKEN_TEST_123', process.env.BASE_URL || 'http://localhost:3000');
-    res.json({ success: true, result, smtp: { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER, from: process.env.SMTP_FROM, configured: !!process.env.SMTP_HOST } });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message, smtp: { host: process.env.SMTP_HOST, port: process.env.SMTP_PORT, user: process.env.SMTP_USER, from: process.env.SMTP_FROM, configured: !!process.env.SMTP_HOST } });
-  }
+// ─── Test email config (temporaire) ─────────────────────────
+app.get('/api/test-email', (req, res) => {
+  res.json({
+    smtp_host:      process.env.SMTP_HOST      || '❌ NON DÉFINI',
+    smtp_port:      process.env.SMTP_PORT      || '❌ NON DÉFINI',
+    smtp_user:      process.env.SMTP_USER      || '❌ NON DÉFINI',
+    smtp_pass_set:  !!process.env.SMTP_PASS,
+    smtp_from:      process.env.SMTP_FROM      || '❌ NON DÉFINI',
+    base_url:       process.env.BASE_URL       || '❌ NON DÉFINI',
+    configured:     !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+  });
 });
 
 // ─── Health check ───────────────────────────────────────────
