@@ -82,15 +82,22 @@
       .product-info { padding: 0; }
       .product-gallery { grid-template-columns: 1fr !important; gap: 0; }
 
-      /* Thumbnails hidden — replaced by dots inside image */
-      .gallery-thumbs { display: none !important; }
+      /* Mobile : vignettes horizontales sous l'image */
+      .gallery-thumbs {
+        display: -webkit-flex !important; display: flex !important;
+        flex-direction: row !important; -webkit-flex-direction: row !important;
+        gap: 6px; overflow-x: auto; padding: 8px 0;
+        scrollbar-width: none; margin-top: 8px;
+      }
+      .gallery-thumbs::-webkit-scrollbar { display: none; }
+      .gallery-thumb { width: 56px !important; height: 56px !important; flex-shrink: 0; border-radius: 6px !important; }
 
-      /* Image pleine largeur, ratio 1:1 préservé, coins moins arrondis */
+      /* Image compacte — 65vw max comme Etsy/Vinted */
       .gallery-main {
         aspect-ratio: 1 / 1;
         border-radius: var(--radius-lg) !important;
-        margin-bottom: 12px;
-        max-height: 88vw;
+        margin-bottom: 0;
+        max-height: 65vw;
       }
 
       /* Carousel swipeable sur mobile — prefixes cross-browser */
@@ -234,6 +241,14 @@
             <span id="prod-price" style="font-size:2rem;font-weight:700;color:var(--rose-dark)"></span>
             <span id="prod-stock"></span>
           </div>
+          <div id="stock-alert-section" style="display:none;margin-top:10px;margin-bottom:16px">
+            <p style="font-size:.82rem;color:var(--text-light);margin-bottom:6px">🔔 Recevez une alerte quand ce produit est disponible :</p>
+            <div style="display:flex;gap:8px">
+              <input type="email" id="stock-alert-email" class="form-input" placeholder="votre@email.fr" style="flex:1;font-size:.85rem">
+              <button class="btn btn-secondary btn-sm" onclick="subscribeStockAlert()">Me prévenir</button>
+            </div>
+            <div id="stock-alert-msg" style="font-size:.8rem;margin-top:5px;display:none"></div>
+          </div>
 
           <!-- Description -->
           <div style="background:var(--cream);border-radius:var(--radius-lg);padding:20px;margin-bottom:24px">
@@ -270,6 +285,14 @@
           </div>
         </div>
       </div>
+
+      <!-- ── Recommandations ── -->
+      <section class="section-sm" style="background:var(--rose-pale)" id="recommendations-section">
+        <div class="container">
+          <h3 style="font-family:var(--font-title);text-align:center;margin-bottom:24px">Vous pourriez aussi aimer ✨</h3>
+          <div id="recommendations" class="grid-4"></div>
+        </div>
+      </section>
 
       <!-- Section Avis -->
       <div class="reviews-section" id="reviews-section">
@@ -345,6 +368,19 @@ async function loadProduct() {
     renderProduct(product);
     loadRelated(product);
     loadReviews(product.id);
+    // Recommandations par catégorie
+    if (product.category_slug) {
+      apiFetch(`/products?category=${encodeURIComponent(product.category_slug)}&limit=8`).then(recs => {
+        const filtered = recs.filter(r => r.id !== product.id).slice(0, 4);
+        const el = document.getElementById('recommendations');
+        const section = document.getElementById('recommendations-section');
+        if (el && filtered.length >= 2) { el.innerHTML = filtered.map(renderProductCard).join(''); }
+        else if (section) { section.style.display = 'none'; }
+      }).catch(() => { const s = document.getElementById('recommendations-section'); if(s) s.style.display='none'; });
+    } else {
+      const s = document.getElementById('recommendations-section');
+      if (s) s.style.display = 'none';
+    }
     renderReviewForm();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('product-detail').style.display = '';
@@ -425,6 +461,10 @@ function renderProduct(p) {
     stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
     document.getElementById('add-cart-btn').disabled = true;
   }
+  // Alerte retour en stock
+  const alertSection = document.getElementById('stock-alert-section');
+  if (alertSection) alertSection.style.display = p.stock === 0 ? '' : 'none';
+  window._currentProductId = p.id;
 
   // Tags
   const tags = p.tags || [];
@@ -766,6 +806,18 @@ async function loadReviews(productId) {
 function showNotFound() {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('not-found').style.display = '';
+}
+
+async function subscribeStockAlert() {
+  const email = document.getElementById('stock-alert-email').value.trim();
+  const msg = document.getElementById('stock-alert-msg');
+  if (!email || !window._currentProductId) return;
+  try {
+    await apiFetch('/products/stock-alert', { method: 'POST', body: { product_id: window._currentProductId, email }});
+    msg.textContent = '✓ Parfait ! Vous recevrez un email dès que ce produit sera de nouveau disponible.';
+    msg.style.color = 'var(--sage-dark)'; msg.style.display = '';
+    document.getElementById('stock-alert-section').style.display = 'none';
+  } catch(e) { msg.textContent = e.message || 'Erreur'; msg.style.color = '#d9534f'; msg.style.display = ''; }
 }
 
 loadProduct();
