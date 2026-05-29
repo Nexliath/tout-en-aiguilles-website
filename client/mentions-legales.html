@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mentions Légales — Tout en Aiguilles</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
+    <nav class="nav">
+      <a href="/">Accueil</a>
+      <a href="/boutique.html">Boutique</a>
+      <a href="/actualites.html">Actualités</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="user-btn">👤</button>
+      <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
+      <button class="hamburger icon-btn" onclick="openMobileNav()" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav-overlay" id="mobile-nav" onclick="closeMobileNav()">
+  <div class="mobile-nav-panel" onclick="event.stopPropagation()">
+    <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
+    <nav class="mobile-nav-links">
+      <a href="/">🏠 Accueil</a>
+      <a href="/boutique.html">🛍️ Boutique</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page-hero">
+  <div class="container">
+    <h1>Mentions Légales</h1>
+    <p>Informations légales relatives au site tout-en-aiguilles.com</p>
+  </div>
+</div>
+
+<main class="section">
+  <div class="container">
+    <div style="max-width:760px;margin:0 auto" class="card" style="padding:40px">
+      <div style="padding:40px">
+
+        <h2 style="font-family:var(--font-title);margin-bottom:16px;margin-top:0">Éditeur du site</h2>
+        <p style="margin-bottom:8px"><strong>Raison sociale :</strong> Tout en Aiguilles</p>
+        <p style="margin-bottom:8px"><strong>Statut :</strong> Micro-entreprise / Artisan créateur</p>
+        <p style="margin-bottom:8px"><strong>Email :</strong> <a href="mailto:tout.en.aiguilles@gmail.com" style="color:var(--rose-dark)">tout.en.aiguilles@gmail.com</a></p>
+        <p style="margin-bottom:32px"><strong>Localisation :</strong> Paris, France</p>
+
+        <h2 style="font-family:var(--font-title);margin-bottom:16px">Hébergement</h2>
+        <p style="margin-bottom:32px">Ce site est hébergé par <strong>Railway</strong> (Railway Corporation, San Francisco, CA, USA) et servi via <strong>Cloudflare</strong>.</p>
+
+        <h2 style="font-family:var(--font-title);margin-bottom:16px">Propriété intellectuelle</h2>
+        <p style="margin-bottom:12px">L'ensemble du contenu de ce site (textes, photographies, créations présentées) est protégé par le droit d'auteur. Toute reproduction, même partielle, est interdite sans autorisation écrite préalable.</p>
+        <p style="margin-bottom:32px">Les photographies des produits sont la propriété exclusive de Tout en Aiguilles.</p>
+
+        <h2 style="font-family:var(--font-title);margin-bottom:16px">Données personnelles</h2>
+        <p style="margin-bottom:12px">Les données collectées lors d'une commande (nom, prénom, email, adresse) sont utilisées uniquement pour le traitement de votre commande et la communication relative à celle-ci. Elles ne sont jamais cédées à des tiers à des fins commerciales.</p>
+        <p style="margin-bottom:12px">Conformément au RGPD et à la loi Informatique et Libertés, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ce droit, contactez-nous à <a href="mailto:tout.en.aiguilles@gmail.com" style="color:var(--rose-dark)">tout.en.aiguilles@gmail.com</a>.</p>
+        <p style="margin-bottom:32px">Les paiements sont traités par <strong>Stripe</strong> — Tout en Aiguilles ne conserve aucune donnée bancaire.</p>
+
+        <h2 style="font-family:var(--font-title);margin-bottom:16px">Cookies</h2>
+        <p style="margin-bottom:32px">Ce site utilise des cookies techniques nécessaires au bon fonctionnement du panier et de l'authentification. Google Tag Manager est utilisé à des fins d'analyse d'audience anonymisée.</p>
+
+        <h2 style="font-family:var(--font-title);margin-bottom:16px">Droit applicable</h2>
+        <p>Le présent site est soumis au droit français. En cas de litige, les tribunaux français sont compétents.</p>
+
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6);flex-wrap:wrap;gap:8px">
+      <span>© <span id="footer-year"></span> Tout en Aiguilles</span>
+      <span>
+        <a href="/livraison.html" style="color:rgba(255,255,255,.6);margin-right:16px">Livraison & Retours</a>
+        <a href="/mentions-legales.html" style="color:rgba(255,255,255,.6)">Mentions légales</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/main.js"></script>
+<script>
+function openMobileNav()  { document.getElementById('mobile-nav').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeMobileNav() { document.getElementById('mobile-nav').classList.remove('open'); document.body.style.overflow=''; }
+const fyEl = document.getElementById('footer-year');
+if (fyEl) fyEl.textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
