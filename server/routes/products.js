@@ -59,6 +59,21 @@ router.get('/', (req, res) => {
   res.json(products);
 });
 
+// GET /api/products/variants/:groupId — variantes d'un même groupe
+// Doit être avant /:slug pour ne pas être intercepté
+router.get('/variants/:groupId', (req, res) => {
+  const variants = db.prepare(`
+    SELECT p.id, p.name, p.slug, p.price, p.stock, p.images, p.variant_label, p.is_active
+    FROM products p
+    WHERE p.variant_group_id = ? AND p.is_active = 1
+    ORDER BY p.created_at ASC
+  `).all(req.params.groupId).map(p => ({
+    ...p,
+    images: JSON.parse(p.images || '[]'),
+  }));
+  res.json(variants);
+});
+
 // GET /api/products/categories — toutes les catégories
 router.get('/categories', (req, res) => {
   const cats = db.prepare('SELECT * FROM categories ORDER BY type, name').all();
@@ -120,21 +135,22 @@ router.delete('/:id/favorite', requireAuth, (req, res) => {
 
 // POST /api/products — créer un produit
 router.post('/', requireAdmin, upload.array('images', 5), (req, res) => {
-  const { name, description, price, stock, category_id, tags, is_featured } = req.body;
+  const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label } = req.body;
   if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
   const slug = slugify(name) + '-' + Date.now();
   const images = (req.files || []).map(f => `/assets/images/products/${f.filename}`);
   db.prepare(`
-    INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name, slug, description || '', Number(price), Number(stock) || 0,
-         category_id || null, JSON.stringify(images), tags || '[]', is_featured ? 1 : 0);
+         category_id || null, JSON.stringify(images), tags || '[]', is_featured ? 1 : 0,
+         variant_group_id?.trim() || null, variant_label?.trim() || null);
   res.status(201).json({ success: true });
 });
 
 // PUT /api/products/:id — modifier un produit
 router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
-  const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images } = req.body;
+  const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label } = req.body;
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
 
@@ -146,13 +162,15 @@ router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
 
   db.prepare(`
     UPDATE products SET name=?, description=?, price=?, stock=?, category_id=?,
-    images=?, tags=?, is_featured=?, is_active=?, updated_at=CURRENT_TIMESTAMP
+    images=?, tags=?, is_featured=?, is_active=?, variant_group_id=?, variant_label=?, updated_at=CURRENT_TIMESTAMP
     WHERE id=?
   `).run(name || existing.name, description ?? existing.description, Number(price) || existing.price,
          Number(stock) ?? existing.stock, category_id || existing.category_id,
          JSON.stringify(images), tags || existing.tags,
          is_featured !== undefined ? (is_featured === '1' || is_featured === 1 || is_featured === true ? 1 : 0) : existing.is_featured,
          is_active !== undefined   ? (is_active   === '1' || is_active   === 1 || is_active   === true ? 1 : 0) : existing.is_active,
+         variant_group_id?.trim() || existing.variant_group_id || null,
+         variant_label?.trim() || existing.variant_label || null,
          req.params.id);
   res.json({ success: true });
 });
