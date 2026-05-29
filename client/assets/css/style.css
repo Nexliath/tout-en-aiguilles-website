@@ -87,8 +87,9 @@ p  { color: var(--text-light); }
   display: flex; align-items: center; gap: 10px;
   font-family: var(--font-title); font-size: 1.35rem; font-weight: 700;
   color: var(--rose-dark);
+  white-space: nowrap; flex-shrink: 0;
 }
-.logo-icon { font-size: 1.8rem; }
+.logo-icon { font-size: 1.8rem; flex-shrink: 0; }
 .logo span { color: var(--sage-dark); }
 .nav { display: flex; align-items: center; gap: 6px; }
 .nav a {
