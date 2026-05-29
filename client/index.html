@@ -188,7 +188,7 @@
       <!-- Crochet -->
       <a href="/boutique.html?type=crochet" style="text-decoration:none">
         <div class="card" style="overflow:hidden;cursor:pointer">
-          <div style="height:200px;background:linear-gradient(135deg,var(--rose-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem">🧶</div>
+          <div id="cat-img-crochet" style="height:200px;background:linear-gradient(135deg,var(--rose-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem;overflow:hidden">🧶</div>
           <div style="padding:28px">
             <h3 style="margin-bottom:8px">Univers Crochet</h3>
             <p style="font-size:.9rem;margin-bottom:16px">Doudous, peluches, accessoires et déco au crochet. Créations tendres et colorées par Victorine.</p>
@@ -199,7 +199,7 @@
       <!-- Couture -->
       <a href="/boutique.html?type=couture" style="text-decoration:none">
         <div class="card" style="overflow:hidden;cursor:pointer">
-          <div style="height:200px;background:linear-gradient(135deg,var(--sage-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem">✂️</div>
+          <div id="cat-img-couture" style="height:200px;background:linear-gradient(135deg,var(--sage-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem;overflow:hidden">✂️</div>
           <div style="padding:28px">
             <h3 style="margin-bottom:8px">Univers Couture</h3>
             <p style="font-size:.9rem;margin-bottom:16px">Tote bags, sorties de bain, bananes et lingettes cousus avec amour par la maman de Victorine.</p>
@@ -341,13 +341,13 @@
         <div class="footer-links">
           <a href="/actualites.html">Actualités</a>
           <a href="#contact">Contact</a>
-          <a href="#">Livraison & retours</a>
-          <a href="#">Mentions légales</a>
+          <a href="/livraison.html">Livraison & retours</a>
+          <a href="/mentions-legales.html">Mentions légales</a>
         </div>
       </div>
     </div>
     <div class="footer-bottom">
-      <span>© 2024 Tout en Aiguilles — Tous droits réservés</span>
+      <span>© <span id="footer-year"></span> Tout en Aiguilles — Tous droits réservés</span>
       <span>Fait avec ❤️ par Victorine</span>
     </div>
   </div>
@@ -472,8 +472,33 @@ async function sendContact() {
   }
 }
 
+// Année dynamique
+const fyEl = document.getElementById('footer-year');
+if (fyEl) fyEl.textContent = new Date().getFullYear();
+
+// Chargement des vraies photos pour les catégories
+async function loadCategoryImages() {
+  try {
+    const [crochet, couture] = await Promise.all([
+      apiFetch('/products?type=crochet&limit=1&featured=true'),
+      apiFetch('/products?type=couture&limit=1&featured=true'),
+    ]);
+    const crochetImg = crochet[0]?.images?.[0];
+    const coutureImg = couture[0]?.images?.[0];
+    if (crochetImg) {
+      const el = document.getElementById('cat-img-crochet');
+      el.innerHTML = `<img src="${crochetImg}" alt="Crochet" style="width:100%;height:100%;object-fit:cover">`;
+    }
+    if (coutureImg) {
+      const el = document.getElementById('cat-img-couture');
+      el.innerHTML = `<img src="${coutureImg}" alt="Couture" style="width:100%;height:100%;object-fit:cover">`;
+    }
+  } catch(e) {}
+}
+
 loadFeaturedProducts();
 loadNews();
+loadCategoryImages();
 </script>
 </body>
 </html>
