@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codes promo — Admin Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px"><div style="font-size:3rem;margin-bottom:12px">🔐</div><h2>Espace admin</h2></div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" id="guard-email" class="form-input"></div>
+    <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" id="guard-password" class="form-input"></div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
+  </div>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
+    <nav class="admin-nav">
+      <a href="index.html">📊 Tableau de bord</a>
+      <a href="produits.html">🧶 Produits</a>
+      <a href="commandes.html">📦 Commandes</a>
+      <a href="actualites.html">📝 Actualités</a>
+      <a href="utilisateurs.html">👥 Utilisateurs</a>
+      <a href="avis.html">⭐ Avis</a>
+      <a href="promo.html" class="active">🏷️ Codes promo</a>
+      <a href="newsletter.html">📧 Newsletter</a>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+      <a href="/" target="_blank">🌐 Voir le site</a>
+      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
+    </nav>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>🏷️ Codes promo</h1>
+      <div id="promo-count" style="font-size:.85rem;color:var(--text-light)"></div>
+    </div>
+
+    <!-- Formulaire création -->
+    <div class="admin-panel" style="margin-bottom:24px">
+      <div class="admin-panel-title">➕ Nouveau code promo</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Code *</label>
+          <input type="text" id="f-code" class="form-input" placeholder="EX: PRINTEMPS10" style="text-transform:uppercase">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Type</label>
+          <select id="f-type" class="form-select">
+            <option value="percent">Pourcentage (%)</option>
+            <option value="amount">Montant fixe (€)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Valeur *</label>
+          <input type="number" id="f-value" class="form-input" placeholder="10" min="0" step="0.01">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Commande min (€)</label>
+          <input type="number" id="f-min" class="form-input" placeholder="0" min="0">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Max utilisations</label>
+          <input type="number" id="f-max" class="form-input" placeholder="Illimité" min="1">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Expiration</label>
+          <input type="date" id="f-expires" class="form-input">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Description (optionnel)</label>
+        <input type="text" id="f-desc" class="form-input" placeholder="Ex: -10% pour les nouveaux clients">
+      </div>
+      <div id="promo-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+      <button class="btn btn-primary" onclick="createPromo()">Créer le code promo</button>
+    </div>
+
+    <!-- Liste des codes -->
+    <div class="admin-panel">
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Code</th><th>Type / Valeur</th><th>Min cmde</th><th>Utilisations</th><th>Expiration</th><th>Statut</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="promo-tbody">
+            <tr><td colspan="7" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let allPromos = [];
+
+function checkAdmin() {
+  const guard = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) { content.style.display='none'; guard.style.display='flex'; }
+  else { guard.style.display='none'; content.style.display=''; loadPromos(); }
+}
+
+document.getElementById('guard-btn').addEventListener('click', function() {
+  const email = document.getElementById('guard-email').value.trim();
+  const password = document.getElementById('guard-password').value;
+  const errEl = document.getElementById('guard-error');
+  errEl.style.display = 'none';
+  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
+    .then(data => { if (data.user.role !== 'admin') throw new Error('Accès refusé'); Auth.save(data.token, data.user); checkAdmin(); })
+    .catch(e => { errEl.textContent = e.message; errEl.style.display = ''; });
+});
+
+async function loadPromos() {
+  try {
+    allPromos = await apiFetch('/promo');
+    document.getElementById('promo-count').textContent = `${allPromos.length} code${allPromos.length > 1 ? 's' : ''}`;
+    renderPromos();
+  } catch(e) { document.getElementById('promo-tbody').innerHTML = `<tr><td colspan="7" style="color:#d9534f;text-align:center;padding:24px">${e.message}</td></tr>`; }
+}
+
+function renderPromos() {
+  const tbody = document.getElementById('promo-tbody');
+  if (!allPromos.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-light)">Aucun code promo créé</td></tr>'; return; }
+  tbody.innerHTML = allPromos.map(p => {
+    const expired = p.expires_at && new Date(p.expires_at) < new Date();
+    return `<tr>
+      <td style="font-weight:700;letter-spacing:.05em">${p.code}</td>
+      <td>${p.discount_type === 'percent' ? `-${p.value}%` : `-${p.value.toFixed(2)} €`}</td>
+      <td>${p.min_order > 0 ? p.min_order.toFixed(2) + ' €' : '—'}</td>
+      <td>${p.uses_count}${p.max_uses ? '/' + p.max_uses : ''}</td>
+      <td style="font-size:.8rem">${p.expires_at ? new Date(p.expires_at).toLocaleDateString('fr-FR') : '—'}</td>
+      <td>
+        ${expired ? '<span style="color:#d9534f;font-size:.8rem">Expiré</span>' : p.is_active ? '<span style="color:var(--sage-dark);font-size:.8rem">✅ Actif</span>' : '<span style="color:var(--text-light);font-size:.8rem">⏸ Inactif</span>'}
+      </td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="togglePromo(${p.id}, ${p.is_active})" style="font-size:.75rem">${p.is_active ? 'Désactiver' : 'Activer'}</button>
+        <button class="btn btn-ghost btn-sm" onclick="deletePromo(${p.id})" style="font-size:.75rem;color:#d9534f">Supprimer</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function createPromo() {
+  const code = document.getElementById('f-code').value.trim().toUpperCase();
+  const value = parseFloat(document.getElementById('f-value').value);
+  const errEl = document.getElementById('promo-error');
+  errEl.style.display = 'none';
+  if (!code || !value) { errEl.textContent = 'Code et valeur requis'; errEl.style.display = ''; return; }
+  try {
+    await apiFetch('/promo', { method: 'POST', body: {
+      code, value,
+      discount_type: document.getElementById('f-type').value,
+      min_order: parseFloat(document.getElementById('f-min').value) || 0,
+      max_uses: document.getElementById('f-max').value || null,
+      expires_at: document.getElementById('f-expires').value || null,
+      description: document.getElementById('f-desc').value.trim(),
+    }});
+    Toast.show('✅ Code promo créé !', 'success');
+    ['f-code','f-value','f-min','f-max','f-expires','f-desc'].forEach(id => document.getElementById(id).value = '');
+    await loadPromos();
+  } catch(e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+async function togglePromo(id, isActive) {
+  await apiFetch(`/promo/${id}`, { method: 'PUT', body: { is_active: !isActive } });
+  await loadPromos();
+}
+
+async function deletePromo(id) {
+  if (!confirm('Supprimer ce code promo ?')) return;
+  await apiFetch(`/promo/${id}`, { method: 'DELETE', body: {} });
+  Toast.show('Code supprimé', 'success');
+  await loadPromos();
+}
+
+checkAdmin();
+</script>
+</body>
+</html>
