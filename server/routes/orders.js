@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail } = require('../utils/email');
+const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail } = require('../utils/email');
 
 // ─── Migrations colonnes supplémentaires ─────────────────────
 try { db.exec('ALTER TABLE orders ADD COLUMN review_requested_at TEXT'); } catch(e) {}
@@ -205,6 +205,24 @@ router.put('/:id/status', requireAdmin, (req, res) => {
     sendOrderStatusEmail({ ...order, items: JSON.parse(order.items || '[]') }).catch(console.error);
   }
   res.json({ success: true });
+});
+
+// PUT /api/orders/:id/relay-point — changer le point relais + notifier le client
+router.put('/:id/relay-point', requireAdmin, async (req, res) => {
+  const { relay_point } = req.body;
+  if (!relay_point?.trim()) return res.status(400).json({ error: 'Nouveau point relais requis' });
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+  if (order.delivery_type !== 'relay') return res.status(400).json({ error: 'Cette commande n\'est pas une livraison en point relais' });
+  const oldRelay = order.relay_point;
+  db.prepare('UPDATE orders SET relay_point = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(relay_point.trim(), req.params.id);
+  try {
+    await sendRelayChangeEmail({ ...order, items: JSON.parse(order.items || '[]') }, oldRelay, relay_point.trim());
+    res.json({ success: true, notified: true });
+  } catch(e) {
+    console.error('Relay change email error:', e.message);
+    res.json({ success: true, notified: false, error: e.message });
+  }
 });
 
 // ─── GET /api/orders/review-reminders — envoi des demandes d'avis J+8 ──
