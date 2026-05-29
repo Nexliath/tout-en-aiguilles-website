@@ -98,6 +98,15 @@ let allOrders = [];
 let currentFilter = '';
 
 const STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
+const DELIVERY_LABEL = { home: '🏠 Domicile', relay: '📦 Point Relais', handover: '🤝 Remise en main propre' };
+// Transitions logiques : seuls les statuts suivants sont proposés selon le statut actuel
+const NEXT_STATUSES = {
+  pending:   ['paid', 'cancelled'],
+  paid:      ['shipped', 'cancelled'],
+  shipped:   ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: ['pending'],
+};
 
 async function init() {
   if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
@@ -151,15 +160,33 @@ function showDetail(id) {
   document.getElementById('order-detail').style.display = '';
   document.getElementById('detail-title').textContent = `Commande #${o.id}`;
   document.getElementById('detail-status').innerHTML = `<span class="order-status status-${o.status}">${STATUS[o.status]}</span>`;
+  // Infos livraison
+  let deliveryInfo = '';
+  if (o.delivery_type === 'handover') {
+    deliveryInfo = `<span style="color:var(--sage-dark)">🤝 Remise en main propre — Paris 8ème, Gare Saint-Lazare</span>`;
+  } else if (o.delivery_type === 'relay' && o.relay_point) {
+    deliveryInfo = `📦 Point Relais : <strong>${o.relay_point}</strong>`;
+  } else {
+    deliveryInfo = `🏠 ${o.address}, ${o.postal_code} ${o.city}, ${o.country}`;
+  }
+  const feeStr = Number(o.delivery_fee || 0) > 0 ? ` (+${Number(o.delivery_fee).toFixed(2)} €)` : ' (Gratuit)';
+  const trackingStr = o.tracking_number ? `<br>📍 Suivi : <strong style="color:var(--sage-dark)">${o.tracking_number}</strong>` : '';
+
   document.getElementById('detail-customer').innerHTML = `
     <strong>${o.first_name} ${o.last_name}</strong><br>
-    ${o.email}<br>${o.address}<br>${o.postal_code} ${o.city}, ${o.country}`;
+    <a href="mailto:${o.email}" style="color:var(--rose-dark)">${o.email}</a><br>
+    ${deliveryInfo}${feeStr}${trackingStr}`;
 
-  const statusFlow = ['pending','paid','shipped','delivered','cancelled'];
-  document.getElementById('status-buttons').innerHTML = statusFlow.map(s => `
-    <button class="btn btn-sm ${s === o.status ? 'btn-primary' : 'btn-ghost'}" onclick="changeStatus(${o.id}, '${s}')">
-      ${STATUS[s]}
-    </button>`).join('');
+  // Transitions logiques seulement
+  const nexts = NEXT_STATUSES[o.status] || [];
+  document.getElementById('status-buttons').innerHTML = nexts.length === 0
+    ? `<span style="font-size:.85rem;color:var(--text-light)">Statut final — aucune action disponible</span>`
+    : nexts.map(s => `
+      <button class="btn btn-sm ${s === 'cancelled' ? 'btn-ghost' : 'btn-secondary'}"
+        onclick="${s === 'shipped' ? `promptTracking(${o.id})` : `changeStatus(${o.id}, '${s}')`}"
+        style="${s === 'cancelled' ? 'color:#d9534f' : ''}">
+        ${STATUS[s]}
+      </button>`).join('');
 
   document.getElementById('detail-items').innerHTML = o.items.map(item => `
     <div style="display:flex;gap:12px;align-items:center;padding:10px;background:var(--cream);border-radius:8px;margin-bottom:6px">
@@ -173,7 +200,10 @@ function showDetail(id) {
       <div style="font-weight:700;color:var(--rose-dark)">${(item.qty * item.price).toFixed(2)} €</div>
     </div>`).join('');
 
-  document.getElementById('detail-total').textContent = `Total : ${Number(o.total).toFixed(2)} €`;
+  const deliveryFee = Number(o.delivery_fee || 0);
+  document.getElementById('detail-total').innerHTML = deliveryFee > 0
+    ? `Articles : ${(Number(o.total) - deliveryFee).toFixed(2)} € + Livraison : ${deliveryFee.toFixed(2)} € = <span style="color:var(--rose-dark)">Total : ${Number(o.total).toFixed(2)} €</span>`
+    : `Total : ${Number(o.total).toFixed(2)} €`;
 
   if (o.notes) {
     document.getElementById('detail-notes').style.display = '';
@@ -185,13 +215,21 @@ function showDetail(id) {
   document.getElementById('order-detail').scrollIntoView({ behavior: 'smooth' });
 }
 
-async function changeStatus(id, status) {
+async function changeStatus(id, status, tracking_number) {
   try {
-    await apiFetch(`/orders/${id}/status`, { method: 'PUT', body: { status } });
+    const body = { status };
+    if (tracking_number !== undefined) body.tracking_number = tracking_number;
+    await apiFetch(`/orders/${id}/status`, { method: 'PUT', body });
     Toast.show(`Statut mis à jour : ${STATUS[status]}`, 'success');
     await loadOrders();
-    showDetail(id); // refresh detail
+    showDetail(id);
   } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+function promptTracking(id) {
+  const tracking = prompt('Numéro de suivi (optionnel — laisser vide si inconnu) :');
+  if (tracking === null) return; // annulé
+  changeStatus(id, 'shipped', tracking.trim() || '');
 }
 
 init();
