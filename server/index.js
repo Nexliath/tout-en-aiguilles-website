@@ -225,6 +225,43 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
+// ─── Demandes d'avis automatiques (J+8, 10h heure de Paris) ────
+async function sendPendingReviewReminders() {
+  // Vérifier que l'heure locale de Paris est entre 10h et 11h
+  const nowParis = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', hour12: false });
+  const hour = parseInt(nowParis, 10);
+  if (hour < 10 || hour >= 11) return; // On ne traite qu'entre 10h et 11h
+
+  try {
+    const db = require('./db/database');
+    const { sendReviewRequestEmail } = require('./utils/email');
+    const eligible = db.prepare(`
+      SELECT * FROM orders
+      WHERE status = 'delivered'
+      AND review_requested_at IS NULL
+      AND updated_at <= datetime('now', '-7 days')
+    `).all();
+
+    for (const order of eligible) {
+      try {
+        await sendReviewRequestEmail({ ...order, items: JSON.parse(order.items || '[]') });
+        db.prepare('UPDATE orders SET review_requested_at = CURRENT_TIMESTAMP WHERE id = ?').run(order.id);
+        console.log(`📧 Demande d'avis envoyée — commande #${order.id} (${order.email})`);
+      } catch (e) {
+        console.error(`❌ Demande d'avis échouée — commande #${order.id}:`, e.message);
+      }
+    }
+    if (eligible.length > 0) {
+      console.log(`📧 Review reminders : ${eligible.length} traité(s)`);
+    }
+  } catch (e) {
+    console.error('Erreur review reminders:', e.message);
+  }
+}
+
+// Vérification toutes les heures
+setInterval(sendPendingReviewReminders, 60 * 60 * 1000);
+
 // ─── Démarrage ──────────────────────────────────────────────
 app.listen(PORT, async () => {
   const db = require('./db/database');
