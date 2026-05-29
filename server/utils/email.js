@@ -269,8 +269,19 @@ async function sendContactEmail(visitorName, visitorEmail, message) {
 }
 
 // ─── Helpers internes ───────────────────────────────────────────
+const HANDOVER_ADDRESS = 'Paris 8ème — Gare Saint-Lazare<br><span style="font-size:12px;color:#9e8070">(lieu exact communiqué par email séparé)</span>';
+
 function formatDate(d) {
   return new Date(d || Date.now()).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+function deliveryAddressBlock(order) {
+  if (order.delivery_type === 'handover') {
+    return `🤝 <strong>Remise en main propre</strong><br>${HANDOVER_ADDRESS}`;
+  }
+  if (order.delivery_type === 'relay' && order.relay_point) {
+    return `📦 <strong>Point Relais</strong><br>${order.relay_point.replace(/</g, '&lt;')}`;
+  }
+  return `🏠 <strong>Livraison à domicile</strong><br>${order.address}, ${order.postal_code} ${order.city}, ${order.country || 'France'}`;
 }
 function statusLabel(s) {
   return { pending: '⏳ En attente de paiement', paid: '✅ Paiement reçu', shipped: '📦 Expédiée', delivered: '🎉 Livrée', cancelled: '❌ Annulée' }[s] || s;
@@ -360,8 +371,8 @@ async function sendNewOrderNotification(order) {
             <a href="mailto:${order.email}" style="color:#c8937a;">${order.email}</a>
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;background:#fdf8f5;border-radius:8px;padding:12px 16px;">
-            <tr><td style="font-size:13px;color:#9e8070;">Adresse de livraison</td></tr>
-            <tr><td style="color:#5a3e2b;">${order.address}, ${order.postal_code} ${order.city}, ${order.country || 'France'}</td></tr>
+            <tr><td style="font-size:13px;color:#9e8070;padding-bottom:4px;">Livraison</td></tr>
+            <tr><td style="color:#5a3e2b;line-height:1.6;">${deliveryAddressBlock(order)}</td></tr>
           </table>
           ${invoiceBlock(order)}
           <div style="text-align:center;margin-top:8px;">
@@ -390,10 +401,23 @@ async function sendOrderStatusEmail(order) {
   const status = order.status;
   const items = typeof order.items === 'string' ? JSON.parse(order.items || '[]') : (order.items || []);
 
+  const isHandover = order.delivery_type === 'handover';
+  const trackingBlock = order.tracking_number
+    ? `<div style="background:#f0fff4;border:1px solid #b8dfc8;border-radius:8px;padding:12px 16px;margin:0 0 24px;">
+        <p style="margin:0;font-size:13px;color:#4a6f5a;">Numéro de suivi</p>
+        <p style="margin:4px 0 0;font-weight:700;color:#2d5a3d;font-size:15px;">${order.tracking_number}</p>
+      </div>`
+    : '';
   const messages = {
-    paid: `Votre paiement a bien été reçu 🎉<br>Nous préparons votre commande avec soin et vous enverrons un email dès son expédition.`,
-    shipped: `Votre commande est en route ! 📦<br>Elle sera livrée sous 3 à 5 jours ouvrés.`,
-    delivered: `Votre commande a été livrée 🎉<br>Nous espérons qu'elle vous plaît ! N'hésitez pas à laisser un avis.`,
+    paid: isHandover
+      ? `Votre paiement a bien été reçu 🎉<br>Nous vous contacterons très prochainement pour convenir d'un rendez-vous de remise en main propre.`
+      : `Votre paiement a bien été reçu 🎉<br>Nous préparons votre commande avec soin et vous enverrons un email dès son expédition.`,
+    shipped: isHandover
+      ? `Votre commande est prête pour la remise en main propre ! 🤝<br>Nous vous contacterons pour le rendez-vous.`
+      : `Votre commande est en route ! 📦<br>Elle sera livrée sous 3 à 5 jours ouvrés.`,
+    delivered: isHandover
+      ? `Votre commande vous a été remise 🎉<br>Nous espérons qu'elle vous plaît ! N'hésitez pas à laisser un avis.`
+      : `Votre commande a été livrée 🎉<br>Nous espérons qu'elle vous plaît ! N'hésitez pas à laisser un avis.`,
     cancelled: `Votre commande a été annulée.<br>Si vous avez été débité(e), un remboursement sera effectué sous 5 à 10 jours ouvrés.`,
     pending: `Votre commande est enregistrée et en attente de paiement.<br>Complétez votre paiement pour la valider.`,
   };
@@ -408,12 +432,13 @@ async function sendOrderStatusEmail(order) {
         ${emailHeader(emoji, `Commande #${order.id} — ${statusLabel(status)}`)}
         <tr><td style="padding:40px;">
           <h2 style="margin:0 0 16px;color:#5a3e2b;font-size:20px;">Bonjour ${order.first_name} 👋</h2>
-          <p style="color:#6b5547;line-height:1.7;margin:0 0 24px;">${messages[status] || `Le statut de votre commande a été mis à jour : <strong>${statusLabel(status)}</strong>`}</p>
+          <p style="color:#6b5547;line-height:1.7;margin:0 0 16px;">${messages[status] || `Le statut de votre commande a été mis à jour : <strong>${statusLabel(status)}</strong>`}</p>
+          ${trackingBlock}
           <div style="background:#fdf8f5;border-radius:8px;padding:12px 20px;margin-bottom:24px;">
             <p style="margin:0;color:#9e8070;font-size:12px;">Commande passée le</p>
             <p style="margin:4px 0 0;color:#5a3e2b;font-weight:700;">${formatDate(order.created_at)}</p>
-            <p style="margin:12px 0 0;color:#9e8070;font-size:12px;">Adresse de livraison</p>
-            <p style="margin:4px 0 0;color:#5a3e2b;">${order.address}, ${order.postal_code} ${order.city}</p>
+            <p style="margin:12px 0 0;color:#9e8070;font-size:12px;">Livraison</p>
+            <p style="margin:4px 0 0;color:#5a3e2b;line-height:1.6;">${deliveryAddressBlock(order)}</p>
           </div>
           <h3 style="margin:0 0 4px;color:#5a3e2b;font-size:15px;">Récapitulatif de votre commande</h3>
           ${invoiceBlock(order)}
