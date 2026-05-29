@@ -193,8 +193,9 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
-var PAGE_SIZE = 12;
-var state = { type: '', category: '', search: '', sort: 'newest', page: 0, total: 0 };
+var PAGE_SIZE = 12;        // produits par page
+var state = { type: '', category: '', search: '', sort: 'newest', page: 0 };
+var _allProducts = [];     // cache complet (fetch une seule fois par changement de filtre API)
 var searchTimer;
 
 // Parse URL params on load
@@ -248,69 +249,104 @@ async function loadCategories() {
   }
 }
 
+// ─── Chargement depuis l'API (sans pagination — limit=100) ────
 async function loadProducts() {
   var grid = document.getElementById('products-grid');
   grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Chargement…</div>';
 
-  var params = new URLSearchParams({
-    limit: PAGE_SIZE,
-    offset: state.page * PAGE_SIZE,
-  });
+  var params = new URLSearchParams({ limit: 100 });
   if (state.type)     params.append('type', state.type);
   if (state.category) params.append('category', state.category);
   if (state.search)   params.append('search', state.search);
 
-  var pMin = document.getElementById('price-min').value;
-  var pMax = document.getElementById('price-max').value;
-
   try {
-    var products = await apiFetch('/products?' + params.toString());
-
-    // Filtre prix côté client
-    if (pMin) products = products.filter(function(p) { return p.price >= Number(pMin); });
-    if (pMax) products = products.filter(function(p) { return p.price <= Number(pMax); });
-
-    // Tri côté client
-    var sort = document.getElementById('sort-select').value;
-    if (sort === 'price_asc')  products.sort(function(a,b) { return a.price - b.price; });
-    if (sort === 'price_desc') products.sort(function(a,b) { return b.price - a.price; });
-    if (sort === 'best_rated') products.sort(function(a,b) { return (Number(b.avg_rating)||0) - (Number(a.avg_rating)||0); });
-
-    state.total = products.length;
-    document.getElementById('results-count').textContent = products.length + ' création' + (products.length !== 1 ? 's' : '') + ' trouvée' + (products.length !== 1 ? 's' : '');
-
-    if (!products.length) {
-      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🧶</div><h3>Aucune création trouvée</h3><p>Essayez de modifier vos filtres ou votre recherche</p><button id="empty-reset-btn" class="btn btn-primary mt-md">Tout voir</button></div>';
-      var emptyBtn = document.getElementById('empty-reset-btn');
-      if (emptyBtn) emptyBtn.addEventListener('click', resetFilters);
-      document.getElementById('pagination').innerHTML = '';
-      return;
-    }
-
-    grid.innerHTML = products.map(renderProductCard).join('');
-    renderPagination();
+    _allProducts = await apiFetch('/products?' + params.toString());
+    state.page = 0; // reset à la page 1 dès qu'on charge
+    renderProducts();
   } catch (e) {
     grid.innerHTML = '<p class="text-muted text-center" style="grid-column:1/-1">Erreur de chargement : ' + e.message + '</p>';
-    console.error('Erreur loadProducts', e);
   }
 }
 
-function renderPagination() {
-  var total = state.total;
-  var pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
-  var html = '';
-  if (state.page > 0) html += '<button class="page-btn" data-page="' + (state.page - 1) + '">←</button>';
-  for (var i = 0; i < pages; i++) {
-    html += '<button class="page-btn ' + (i === state.page ? 'active' : '') + '" data-page="' + i + '">' + (i + 1) + '</button>';
+// ─── Filtrage / tri / pagination côté client ──────────────────
+function renderProducts() {
+  var grid = document.getElementById('products-grid');
+  var pMin = parseFloat(document.getElementById('price-min').value) || 0;
+  var pMax = parseFloat(document.getElementById('price-max').value) || Infinity;
+
+  // Filtre prix
+  var filtered = _allProducts.filter(function(p) {
+    return (!pMin || p.price >= pMin) && (pMax === Infinity || p.price <= pMax);
+  });
+
+  // Tri
+  var sort = document.getElementById('sort-select').value;
+  if (sort === 'price_asc')  filtered.sort(function(a,b) { return a.price - b.price; });
+  if (sort === 'price_desc') filtered.sort(function(a,b) { return b.price - a.price; });
+  if (sort === 'best_rated') filtered.sort(function(a,b) { return (Number(b.avg_rating)||0) - (Number(a.avg_rating)||0); });
+
+  var total = filtered.length;
+  var pages = Math.ceil(total / PAGE_SIZE) || 1;
+  if (state.page >= pages) state.page = pages - 1;
+
+  // Affichage compteur
+  var start = state.page * PAGE_SIZE + 1;
+  var end   = Math.min((state.page + 1) * PAGE_SIZE, total);
+  var countEl = document.getElementById('results-count');
+  if (total === 0) {
+    countEl.textContent = 'Aucune création trouvée';
+  } else if (pages > 1) {
+    countEl.textContent = start + '–' + end + ' sur ' + total + ' création' + (total > 1 ? 's' : '');
+  } else {
+    countEl.textContent = total + ' création' + (total !== 1 ? 's' : '') + ' trouvée' + (total !== 1 ? 's' : '');
   }
-  if (state.page < pages - 1) html += '<button class="page-btn" data-page="' + (state.page + 1) + '">→</button>';
-  document.getElementById('pagination').innerHTML = html;
-  // Listeners pagination
-  document.querySelectorAll('#pagination .page-btn').forEach(function(btn) {
+
+  // Grille
+  var pageItems = filtered.slice(state.page * PAGE_SIZE, (state.page + 1) * PAGE_SIZE);
+  if (!pageItems.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🧶</div><h3>Aucune création trouvée</h3><p>Essayez de modifier vos filtres</p><button id="empty-reset-btn" class="btn btn-primary mt-md">Tout voir</button></div>';
+    var emptyBtn = document.getElementById('empty-reset-btn');
+    if (emptyBtn) emptyBtn.addEventListener('click', resetFilters);
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  grid.innerHTML = pageItems.map(renderProductCard).join('');
+  renderPagination(pages, total);
+}
+
+function renderPagination(pages, total) {
+  var paginEl = document.getElementById('pagination');
+  if (pages <= 1) { paginEl.innerHTML = ''; return; }
+
+  var html = '<div class="pagination-info">' + (state.page + 1) + ' / ' + pages + '</div>';
+
+  // Bouton précédent
+  html += '<button class="page-btn' + (state.page === 0 ? ' disabled' : '') + '" data-page="' + (state.page - 1) + '" ' + (state.page === 0 ? 'disabled' : '') + '>‹</button>';
+
+  // Numéros de pages (max 7 visibles avec ellipsis)
+  var range = [], delta = 2;
+  for (var i = 0; i < pages; i++) {
+    if (i === 0 || i === pages - 1 || (i >= state.page - delta && i <= state.page + delta)) {
+      range.push(i);
+    }
+  }
+  var prev = -1;
+  for (var j = 0; j < range.length; j++) {
+    var p = range[j];
+    if (prev !== -1 && p - prev > 1) html += '<span class="page-ellipsis">…</span>';
+    html += '<button class="page-btn' + (p === state.page ? ' active' : '') + '" data-page="' + p + '">' + (p + 1) + '</button>';
+    prev = p;
+  }
+
+  // Bouton suivant
+  html += '<button class="page-btn' + (state.page === pages - 1 ? ' disabled' : '') + '" data-page="' + (state.page + 1) + '" ' + (state.page === pages - 1 ? 'disabled' : '') + '>›</button>';
+
+  paginEl.innerHTML = html;
+  paginEl.querySelectorAll('.page-btn:not(.disabled)').forEach(function(btn) {
     btn.addEventListener('click', function() {
       state.page = Number(this.dataset.page);
-      loadProducts();
+      renderProducts();
       window.scrollTo({ top: 200, behavior: 'smooth' });
     });
   });
@@ -380,12 +416,12 @@ document.getElementById('search-input').addEventListener('input', function() {
   }, 350);
 });
 
-// Prix min/max
-document.getElementById('price-min').addEventListener('change', function() { state.page = 0; loadProducts(); updateFilterBadge(); });
-document.getElementById('price-max').addEventListener('change', function() { state.page = 0; loadProducts(); updateFilterBadge(); });
+// Prix min/max — filtre client-side, pas d'appel API
+document.getElementById('price-min').addEventListener('change', function() { state.page = 0; renderProducts(); updateFilterBadge(); });
+document.getElementById('price-max').addEventListener('change', function() { state.page = 0; renderProducts(); updateFilterBadge(); });
 
-// Tri
-document.getElementById('sort-select').addEventListener('change', function() { state.page = 0; loadProducts(); });
+// Tri — client-side
+document.getElementById('sort-select').addEventListener('change', function() { state.page = 0; renderProducts(); });
 
 // Reset
 document.getElementById('reset-filters-btn').addEventListener('click', function() {
