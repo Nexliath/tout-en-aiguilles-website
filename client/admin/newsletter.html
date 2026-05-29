@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Newsletter — Admin Tout en Aiguilles</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px"><div style="font-size:3rem;margin-bottom:12px">🔐</div><h2>Espace admin</h2></div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" id="guard-email" class="form-input"></div>
+    <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" id="guard-password" class="form-input"></div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
+  </div>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
+    <nav class="admin-nav">
+      <a href="index.html">📊 Tableau de bord</a>
+      <a href="produits.html">🧶 Produits</a>
+      <a href="commandes.html">📦 Commandes</a>
+      <a href="actualites.html">📝 Actualités</a>
+      <a href="utilisateurs.html">👥 Utilisateurs</a>
+      <a href="avis.html">⭐ Avis</a>
+      <a href="promo.html">🏷️ Codes promo</a>
+      <a href="newsletter.html" class="active">📧 Newsletter</a>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+      <a href="/" target="_blank">🌐 Voir le site</a>
+      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
+    </nav>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-header">
+      <h1>📧 Newsletter</h1>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div id="sub-count" style="font-size:.85rem;color:var(--text-light)"></div>
+        <button class="btn btn-secondary btn-sm" onclick="exportSubscribers()">📥 Export XLS</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px">
+      <div class="stat-card"><div class="stat-val" id="stat-total">—</div><div class="stat-label">📧 Subscribers total</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-active">—</div><div class="stat-label">✅ Actifs</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-recent">—</div><div class="stat-label">🆕 Ce mois-ci</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+      <!-- Envoi newsletter -->
+      <div class="admin-panel">
+        <div class="admin-panel-title">✉️ Envoyer une newsletter</div>
+        <div class="form-group">
+          <label class="form-label">Sujet *</label>
+          <input type="text" id="nl-subject" class="form-input" placeholder="Nouveautés printemps 2026 🌸">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contenu (HTML ou texte) *</label>
+          <textarea id="nl-content" class="form-textarea" style="min-height:200px;font-family:monospace;font-size:.82rem" placeholder="<p>Bonjour,</p><p>Découvrez nos dernières créations...</p>"></textarea>
+        </div>
+        <div style="background:var(--cream-dark);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:.82rem;color:var(--text-light)">
+          ⚠️ La newsletter sera envoyée à <strong id="send-count">—</strong> subscriber(s) actif(s). Cette action est irréversible.
+        </div>
+        <div id="nl-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+        <div id="nl-success" style="display:none;background:var(--sage-pale);color:var(--sage-dark);padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:.875rem"></div>
+        <button class="btn btn-primary" id="nl-send-btn" onclick="sendNewsletter()">📧 Envoyer à tous les subscribers</button>
+      </div>
+
+      <!-- Liste subscribers -->
+      <div class="admin-panel">
+        <div class="admin-panel-title">👥 Subscribers récents</div>
+        <div class="admin-table-wrap" style="max-height:420px;overflow-y:auto">
+          <table class="admin-table">
+            <thead><tr><th>Email</th><th>Prénom</th><th>Date</th></tr></thead>
+            <tbody id="subs-tbody">
+              <tr><td colspan="3" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let allSubs = [];
+
+function checkAdmin() {
+  const guard = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) { content.style.display='none'; guard.style.display='flex'; }
+  else { guard.style.display='none'; content.style.display=''; loadSubscribers(); }
+}
+
+document.getElementById('guard-btn').addEventListener('click', function() {
+  const email = document.getElementById('guard-email').value.trim();
+  const password = document.getElementById('guard-password').value;
+  const errEl = document.getElementById('guard-error');
+  errEl.style.display = 'none';
+  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
+    .then(data => { if (data.user.role !== 'admin') throw new Error('Accès refusé'); Auth.save(data.token, data.user); checkAdmin(); })
+    .catch(e => { errEl.textContent = e.message; errEl.style.display = ''; });
+});
+
+async function loadSubscribers() {
+  try {
+    allSubs = await apiFetch('/newsletter/subscribers');
+    const active = allSubs.filter(s => s.is_active);
+    const now = new Date();
+    const thisMonth = allSubs.filter(s => { const d = new Date(s.subscribed_at); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth(); });
+
+    document.getElementById('stat-total').textContent = allSubs.length;
+    document.getElementById('stat-active').textContent = active.length;
+    document.getElementById('stat-recent').textContent = thisMonth.length;
+    document.getElementById('sub-count').textContent = `${allSubs.length} subscriber${allSubs.length > 1 ? 's' : ''}`;
+    document.getElementById('send-count').textContent = active.length;
+
+    const tbody = document.getElementById('subs-tbody');
+    tbody.innerHTML = allSubs.slice(0,50).map(s => `
+      <tr>
+        <td style="font-size:.85rem">${s.email}</td>
+        <td style="font-size:.85rem">${s.first_name || '—'}</td>
+        <td style="font-size:.78rem;color:var(--text-light)">${new Date(s.subscribed_at).toLocaleDateString('fr-FR')}</td>
+      </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-light)">Aucun subscriber</td></tr>';
+  } catch(e) { Toast.show(e.message, 'error'); }
+}
+
+async function sendNewsletter() {
+  const subject = document.getElementById('nl-subject').value.trim();
+  const html_content = document.getElementById('nl-content').value.trim();
+  const errEl = document.getElementById('nl-error');
+  const successEl = document.getElementById('nl-success');
+  errEl.style.display = 'none'; successEl.style.display = 'none';
+
+  if (!subject || !html_content) { errEl.textContent = 'Sujet et contenu requis'; errEl.style.display = ''; return; }
+  if (!confirm(`Envoyer la newsletter à tous les subscribers actifs ?\n\nSujet : ${subject}`)) return;
+
+  const btn = document.getElementById('nl-send-btn');
+  btn.disabled = true; btn.textContent = '⏳ Envoi en cours…';
+  try {
+    const r = await apiFetch('/newsletter/send', { method: 'POST', body: { subject, html_content } });
+    successEl.textContent = `✅ Newsletter envoyée avec succès — ${r.sent} envoi(s), ${r.errors} erreur(s)`;
+    successEl.style.display = '';
+    document.getElementById('nl-subject').value = '';
+    document.getElementById('nl-content').value = '';
+  } catch(e) { errEl.textContent = e.message; errEl.style.display = ''; }
+  btn.disabled = false; btn.textContent = '📧 Envoyer à tous les subscribers';
+}
+
+function exportSubscribers() {
+  if (!allSubs.length) { Toast.show('Aucun subscriber à exporter', 'info'); return; }
+  const rows = allSubs.map(s => ({
+    'Email': s.email, 'Prénom': s.first_name || '',
+    'Source': s.source || 'website', 'Actif': s.is_active ? 'Oui' : 'Non',
+    'Date inscription': new Date(s.subscribed_at).toLocaleDateString('fr-FR'),
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:30},{wch:16},{wch:12},{wch:8},{wch:18}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Subscribers');
+  XLSX.writeFile(wb, `newsletter_subscribers_${new Date().toISOString().split('T')[0]}.xlsx`);
+  Toast.show(`📥 ${allSubs.length} subscriber(s) exporté(s)`, 'success');
+}
+
+checkAdmin();
+</script>
+</body>
+</html>
