@@ -1,7 +1,10 @@
 const express = require('express');
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { sendNewOrderNotification, sendOrderStatusEmail } = require('../utils/email');
+const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail } = require('../utils/email');
+
+// ─── Migration : colonne review_requested_at ─────────────────
+try { db.exec('ALTER TABLE orders ADD COLUMN review_requested_at TEXT'); } catch(e) { /* déjà présente */ }
 
 const router = express.Router();
 
@@ -196,6 +199,38 @@ router.put('/:id/status', requireAdmin, (req, res) => {
     sendOrderStatusEmail({ ...order, items: JSON.parse(order.items || '[]') }).catch(console.error);
   }
   res.json({ success: true });
+});
+
+// ─── GET /api/orders/review-reminders — envoi des demandes d'avis J+8 ──
+// Protégé par CRON_SECRET (header x-cron-secret ou query ?secret=)
+// Appelé chaque jour à 10h par le scheduled task Cowork
+router.get('/review-reminders', async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  const provided = req.headers['x-cron-secret'] || req.query.secret;
+  if (secret && provided !== secret) {
+    return res.status(401).json({ error: 'Non autorisé' });
+  }
+
+  const eligible = db.prepare(`
+    SELECT * FROM orders
+    WHERE status = 'delivered'
+    AND review_requested_at IS NULL
+    AND updated_at <= datetime('now', '-7 days')
+  `).all();
+
+  let sent = 0, errors = 0;
+  for (const order of eligible) {
+    try {
+      await sendReviewRequestEmail({ ...order, items: JSON.parse(order.items || '[]') });
+      db.prepare('UPDATE orders SET review_requested_at = CURRENT_TIMESTAMP WHERE id = ?').run(order.id);
+      sent++;
+    } catch (e) {
+      console.error(`Review reminder error order #${order.id}:`, e.message);
+      errors++;
+    }
+  }
+  console.log(`📧 Review reminders: ${sent} envoyé(s), ${errors} erreur(s), ${eligible.length - sent - errors} ignoré(s)`);
+  res.json({ processed: eligible.length, sent, errors });
 });
 
 module.exports = router;
