@@ -217,6 +217,44 @@ p  { color: var(--text-light); }
   background: rgba(58, 46, 40, 0.75); color: white;
   font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;
 }
+/* Ancien badge renommé */
+.badge-featured {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--rose-dark); color: white;
+  font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+}
+.badge-new-product {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--sage-dark); color: white;
+  font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+}
+/* Étoiles sur les cards */
+.product-card-stars {
+  display: flex; align-items: center; gap: 4px;
+  margin-bottom: 4px; font-size: .8rem;
+}
+.star-full  { color: #F0AD00; }
+.star-half  { color: #F0AD00; opacity: .55; }
+.star-empty { color: #ddd; }
+.stars-count { font-size: .72rem; color: var(--text-light); }
+/* Urgence stock */
+.stock-urgency {
+  font-size: .72rem; font-weight: 700; color: #c0521a;
+  margin-bottom: 4px;
+}
+/* Bouton retour en haut */
+#back-to-top {
+  position: fixed; bottom: 24px; right: 24px;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--rose-dark); color: white; border: none;
+  font-size: 1.2rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(192,113,138,.35);
+  opacity: 0; pointer-events: none; z-index: 90;
+  transition: opacity .25s, transform .25s;
+  transform: translateY(8px);
+}
+#back-to-top.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+#back-to-top:hover { background: #A85D7A; }
 .badge-new {
   position: absolute; top: 12px; right: 12px;
   background: var(--rose-dark); color: white;
@@ -768,7 +806,9 @@ p  { color: var(--text-light); }
   #products-grid .card-add-btn .btn-label { display: none; }
   #products-grid .card-add-btn .btn-icon { font-size: .95rem; }
   #products-grid .out-of-stock,
-  #products-grid .badge-new { font-size: .65rem; top: 6px; }
+  #products-grid .badge-new,
+  #products-grid .badge-featured,
+  #products-grid .badge-new-product { font-size: .65rem; top: 6px; }
 }
 
 /* ─── Footer accordion on mobile ────────────────────────────── */
