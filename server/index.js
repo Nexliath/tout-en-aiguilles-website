@@ -279,4 +279,105 @@ app.listen(PORT, async () => {
     console.log(`   → ${admins} admin(s) configuré(s) ✓`);
   }
   console.log('');
+
+  // ─── Seed des articles d'actualité ──────────────────────────
+  seedNews(db);
 });
+
+function slugify(str) {
+  return str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
+
+function seedNews(db) {
+  const articles = [
+    {
+      title: "Foire à tout de La Mailleray-sur-Seine — notre première sortie !",
+      excerpt: "Le 12 avril, on posait nos valises (et nos crochets !) à La Mailleray-sur-Seine pour notre toute première participation à une foire à tout. Une journée inoubliable, pleine de rencontres et de couleurs.",
+      cover_image: "/assets/images/news/mailleray-11.jpg",
+      created_at: "2026-04-14 10:00:00",
+      content: `<p>Le dimanche 12 avril 2026, Tout en Aiguilles prenait la route pour La Mailleray-sur-Seine, une charmante commune normande où se tenait la foire à tout annuelle. Une première pour nous — et quelle première !</p>
+
+<figure>
+  <img src="/assets/images/news/mailleray-11.jpg" alt="Le stand Tout en Aiguilles à La Mailleray-sur-Seine" style="width:100%;border-radius:12px;margin:8px 0">
+  <figcaption style="font-size:.82rem;color:#888;text-align:center;margin-top:6px">Le stand en plein soleil 🌞</figcaption>
+</figure>
+
+<h2>Un stand coloré au cœur du village</h2>
+<p>Dès 7h du matin, on installait la table, on déroulait la nappe et on sortait les créations une par une : bouquets de fleurs en crochet, peluches en tous genres, doudous, tote bags, bijoux... Le stand s'est transformé en petit coin de douceur au beau milieu de la foire.</p>
+<p>Les passants s'arrêtaient, touchaient les laines, souriaient. <em>"C'est vous qui faites tout ça à la main ?!"</em> — une question qu'on a entendue des dizaines de fois dans la journée, avec toujours le même plaisir à répondre oui.</p>
+
+<figure>
+  <img src="/assets/images/news/mailleray-6.jpg" alt="Créations crochet exposées" style="width:100%;border-radius:12px;margin:8px 0">
+  <figcaption style="font-size:.82rem;color:#888;text-align:center;margin-top:6px">Bouquets, peluches et douceurs au crochet</figcaption>
+</figure>
+
+<h2>Des rencontres qui font chaud au cœur</h2>
+<p>Au-delà des ventes, ce qui nous a le plus marqué, c'est la chaleur des gens. Une mamie qui voulait apprendre le crochet, une jeune maman qui cherchait un doudou original pour sa fille, un enfant qui n'arrivait pas à lâcher un petit poulpe... Ces moments-là, on les garde précieusement.</p>
+
+<figure>
+  <img src="/assets/images/news/mailleray-7.jpg" alt="Détail des créations" style="width:100%;border-radius:12px;margin:8px 0">
+</figure>
+
+<h2>Bilan : une journée pleine de promesses</h2>
+<p>La Mailleray-sur-Seine, c'était notre baptême du feu des marchés et foires en plein air. On est rentrées fatiguées mais heureuses, avec des carnets de commandes, des sourires plein la tête et une certitude : on reviendra !</p>
+
+<figure>
+  <img src="/assets/images/news/mailleray-12.jpg" alt="Fin de journée au marché" style="width:100%;border-radius:12px;margin:8px 0">
+  <figcaption style="font-size:.82rem;color:#888;text-align:center;margin-top:6px">Fin de journée — rangement en cours 😄</figcaption>
+</figure>
+
+<p>Merci à tous ceux qui se sont arrêtés, qui ont acheté, qui ont encouragé. Vous êtes la raison pour laquelle on continue à crocheter avec autant d'amour. À très vite pour la prochaine aventure ! 🧶🌸</p>`
+    },
+    {
+      title: "Marché rue Lamarck à Paris — une matinée parisienne pleine d'énergie",
+      excerpt: "Direction le 18ème arrondissement pour le marché de la rue Lamarck ! Une belle matinée sous les toits de Paris, entre Montmartre et les créations colorées.",
+      cover_image: "/assets/images/news/lamarck-cover.jpg",
+      created_at: "2026-03-30 10:00:00",
+      content: `<p>Fin mars, on chargeait la voiture à l'aube et on fonçait vers le 18ème arrondissement de Paris pour le marché de la rue Lamarck. Entre Montmartre et les petites rues pavées, un cadre de rêve pour présenter nos créations.</p>
+
+<figure>
+  <img src="/assets/images/news/lamarck-cover.jpg" alt="Stand Tout en Aiguilles rue Lamarck Paris" style="width:100%;border-radius:12px;margin:8px 0">
+  <figcaption style="font-size:.82rem;color:#888;text-align:center;margin-top:6px">Notre stand rue Lamarck, dans l'animation du marché parisien</figcaption>
+</figure>
+
+<h2>Paris, ses marchés et sa clientèle curieuse</h2>
+<p>Le marché de la rue Lamarck, c'est une institution du quartier. Les habitués arrivent tôt, connaissent les exposants, ont l'œil avisé. Quand ils se sont penchés sur nos peluches et nos bouquets en laine, on a senti qu'on avait quelque chose à leur offrir d'un peu différent.</p>
+<p>Les fleurs en crochet ont été les grandes vedettes de la matinée — plusieurs bouquets sont partis dans les premières heures. <em>"C'est tellement plus durable qu'un vrai bouquet"</em>, nous a glissé une cliente avec le sourire.</p>
+
+<figure>
+  <img src="/assets/images/news/lamarck-2.jpg" alt="Créations exposées" style="width:100%;border-radius:12px;margin:8px 0">
+  <figcaption style="font-size:.82rem;color:#888;text-align:center;margin-top:6px">Un aperçu des créations du jour</figcaption>
+</figure>
+
+<h2>L'ambiance unique des marchés parisiens</h2>
+<p>Ce qui est particulier avec Paris, c'est le mélange des gens : des familles du quartier, des touristes qui déambulent, des connaisseurs qui prennent le temps d'examiner chaque point de crochet. On a eu des conversations en français, en anglais, en espagnol — notre petit stand est devenu un point de rencontre inattendu.</p>
+
+<figure>
+  <img src="/assets/images/news/lamarck-3.jpg" alt="Ambiance du marché" style="width:100%;border-radius:12px;margin:8px 0">
+</figure>
+
+<h2>Des commandes personnalisées qui décollent</h2>
+<p>L'une des belles surprises de cette journée : plusieurs personnes repartaient non pas avec un produit fini, mais avec l'idée d'une commande sur-mesure. Un prénom à broder, une couleur précise pour assortir à une chambre d'enfant... Ces demandes-là nous touchent particulièrement, parce qu'elles montrent que nos créations s'invitent dans des histoires de famille.</p>
+
+<figure>
+  <img src="/assets/images/news/lamarck-4.jpg" alt="Détail des créations faites main" style="width:100%;border-radius:12px;margin:8px 0">
+  <figcaption style="font-size:.82rem;color:#888;text-align:center;margin-top:6px">Chaque pièce, unique et faite main 🌸</figcaption>
+</figure>
+
+<p>La rue Lamarck, on en garde un souvenir radieux. Paris nous a accueillies avec bienveillance, et on espère bien y revenir. En attendant, toutes nos créations sont disponibles sur la boutique en ligne — parce que la douceur du fait main ne devrait pas avoir de frontières géographiques. 🧶✨</p>`
+    }
+  ];
+
+  for (const article of articles) {
+    const exists = db.prepare('SELECT id FROM news WHERE title = ?').get(article.title);
+    if (!exists) {
+      const slug = slugify(article.title) + '-' + Date.now();
+      db.prepare(`
+        INSERT INTO news (title, slug, excerpt, content, cover_image, published, created_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?)
+      `).run(article.title, slug, article.excerpt, article.content, article.cover_image, article.created_at);
+      console.log(`📰 Article créé : ${article.title}`);
+    }
+  }
+}
