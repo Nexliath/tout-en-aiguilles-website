@@ -136,6 +136,14 @@
               <span id="delivery-fee-label">Livraison</span>
               <span id="delivery-fee-amount">+0,00 €</span>
             </div>
+            <div id="promo-row" class="cart-total-row" style="display:none;color:var(--sage-dark)">
+              <span id="promo-label">Réduction</span>
+              <span id="promo-amount">-0,00 €</span>
+            </div>
+            <div id="gift-row" class="cart-total-row" style="display:none">
+              <span>Emballage cadeau 🎁</span>
+              <span>+2,00 €</span>
+            </div>
             <div class="divider"></div>
             <div class="cart-total-row big">
               <span>Total</span>
@@ -145,6 +153,9 @@
             <!-- Checkout form -->
             <div style="margin-top:24px">
               <h4 style="margin-bottom:16px;font-size:.95rem">Informations de livraison</h4>
+              <div id="guest-checkout-notice" style="display:none;background:var(--cream-dark);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:.82rem;color:var(--text-light)">
+                💡 Commandez sans créer de compte. <a href="#" onclick="openAuthModal();return false" style="color:var(--rose-dark)">Connexion</a> pour auto-remplir et suivre vos commandes.
+              </div>
 
               <!-- Adresses enregistrées (visible si connecté et au moins 1 adresse) -->
               <div id="saved-addr-section" style="display:none;margin-bottom:20px">
@@ -251,6 +262,25 @@
                 <textarea id="co-notes" class="form-textarea" style="min-height:72px" placeholder="Personnalisation, message cadeau…"></textarea>
               </div>
 
+              <div style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+                  <input type="checkbox" id="co-gift-wrap" style="margin-top:3px" onchange="toggleGiftMessage()">
+                  <div>
+                    <div style="font-weight:600;font-size:.88rem">🎁 Emballage cadeau — +2,00 €</div>
+                    <div style="font-size:.76rem;color:var(--text-light)">Papier de soie, ruban et carte personnalisée</div>
+                  </div>
+                </label>
+                <input type="text" id="co-gift-message" class="form-input" style="margin-top:10px;display:none;font-size:.85rem" placeholder="Message pour la carte cadeau (optionnel)" maxlength="120">
+              </div>
+
+              <div style="margin-bottom:12px">
+                <div style="display:flex;gap:8px">
+                  <input type="text" id="promo-input" class="form-input" placeholder="Code promo" style="flex:1;text-transform:uppercase;font-size:.85rem">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="applyPromo()">Appliquer</button>
+                </div>
+                <div id="promo-result" style="font-size:.8rem;margin-top:5px;display:none"></div>
+              </div>
+
               <div id="checkout-error" class="form-error" style="display:none;margin-bottom:12px"></div>
 
               <!-- Choix du mode de paiement -->
@@ -292,8 +322,8 @@
 <footer class="site-footer">
   <div class="container">
     <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
-      <span>© 2024 Tout en Aiguilles</span>
-      <a href="/boutique.html" style="color:rgba(255,255,255,.6)">← Retour boutique</a>
+      <span>© <span id="fy-p"></span> Tout en Aiguilles</span>
+      <span><a href="/cgv.html" style="color:rgba(255,255,255,.6);margin-right:12px">CGV</a><a href="/livraison.html" style="color:rgba(255,255,255,.6)">Livraison</a></span>
     </div>
   </div>
 </footer>
@@ -319,6 +349,49 @@ function selectDelivery(type) {
   updateDeliveryRow();
 }
 
+let _appliedPromo = null;
+
+function toggleGiftMessage() {
+  const checked = document.getElementById('co-gift-wrap').checked;
+  document.getElementById('co-gift-message').style.display = checked ? '' : 'none';
+  document.getElementById('gift-row').style.display = checked ? '' : 'none';
+  updateCartTotal();
+}
+
+async function applyPromo() {
+  const code = document.getElementById('promo-input').value.trim();
+  const resultEl = document.getElementById('promo-result');
+  if (!code) return;
+  try {
+    const total = Cart.total() + (DELIVERY_FEES[selectedDelivery] || 0);
+    const r = await apiFetch(`/promo/validate?code=${encodeURIComponent(code)}&total=${total}`);
+    if (r.valid) {
+      _appliedPromo = r;
+      resultEl.style.color = 'var(--sage-dark)';
+      resultEl.textContent = `✓ Code "${r.code}" — -${r.discount_amount.toFixed(2)} €${r.description ? ' (' + r.description + ')' : ''}`;
+      document.getElementById('promo-row').style.display = '';
+      document.getElementById('promo-amount').textContent = `-${r.discount_amount.toFixed(2)} €`;
+      document.getElementById('promo-label').textContent = `Code "${r.code}"`;
+    } else {
+      resultEl.style.color = '#d9534f';
+      resultEl.textContent = r.message || 'Code invalide';
+      _appliedPromo = null;
+      document.getElementById('promo-row').style.display = 'none';
+    }
+    resultEl.style.display = '';
+    updateCartTotal();
+  } catch(e) { resultEl.style.color = '#d9534f'; resultEl.textContent = 'Erreur'; resultEl.style.display = ''; }
+}
+
+function updateCartTotal() {
+  const base = Cart.total() + (DELIVERY_FEES[selectedDelivery] || 0);
+  const gift = document.getElementById('co-gift-wrap')?.checked ? 2 : 0;
+  const discount = _appliedPromo ? _appliedPromo.discount_amount : 0;
+  const total = Math.max(0, base + gift - discount);
+  const el = document.getElementById('cart-total-display');
+  if (el) el.textContent = total.toFixed(2) + ' €';
+}
+
 function updateDeliveryRow() {
   const fee    = DELIVERY_FEES[selectedDelivery] || 0;
   const row    = document.getElementById('delivery-row');
@@ -333,8 +406,7 @@ function updateDeliveryRow() {
       row.style.display = 'none';
     }
   }
-  const totalEl = document.getElementById('cart-total-display');
-  if (totalEl) totalEl.textContent = (Cart.total() + fee).toFixed(2) + ' €';
+  updateCartTotal();
 }
 
 // ── Géocodage pour éligibilité remise en main propre ─────────
@@ -458,6 +530,16 @@ function renderCart() {
     if (document.getElementById('co-lname').value === '') document.getElementById('co-lname').value = u.last_name || '';
     if (document.getElementById('co-email').value === '') document.getElementById('co-email').value = u.email || '';
   }
+
+  // Guest notice
+  const noticeEl = document.getElementById('guest-checkout-notice');
+  if (noticeEl) noticeEl.style.display = Auth.isLoggedIn() ? 'none' : '';
+
+  // Sync panier pour abandoned cart tracking
+  const cartItems = Cart.get();
+  if (u && cartItems.length > 0) {
+    apiFetch('/cart/sync', { method: 'POST', body: { session_key: `user_${u.id}`, email: u.email, items: cartItems }}).catch(() => {});
+  }
 }
 
 function updateQty(id, qty) { Cart.updateQty(id, qty); renderCart(); }
@@ -506,7 +588,11 @@ async function startCheckout() {
           user_id: Auth.getUser()?.id || null,
           email, first_name: fname, last_name: lname,
           address, city, postal_code: postal, country: 'France', notes,
-        }
+        },
+        gift_wrap: document.getElementById('co-gift-wrap')?.checked || false,
+        gift_message: document.getElementById('co-gift-message')?.value.trim() || '',
+        promo_code: _appliedPromo?.code || null,
+        promo_discount: _appliedPromo?.discount_amount || 0,
       }
     });
 
