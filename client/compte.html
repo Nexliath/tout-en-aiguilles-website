@@ -195,6 +195,15 @@
                 <input type="email" id="profile-email" class="form-input" disabled style="opacity:.6">
                 <p class="form-hint">L'email ne peut pas être modifié</p>
               </div>
+              <div class="form-group" style="background:var(--cream-dark);border-radius:var(--radius-lg);padding:14px 16px">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                  <input type="checkbox" id="profile-newsletter" style="width:16px;height:16px">
+                  <div>
+                    <div style="font-weight:600;font-size:.88rem">📧 Recevoir les nouveautés et offres exclusives</div>
+                    <div style="font-size:.76rem;color:var(--text-light)">Nouvelles créations, inspiration et offres ponctuelles — pas de spam</div>
+                  </div>
+                </label>
+              </div>
               <div id="profile-success" class="form-hint" style="display:none;color:var(--sage-dark);margin-bottom:12px">✓ Profil mis à jour !</div>
               <button class="btn btn-primary" onclick="saveProfile()">Enregistrer les modifications</button>
             </div>
@@ -333,6 +342,9 @@ async function initAccount() {
     document.getElementById('profile-lname').value = user.last_name;
     document.getElementById('profile-email').value = user.email;
     document.getElementById('profile-username').value = user.username || '';
+    // Toggle newsletter
+    const nlCheck = document.getElementById('profile-newsletter');
+    if (nlCheck) nlCheck.checked = !user.newsletter_opt_out;
     // Remplir aussi le champ email dans l'onglet sécurité
     const emailDisp = document.getElementById('email-current-display');
     if (emailDisp) emailDisp.value = user.email;
@@ -426,7 +438,8 @@ async function saveProfile() {
   const last_name  = document.getElementById('profile-lname').value.trim();
   const username   = document.getElementById('profile-username').value.trim();
   try {
-    await apiFetch('/auth/me', { method: 'PUT', body: { first_name, last_name, username } });
+    const newsletter_opt_out = document.getElementById('profile-newsletter')?.checked === false ? 1 : 0;
+    await apiFetch('/auth/me', { method: 'PUT', body: { first_name, last_name, username, newsletter_opt_out } });
     const user = Auth.getUser();
     Auth.save(Auth.getToken(), { ...user, first_name, last_name, username });
     document.getElementById('account-name').textContent = `${first_name} ${last_name}`;
