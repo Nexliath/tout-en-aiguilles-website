@@ -76,6 +76,7 @@
         <div style="text-align:right;margin-top:12px;font-family:var(--font-title);font-size:1.2rem;font-weight:700;color:var(--rose-dark)" id="detail-total"></div>
       </div>
       <div id="detail-notes" style="display:none;margin-top:16px;padding:12px;background:var(--cream);border-radius:var(--radius)"></div>
+      <div id="relay-change-section" style="display:none"></div>
     </div>
 
     <!-- Table -->
@@ -212,6 +213,19 @@ function showDetail(id) {
     document.getElementById('detail-notes').style.display = 'none';
   }
 
+  // Bouton changement point relais (si livraison relay)
+  const relayChangeEl = document.getElementById('relay-change-section');
+  if (o.delivery_type === 'relay') {
+    relayChangeEl.style.display = '';
+    relayChangeEl.innerHTML = `
+      <div style="margin-top:16px;padding:12px 16px;background:var(--cream);border-radius:var(--radius);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:.85rem;color:var(--text-light);flex:1">Point relais actuel : <strong style="color:var(--text)">${o.relay_point || 'Non renseigné'}</strong></span>
+        <button class="btn btn-secondary btn-sm" onclick="changeRelayPoint(${o.id})">📦 Modifier le point relais</button>
+      </div>`;
+  } else {
+    relayChangeEl.style.display = 'none';
+  }
+
   document.getElementById('order-detail').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -228,8 +242,22 @@ async function changeStatus(id, status, tracking_number) {
 
 function promptTracking(id) {
   const tracking = prompt('Numéro de suivi (optionnel — laisser vide si inconnu) :');
-  if (tracking === null) return; // annulé
+  if (tracking === null) return;
   changeStatus(id, 'shipped', tracking.trim() || '');
+}
+
+async function changeRelayPoint(id) {
+  const o = allOrders.find(x => x.id === id);
+  const current = o?.relay_point || '';
+  const newRelay = prompt(`Nouveau point relais :\n(Ancien : ${current || 'non renseigné'})`, current);
+  if (newRelay === null || newRelay.trim() === current.trim()) return;
+  if (!newRelay.trim()) { Toast.show('Le point relais ne peut pas être vide', 'error'); return; }
+  try {
+    const res = await apiFetch(`/orders/${id}/relay-point`, { method: 'PUT', body: { relay_point: newRelay.trim() } });
+    Toast.show(res.notified ? '✅ Point relais modifié — client notifié par email' : '✅ Point relais modifié (email non envoyé)', res.notified ? 'success' : 'info');
+    await loadOrders();
+    showDetail(id);
+  } catch(e) { Toast.show(e.message, 'error'); }
 }
 
 init();
