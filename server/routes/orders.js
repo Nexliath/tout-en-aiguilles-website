@@ -24,6 +24,34 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
+// ─── PayPal helpers ──────────────────────────────────────────
+const PAYPAL_BASE = () => process.env.PAYPAL_MODE === 'live'
+  ? 'https://api-m.paypal.com'
+  : 'https://api-m.sandbox.paypal.com';
+
+async function getPayPalToken() {
+  const cid = process.env.PAYPAL_CLIENT_ID;
+  const sec = process.env.PAYPAL_CLIENT_SECRET;
+  if (!cid || !sec) return null;
+  const creds = Buffer.from(`${cid}:${sec}`).toString('base64');
+  const r = await fetch(`${PAYPAL_BASE()}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials',
+  });
+  const d = await r.json();
+  return d.access_token || null;
+}
+
+async function paypalRequest(method, path, body, token) {
+  const r = await fetch(`${PAYPAL_BASE()}${path}`, {
+    method,
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { ok: r.ok, status: r.status, data: await r.json() };
+}
+
 // POST /api/orders/checkout — créer une session Stripe Checkout
 router.post('/checkout', async (req, res) => {
   const { items, customer, delivery, success_url, cancel_url } = req.body;
@@ -223,6 +251,97 @@ router.put('/:id/relay-point', requireAdmin, async (req, res) => {
     console.error('Relay change email error:', e.message);
     res.json({ success: true, notified: false, error: e.message });
   }
+});
+
+// ─── PayPal : config publique (client_id) ──────────────────────
+router.get('/paypal/config', (req, res) => {
+  const cid = process.env.PAYPAL_CLIENT_ID;
+  if (!cid) return res.json({ enabled: false });
+  res.json({ enabled: true, client_id: cid, mode: process.env.PAYPAL_MODE || 'sandbox' });
+});
+
+// ─── PayPal : créer une commande ───────────────────────────────
+router.post('/paypal/create', async (req, res) => {
+  const { items, customer, delivery } = req.body;
+  if (!items || items.length === 0) return res.status(400).json({ error: 'Panier vide' });
+
+  const deliveryType = delivery?.type || 'home';
+  const deliveryFee  = typeof delivery?.fee === 'number' ? delivery.fee : 0;
+  const relayPoint   = delivery?.relay_point || null;
+
+  // Valider les produits
+  let productsTotal = 0;
+  const orderItems = [];
+  for (const item of items) {
+    const p = db.prepare('SELECT * FROM products WHERE id = ? AND is_active = 1').get(item.product_id);
+    if (!p) return res.status(400).json({ error: `Produit ${item.product_id} introuvable` });
+    if (p.stock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${p.name}` });
+    productsTotal += p.price * item.qty;
+    orderItems.push({ product_id: item.product_id, name: p.name, price: p.price, qty: item.qty, image: JSON.parse(p.images || '[]')[0] || '' });
+  }
+  const total = productsTotal + deliveryFee;
+
+  // Créer la commande en base
+  const orderData = JSON.stringify(orderItems);
+  const result = db.prepare(`
+    INSERT INTO orders (user_id, email, first_name, last_name, address, city, postal_code, country, total, items, notes, delivery_type, delivery_fee, relay_point)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    customer.user_id || null, customer.email, customer.first_name, customer.last_name,
+    customer.address, customer.city, customer.postal_code, customer.country || 'France',
+    total, orderData, customer.notes || '', deliveryType, deliveryFee, relayPoint
+  );
+  const orderId = result.lastInsertRowid;
+
+  // Notification boutique immédiate
+  const newOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+  sendNewOrderNotification({ ...newOrder, items: orderItems }).catch(console.error);
+
+  // Créer l'ordre PayPal
+  const token = await getPayPalToken();
+  if (!token) {
+    // Mode démo sans PayPal
+    db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
+    for (const item of items) db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
+    return res.json({ demo: true, order_id: orderId });
+  }
+
+  const { ok, data: ppOrder } = await paypalRequest('POST', '/v2/checkout/orders', {
+    intent: 'CAPTURE',
+    purchase_units: [{
+      reference_id: String(orderId),
+      amount: { currency_code: 'EUR', value: total.toFixed(2) },
+      description: `Commande Tout en Aiguilles #${orderId}`,
+    }],
+  }, token);
+
+  if (!ok) return res.status(500).json({ error: `PayPal : ${ppOrder.message || 'erreur inconnue'}` });
+
+  db.prepare('UPDATE orders SET stripe_session_id = ? WHERE id = ?').run(`paypal:${ppOrder.id}`, orderId);
+  res.json({ paypal_order_id: ppOrder.id, order_id: orderId });
+});
+
+// ─── PayPal : capturer le paiement ─────────────────────────────
+router.post('/paypal/capture', async (req, res) => {
+  const { paypal_order_id, order_id } = req.body;
+  if (!paypal_order_id || !order_id) return res.status(400).json({ error: 'Données manquantes' });
+
+  const token = await getPayPalToken();
+  if (!token) return res.status(500).json({ error: 'PayPal non configuré' });
+
+  const { ok, data: capture } = await paypalRequest('POST', `/v2/checkout/orders/${paypal_order_id}/capture`, {}, token);
+  if (!ok || capture.status !== 'COMPLETED') {
+    return res.status(400).json({ error: `Paiement non complété : ${capture.status || 'erreur'}` });
+  }
+
+  db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('paid', order_id);
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
+  if (order) {
+    const parsedItems = JSON.parse(order.items || '[]');
+    for (const item of parsedItems) db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
+    sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
+  }
+  res.json({ success: true, order_id });
 });
 
 // ─── GET /api/orders/review-reminders — envoi des demandes d'avis J+8 ──
