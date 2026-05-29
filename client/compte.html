@@ -438,11 +438,12 @@ async function redeemPoints() {
 }
 
 async function initAccount() {
+  try {
   if (!Auth.isLoggedIn()) {
     document.getElementById('not-logged-in').style.display = '';
     return;
   }
-  document.getElementById('logged-in').style.display = '';
+  document.getElementById('logged-in').style.display = 'block';
 
   try {
     const user = await apiFetch('/auth/me');
@@ -462,11 +463,13 @@ async function initAccount() {
 
     // Avatar
     if (user.avatar_url) {
-      document.getElementById('avatar-img').src = user.avatar_url;
-      document.getElementById('avatar-img').style.display = 'block';
-      document.getElementById('avatar-initials-text').style.display = 'none';
+      const ai = document.getElementById('avatar-img');
+      if (ai) { ai.src = user.avatar_url; ai.style.display = 'block'; }
+      const ait = document.getElementById('avatar-initials-text');
+      if (ait) ait.style.display = 'none';
     } else {
-      document.getElementById('avatar-initials-text').textContent = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+      const ait = document.getElementById('avatar-initials-text');
+      if (ait) ait.textContent = `${(user.first_name||'?')[0]}${(user.last_name||'?')[0]}`.toUpperCase();
     }
   } catch {}
 
@@ -491,6 +494,20 @@ async function initAccount() {
   }
 
   loadOrders();
+  } catch(e) {
+    // Fallback: show content even if something crashed
+    const loggedIn = document.getElementById('logged-in');
+    if (loggedIn) loggedIn.style.display = 'block';
+    const notLoggedIn = document.getElementById('not-logged-in');
+    if (Auth.isLoggedIn() && loggedIn) {
+      if(notLoggedIn) notLoggedIn.style.display = 'none';
+      loggedIn.style.display = 'block';
+      loadOrders();
+    } else if (notLoggedIn) {
+      notLoggedIn.style.display = '';
+    }
+    console.error('initAccount error:', e);
+  }
 }
 
 function showTab(tab, link) {

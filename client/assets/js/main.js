@@ -399,6 +399,10 @@ function initHeader() {
       adminLink.className = 'admin-nav-link';
       adminLink.innerHTML = '⚙️ <span style="font-size:.8rem">Admin</span>';
       adminLink.style.cssText = 'display:flex;align-items:center;gap:3px;color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:8px;padding:5px 10px;font-size:.82rem;white-space:nowrap;text-decoration:none;margin-left:4px;flex-shrink:0';
+      // Hide on mobile — admin accesses via desktop
+      const adminStyle = document.createElement('style');
+      adminStyle.textContent = '@media (max-width:768px){.admin-nav-link{display:none!important}}';
+      document.head.appendChild(adminStyle);
       apiFetch('/admin-path').then(d => {
         adminLink.href = '/' + d.path + '/';
       }).catch(() => { adminLink.href = '/gestion-tea/'; });
@@ -406,6 +410,19 @@ function initHeader() {
       const hamburger = actions.querySelector('.hamburger');
       if (hamburger) actions.insertBefore(adminLink, hamburger);
       else actions.appendChild(adminLink);
+
+      // Also add to mobile nav panel
+      const mobileNav = document.querySelector('.mobile-nav-links');
+      if (mobileNav && !mobileNav.querySelector('.admin-mobile-link')) {
+        const divider = mobileNav.querySelector('.mobile-nav-divider');
+        const mobileAdminLink = document.createElement('a');
+        mobileAdminLink.className = 'admin-mobile-link';
+        mobileAdminLink.textContent = '⚙️ Administration';
+        mobileAdminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700';
+        apiFetch('/admin-path').then(d => { mobileAdminLink.href = '/' + d.path + '/'; }).catch(() => { mobileAdminLink.href = '/gestion-tea/'; });
+        if (divider) mobileNav.insertBefore(mobileAdminLink, divider);
+        else mobileNav.appendChild(mobileAdminLink);
+      }
     }
   }
   // Highlight active nav
