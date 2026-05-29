@@ -413,9 +413,17 @@ function initHeader() {
 // ─── Cache produits pour event delegation ────────────────────
 if (!window._pcache) window._pcache = {};
 
+// ─── Helper : rendu des étoiles ───────────────────────────────
+function renderStars(rating) {
+  return [1,2,3,4,5].map(i => {
+    if (rating >= i - 0.25) return '<span class="star-full">★</span>';
+    if (rating >= i - 0.75) return '<span class="star-half">★</span>';
+    return '<span class="star-empty">★</span>';
+  }).join('');
+}
+
 // ─── Product card renderer ────────────────────────────────────
 function renderProductCard(p) {
-  // Stocker le produit dans le cache global pour les event listeners
   window._pcache[p.id] = p;
 
   const img = p.images && p.images.length > 0
@@ -428,19 +436,30 @@ function renderProductCard(p) {
     ? p.tags.slice(0, 3).map(t => `<span class="product-card-tag">${t}</span>`).join('')
     : '';
 
+  // Badge "Nouveau" si créé il y a moins de 30 jours
+  const isNew = p.created_at && (Date.now() - new Date(p.created_at).getTime()) < 30 * 24 * 60 * 60 * 1000;
+  // Urgence stock (≤ 3 en stock)
+  const isLowStock = inStock && p.stock <= 3;
+  // Note moyenne
+  const avgRating = p.avg_rating ? Number(p.avg_rating) : 0;
+  const reviewCount = Number(p.review_count || 0);
+
   return `
     <div class="card product-card" data-id="${p.id}">
       <a class="card-full-link" href="/produit.html?id=${p.id}" aria-label="Voir ${p.name}"></a>
       <a href="/produit.html?id=${p.id}">
         <div class="product-card-img">${img}${placeholder}</div>
         ${!inStock ? '<span class="out-of-stock">Rupture de stock</span>' : ''}
-        ${p.is_featured ? '<span class="badge-new">✦ Coup de cœur</span>' : ''}
+        ${p.is_featured && !isNew ? '<span class="badge-featured">✦ Coup de cœur</span>' : ''}
+        ${isNew ? '<span class="badge-new-product">Nouveau</span>' : ''}
       </a>
       <div class="product-card-body">
         <div class="product-card-cat">${p.category_name || ''}</div>
         <a href="/produit.html?id=${p.id}">
           <div class="product-card-name">${p.name}</div>
         </a>
+        ${reviewCount > 0 ? `<div class="product-card-stars">${renderStars(avgRating)}<span class="stars-count">${avgRating.toFixed(1)} (${reviewCount})</span></div>` : ''}
+        ${isLowStock ? `<div class="stock-urgency">⚡ Plus que ${p.stock} en stock !</div>` : ''}
         <div class="product-card-price">${p.price.toFixed(2)} €</div>
         <div class="product-card-bottom">
           ${tags ? `<div class="product-card-tags">${tags}</div>` : ''}
@@ -481,9 +500,23 @@ function formatDate(str) {
   return new Date(str).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+// ─── Bouton retour en haut ────────────────────────────────────
+function initBackToTop() {
+  const btn = document.createElement('button');
+  btn.id = 'back-to-top';
+  btn.setAttribute('aria-label', 'Retour en haut de page');
+  btn.innerHTML = '↑';
+  btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.body.appendChild(btn);
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('visible', window.scrollY > 400);
+  }, { passive: true });
+}
+
 // ─── Init on load ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   Toast.init();
   initHeader();
   Favorites.loadFromServer();
+  initBackToTop();
 });
