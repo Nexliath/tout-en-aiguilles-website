@@ -11,20 +11,10 @@ const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 // ─── Config upload photos d'avis ────────────────────────────
-const reviewStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../client/assets/images/reviews');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    cb(null, `review_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
-  }
-});
+const { uploadImage } = require('../utils/imageUpload');
 const upload = multer({
-  storage: reviewStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB par photo (le client compresse déjà)
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
     cb(null, true);
@@ -65,7 +55,7 @@ router.get('/', (req, res) => {
 
 // ─── POST /api/reviews ──────────────────────────────────────
 // Authentifié : poster un avis avec jusqu'à 3 photos
-router.post('/', requireAuth, upload.array('photos', 3), (req, res) => {
+router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
   const { product_id, rating, comment } = req.body;
   const user_id = req.user.id;
 
@@ -89,9 +79,11 @@ router.post('/', requireAuth, upload.array('photos', 3), (req, res) => {
 
   // Enregistrer les photos si présentes
   if (req.files && req.files.length > 0) {
+    const localDir = require('path').join(__dirname, '../../client/assets/images/reviews');
     const insertPhoto = db.prepare('INSERT INTO review_photos (review_id, photo_url) VALUES (?, ?)');
     for (const file of req.files) {
-      insertPhoto.run(reviewId, `/assets/images/reviews/${file.filename}`);
+      const url = await uploadImage(file.buffer, file.originalname, 'reviews', localDir);
+      insertPhoto.run(reviewId, url);
     }
   }
 

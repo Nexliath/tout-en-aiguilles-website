@@ -8,19 +8,9 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Config upload images
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../client/assets/images/products');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `product_${Date.now()}${ext}`);
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+// Config upload images — mémoire pour support Cloudinary
+const { uploadImage, deleteImage } = require('../utils/imageUpload');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Helper: slugify
 function slugify(str) {
@@ -134,11 +124,14 @@ router.delete('/:id/favorite', requireAuth, (req, res) => {
 // ─── Admin ──────────────────────────────────────────────────
 
 // POST /api/products — créer un produit
-router.post('/', requireAdmin, upload.array('images', 5), (req, res) => {
+router.post('/', requireAdmin, upload.array('images', 5), async (req, res) => {
   const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label } = req.body;
   if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
   const slug = slugify(name) + '-' + Date.now();
-  const images = (req.files || []).map(f => `/assets/images/products/${f.filename}`);
+  const localDir = require('path').join(__dirname, '../../client/assets/images/products');
+  const images = await Promise.all(
+    (req.files || []).map(f => uploadImage(f.buffer, f.originalname, 'products', localDir))
+  );
   db.prepare(`
     INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -149,14 +142,17 @@ router.post('/', requireAdmin, upload.array('images', 5), (req, res) => {
 });
 
 // PUT /api/products/:id — modifier un produit
-router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
+router.put('/:id', requireAdmin, upload.array('images', 5), async (req, res) => {
   const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label } = req.body;
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
 
   let images = JSON.parse(keep_images || existing.images || '[]');
   if (req.files && req.files.length > 0) {
-    const newImgs = req.files.map(f => `/assets/images/products/${f.filename}`);
+    const localDir = require('path').join(__dirname, '../../client/assets/images/products');
+    const newImgs = await Promise.all(
+      req.files.map(f => uploadImage(f.buffer, f.originalname, 'products', localDir))
+    );
     images = [...images, ...newImgs];
   }
 
