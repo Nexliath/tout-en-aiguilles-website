@@ -103,6 +103,9 @@ app.use('/api/products',        require('./routes/products'));
 app.use('/api/orders/checkout', checkoutLimiter);
 app.use('/api/orders',          require('./routes/orders'));
 app.use('/api/addresses',       require('./routes/addresses'));
+app.use('/api/promo',      require('./routes/promo'));
+app.use('/api/newsletter', require('./routes/newsletter'));
+app.use('/api/cart',       require('./routes/cart'));
 app.use('/api/news',            require('./routes/news'));
 app.use('/api/admin',           require('./routes/admin'));
 app.use('/api/reviews',         reviewLimiter, require('./routes/reviews'));
@@ -263,6 +266,41 @@ async function sendPendingReviewReminders() {
 // Vérification toutes les heures
 setInterval(sendPendingReviewReminders, 60 * 60 * 1000);
 
+async function checkAbandonedCarts() {
+  try {
+    const db = require('./db/database');
+    const { sendAbandonedCartEmail } = require('./utils/email');
+    const carts1h = db.prepare(`SELECT * FROM cart_sessions WHERE email IS NOT NULL AND converted = 0 AND email_1h_sent = 0 AND datetime(updated_at, '+1 hours') <= datetime('now') AND items_json != '[]'`).all();
+    for (const cart of carts1h) {
+      try {
+        await sendAbandonedCartEmail(cart.email, '', JSON.parse(cart.items_json || '[]'));
+        db.prepare('UPDATE cart_sessions SET email_1h_sent = 1 WHERE id = ?').run(cart.id);
+      } catch(e) {}
+    }
+    const carts24h = db.prepare(`SELECT * FROM cart_sessions WHERE email IS NOT NULL AND converted = 0 AND email_24h_sent = 0 AND email_1h_sent = 1 AND datetime(updated_at, '+24 hours') <= datetime('now') AND items_json != '[]'`).all();
+    for (const cart of carts24h) {
+      try {
+        await sendAbandonedCartEmail(cart.email, '', JSON.parse(cart.items_json || '[]'));
+        db.prepare('UPDATE cart_sessions SET email_24h_sent = 1 WHERE id = ?').run(cart.id);
+      } catch(e) {}
+    }
+  } catch(e) { console.error('Abandoned cart check error:', e.message); }
+}
+
+async function checkStockAlerts() {
+  try {
+    const db = require('./db/database');
+    const { sendBackInStockEmail } = require('./utils/email');
+    const alerts = db.prepare(`SELECT sa.*, p.name, p.price, p.images, p.slug FROM stock_alerts sa JOIN products p ON p.id = sa.product_id WHERE sa.notified = 0 AND p.stock > 0 AND p.is_active = 1`).all();
+    for (const alert of alerts) {
+      try {
+        await sendBackInStockEmail(alert.email, { name: alert.name, price: alert.price, image: JSON.parse(alert.images || '[]')[0], slug: alert.slug, id: alert.product_id });
+        db.prepare('UPDATE stock_alerts SET notified = 1 WHERE id = ?').run(alert.id);
+      } catch(e) {}
+    }
+  } catch(e) {}
+}
+
 // ─── Démarrage ──────────────────────────────────────────────
 app.listen(PORT, async () => {
   const db = require('./db/database');
@@ -283,6 +321,11 @@ app.listen(PORT, async () => {
 
   // ─── Seed des articles d'actualité ──────────────────────────
   seedNews(db);
+  // ─── Migration des produits Etsy ────────────────────────────
+  const { seedEtsyProducts } = require('./db/seedEtsy');
+  seedEtsyProducts(db);
+  setInterval(checkAbandonedCarts, 60 * 60 * 1000);
+  setInterval(checkStockAlerts, 60 * 60 * 1000);
 });
 
 function slugify(str) {
