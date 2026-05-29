@@ -14,10 +14,19 @@
   <title>Actualités — Admin Tout en Aiguilles</title>
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
-    .editor-toolbar { display:flex;gap:4px;padding:8px;background:var(--cream-dark);border-radius:8px 8px 0 0;border:1.5px solid var(--border);border-bottom:none;flex-wrap:wrap }
-    .editor-btn { padding:4px 10px;border-radius:4px;border:none;background:transparent;font-size:.85rem;cursor:pointer;font-weight:700 }
+    .editor-toolbar { display:flex;gap:2px;padding:8px;background:var(--cream-dark);border-radius:8px 8px 0 0;border:1.5px solid var(--border);border-bottom:none;flex-wrap:wrap;align-items:center }
+    .editor-btn { padding:4px 8px;border-radius:4px;border:none;background:transparent;font-size:.82rem;cursor:pointer;font-weight:700;min-width:28px;text-align:center }
     .editor-btn:hover { background:white }
-    #f-content { border-radius:0 0 8px 8px;min-height:200px }
+    .editor-sep { width:1px;height:20px;background:var(--border);margin:0 4px;flex-shrink:0 }
+    #f-content { border-radius:0 0 8px 8px;min-height:280px;outline:none;padding:16px;border:1.5px solid var(--border);border-top:none;line-height:1.8;font-size:.95rem }
+    #f-content h2 { font-family:var(--font-title);font-size:1.4rem;color:var(--rose-dark);margin:24px 0 12px }
+    #f-content h3 { font-family:var(--font-title);font-size:1.15rem;margin:20px 0 8px }
+    #f-content figure { margin:16px 0 }
+    #f-content figure img { max-width:100%;border-radius:8px }
+    #f-content blockquote { border-left:3px solid var(--rose);padding:12px 16px;margin:16px 0;background:var(--rose-pale);border-radius:0 8px 8px 0;font-style:italic;color:var(--rose-dark) }
+    .editor-counter { font-size:.75rem;color:var(--text-light);margin-left:auto;padding:0 6px }
+    #art-preview { display:none;border:1.5px solid var(--border);border-radius:8px;padding:24px;margin-top:8px;background:white;max-height:400px;overflow-y:auto }
+    #art-preview.visible { display:block }
   </style>
 </head>
 <body>
@@ -66,12 +75,26 @@
         <div class="editor-toolbar">
           <button class="editor-btn" onclick="fmt('bold')" title="Gras"><b>G</b></button>
           <button class="editor-btn" onclick="fmt('italic')" title="Italique"><i>I</i></button>
-          <button class="editor-btn" onclick="fmt('insertUnorderedList')" title="Liste à puces">• Liste</button>
-          <button class="editor-btn" onclick="fmtBlock('h2')" title="Titre">H2</button>
+          <button class="editor-btn" onclick="fmt('underline')" title="Souligné"><u>S</u></button>
+          <div class="editor-sep"></div>
+          <button class="editor-btn" onclick="fmtBlock('h2')" title="Titre H2" style="font-size:.75rem">H2</button>
+          <button class="editor-btn" onclick="fmtBlock('h3')" title="Titre H3" style="font-size:.75rem">H3</button>
           <button class="editor-btn" onclick="fmtBlock('p')" title="Paragraphe">¶</button>
-          <button class="editor-btn" onclick="insertEmoji()" title="Emoji">😊</button>
+          <div class="editor-sep"></div>
+          <button class="editor-btn" onclick="fmt('insertUnorderedList')" title="Liste à puces">• —</button>
+          <button class="editor-btn" onclick="fmt('insertOrderedList')" title="Liste numérotée">1.</button>
+          <button class="editor-btn" onclick="insertBlockquote()" title="Citation">❝</button>
+          <button class="editor-btn" onclick="insertHR()" title="Séparateur">—</button>
+          <div class="editor-sep"></div>
+          <button class="editor-btn" onclick="insertLink()" title="Lien">🔗</button>
+          <button class="editor-btn" onclick="insertImageUrl()" title="Image (URL)">🖼️</button>
+          <div class="editor-sep"></div>
+          <button class="editor-btn" onclick="fmt('removeFormat')" title="Supprimer la mise en forme" style="font-size:.72rem;color:var(--text-light)">Ø</button>
+          <button class="editor-btn" onclick="togglePreview()" title="Aperçu" style="color:var(--rose-dark)">👁 Aperçu</button>
+          <span class="editor-counter" id="word-count">0 mots</span>
         </div>
-        <div id="f-content" class="form-textarea" contenteditable="true" style="outline:none;padding:12px 16px;border:1.5px solid var(--border);border-top:none;border-radius:0 0 8px 8px;min-height:200px"></div>
+        <div id="f-content" contenteditable="true" oninput="updateWordCount()"></div>
+        <div id="art-preview" class="article-body"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Photo de couverture</label>
@@ -224,13 +247,53 @@ async function deleteArticle(id, title) {
   } catch (e) { Toast.show(e.message, 'error'); }
 }
 
-// Rich text editor helpers
-function fmt(cmd) { document.execCommand(cmd, false, null); document.getElementById('f-content').focus(); }
-function fmtBlock(tag) { document.execCommand('formatBlock', false, tag); document.getElementById('f-content').focus(); }
-function insertEmoji() {
-  const emojis = ['🌸','🧶','✂️','🐰','🎁','💕','✨','🌿','🛁','👜'];
-  const e = emojis[Math.floor(Math.random() * emojis.length)];
-  document.execCommand('insertText', false, e);
+// ─── Rich text editor ─────────────────────────────────────────
+function fmt(cmd) { document.execCommand(cmd, false, null); document.getElementById('f-content').focus(); updateWordCount(); }
+function fmtBlock(tag) { document.execCommand('formatBlock', false, tag); document.getElementById('f-content').focus(); updateWordCount(); }
+
+function insertLink() {
+  const url = prompt('URL du lien :', 'https://');
+  if (!url) return;
+  const text = window.getSelection().toString() || url;
+  document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener">${text}</a>`);
+}
+
+function insertImageUrl() {
+  const url = prompt('URL de l\'image :', 'https://');
+  if (!url) return;
+  const alt = prompt('Description de l\'image (alt) :', '') || '';
+  document.execCommand('insertHTML', false,
+    `<figure><img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px"><figcaption>${alt}</figcaption></figure><p><br></p>`);
+}
+
+function insertBlockquote() {
+  const sel = window.getSelection().toString();
+  const txt = sel || prompt('Texte de la citation :', '') || '';
+  if (!txt) return;
+  document.execCommand('insertHTML', false, `<blockquote>${txt}</blockquote><p><br></p>`);
+}
+
+function insertHR() {
+  document.execCommand('insertHTML', false, '<hr style="border:none;border-top:2px solid var(--border);margin:24px 0"><p><br></p>');
+}
+
+function updateWordCount() {
+  const text = document.getElementById('f-content').innerText || '';
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const el = document.getElementById('word-count');
+  if (el) el.textContent = `${words} mot${words > 1 ? 's' : ''}`;
+}
+
+function togglePreview() {
+  const preview = document.getElementById('art-preview');
+  const content = document.getElementById('f-content').innerHTML;
+  if (preview.classList.contains('visible')) {
+    preview.classList.remove('visible');
+  } else {
+    preview.innerHTML = content || '<p style="color:var(--text-light);font-style:italic">Aucun contenu à prévisualiser</p>';
+    preview.classList.add('visible');
+    preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 init();
