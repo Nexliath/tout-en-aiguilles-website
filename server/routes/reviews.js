@@ -79,11 +79,15 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
 
   // Enregistrer les photos si présentes
   if (req.files && req.files.length > 0) {
-    const localDir = require('path').join(__dirname, '../../client/assets/images/reviews');
+    const localDir = path.join(__dirname, '../../client/assets/images/reviews');
     const insertPhoto = db.prepare('INSERT INTO review_photos (review_id, photo_url) VALUES (?, ?)');
     for (const file of req.files) {
-      const url = await uploadImage(file.buffer, file.originalname, 'reviews', localDir);
-      insertPhoto.run(reviewId, url);
+      try {
+        const url = await uploadImage(file.buffer, file.originalname, 'reviews', localDir);
+        insertPhoto.run(reviewId, url);
+      } catch(imgErr) {
+        console.error('[review photo upload]', imgErr.message);
+      }
     }
   }
 

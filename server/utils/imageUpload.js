@@ -65,13 +65,19 @@ async function uploadImage(buffer, originalname, folder = 'products', localDir =
   }
 
   // Fallback : disque local
-  const dir = localDir || path.join(__dirname, '../../client/assets/images', folder);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const ext      = path.extname(originalname) || '.jpg';
-  const filename = `${folder}_${Date.now()}${ext}`;
-  const filepath = path.join(dir, filename);
-  fs.writeFileSync(filepath, buffer);
-  return `/assets/images/${folder}/${filename}`;
+  try {
+    const dir = localDir || path.join(__dirname, '../../client/assets/images', folder);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const ext      = path.extname(originalname) || '.jpg';
+    const filename = `${folder}_${Date.now()}${ext}`;
+    const filepath = path.join(dir, filename);
+    fs.writeFileSync(filepath, buffer);
+    console.log(`[imageUpload] Disque: ${filepath}`);
+    return `/assets/images/${folder}/${filename}`;
+  } catch(e) {
+    console.error('[imageUpload] Erreur écriture disque:', e.message);
+    throw new Error('Impossible de sauvegarder l\'image : ' + e.message);
+  }
 }
 
 /**

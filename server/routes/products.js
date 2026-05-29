@@ -125,50 +125,60 @@ router.delete('/:id/favorite', requireAuth, (req, res) => {
 
 // POST /api/products — créer un produit
 router.post('/', requireAdmin, upload.array('images', 5), async (req, res) => {
-  const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label } = req.body;
-  if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
-  const slug = slugify(name) + '-' + Date.now();
-  const localDir = require('path').join(__dirname, '../../client/assets/images/products');
-  const images = await Promise.all(
-    (req.files || []).map(f => uploadImage(f.buffer, f.originalname, 'products', localDir))
-  );
-  db.prepare(`
-    INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(name, slug, description || '', Number(price), Number(stock) || 0,
-         category_id || null, JSON.stringify(images), tags || '[]', is_featured ? 1 : 0,
-         variant_group_id?.trim() || null, variant_label?.trim() || null);
-  res.status(201).json({ success: true });
+  try {
+    const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label } = req.body;
+    if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
+    const slug = slugify(name) + '-' + Date.now();
+    const localDir = path.join(__dirname, '../../client/assets/images/products');
+    const images = await Promise.all(
+      (req.files || []).map(f => uploadImage(f.buffer, f.originalname, 'products', localDir))
+    );
+    db.prepare(`
+      INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, slug, description || '', Number(price), Number(stock) || 0,
+           category_id || null, JSON.stringify(images), tags || '[]', is_featured ? 1 : 0,
+           variant_group_id?.trim() || null, variant_label?.trim() || null);
+    res.status(201).json({ success: true });
+  } catch(e) {
+    console.error('[POST /products]', e);
+    res.status(500).json({ error: 'Erreur lors de la création : ' + e.message });
+  }
 });
 
 // PUT /api/products/:id — modifier un produit
 router.put('/:id', requireAdmin, upload.array('images', 5), async (req, res) => {
-  const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label } = req.body;
-  const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
+  try {
+    const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label } = req.body;
+    const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
 
-  let images = JSON.parse(keep_images || existing.images || '[]');
-  if (req.files && req.files.length > 0) {
-    const localDir = require('path').join(__dirname, '../../client/assets/images/products');
-    const newImgs = await Promise.all(
-      req.files.map(f => uploadImage(f.buffer, f.originalname, 'products', localDir))
-    );
-    images = [...images, ...newImgs];
+    let images = JSON.parse(keep_images || existing.images || '[]');
+    if (req.files && req.files.length > 0) {
+      const localDir = path.join(__dirname, '../../client/assets/images/products');
+      const newImgs = await Promise.all(
+        req.files.map(f => uploadImage(f.buffer, f.originalname, 'products', localDir))
+      );
+      images = [...images, ...newImgs];
+    }
+
+    db.prepare(`
+      UPDATE products SET name=?, description=?, price=?, stock=?, category_id=?,
+      images=?, tags=?, is_featured=?, is_active=?, variant_group_id=?, variant_label=?, updated_at=CURRENT_TIMESTAMP
+      WHERE id=?
+    `).run(name || existing.name, description ?? existing.description, Number(price) || existing.price,
+           Number(stock) ?? existing.stock, category_id || existing.category_id,
+           JSON.stringify(images), tags || existing.tags,
+           is_featured !== undefined ? (is_featured === '1' || is_featured === 1 || is_featured === true ? 1 : 0) : existing.is_featured,
+           is_active !== undefined   ? (is_active   === '1' || is_active   === 1 || is_active   === true ? 1 : 0) : existing.is_active,
+           variant_group_id?.trim() || existing.variant_group_id || null,
+           variant_label?.trim() || existing.variant_label || null,
+           req.params.id);
+    res.json({ success: true });
+  } catch(e) {
+    console.error('[PUT /products/:id]', e);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour : ' + e.message });
   }
-
-  db.prepare(`
-    UPDATE products SET name=?, description=?, price=?, stock=?, category_id=?,
-    images=?, tags=?, is_featured=?, is_active=?, variant_group_id=?, variant_label=?, updated_at=CURRENT_TIMESTAMP
-    WHERE id=?
-  `).run(name || existing.name, description ?? existing.description, Number(price) || existing.price,
-         Number(stock) ?? existing.stock, category_id || existing.category_id,
-         JSON.stringify(images), tags || existing.tags,
-         is_featured !== undefined ? (is_featured === '1' || is_featured === 1 || is_featured === true ? 1 : 0) : existing.is_featured,
-         is_active !== undefined   ? (is_active   === '1' || is_active   === 1 || is_active   === true ? 1 : 0) : existing.is_active,
-         variant_group_id?.trim() || existing.variant_group_id || null,
-         variant_label?.trim() || existing.variant_label || null,
-         req.params.id);
-  res.json({ success: true });
 });
 
 // DELETE /api/products/:id — supprimer définitivement un produit
