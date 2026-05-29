@@ -54,6 +54,20 @@ const migrations = [
   "ALTER TABLE users ADD COLUMN pending_email TEXT DEFAULT NULL",
   "ALTER TABLE users ADD COLUMN email_change_token TEXT DEFAULT NULL",
   "ALTER TABLE users ADD COLUMN email_change_expires_at DATETIME DEFAULT NULL",
+  // Table adresses
+  `CREATE TABLE IF NOT EXISTS addresses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label TEXT NOT NULL DEFAULT 'Maison',
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    city TEXT NOT NULL,
+    postal_code TEXT NOT NULL,
+    country TEXT NOT NULL DEFAULT 'France',
+    is_primary INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
