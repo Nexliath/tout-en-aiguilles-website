@@ -179,7 +179,8 @@ router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
 router.delete('/:id', requireAdmin, (req, res) => {
   const id = req.params.id;
   db.prepare('DELETE FROM favorites WHERE product_id = ?').run(id);
-  db.prepare('DELETE FROM order_items WHERE product_id = ?').run(id);
+  db.prepare('DELETE FROM reviews WHERE product_id = ?').run(id);
+  db.prepare('DELETE FROM stock_alerts WHERE product_id = ?').run(id);
   db.prepare('DELETE FROM products WHERE id = ?').run(id);
   res.json({ success: true });
 });

@@ -375,14 +375,18 @@ function initHeader() {
     if (Auth.isLoggedIn()) {
       const u = Auth.getUser();
       if (u && u.avatar_url) {
-        userBtn.innerHTML = `<img src="${u.avatar_url}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;display:block" alt="${u.first_name}">`;
+        userBtn.innerHTML = `<img src="${u.avatar_url}" style="width:32px;height:32px;object-fit:cover;border-radius:50%;display:block" alt="${u.first_name || ''}">`;
         userBtn.style.padding = '0';
         userBtn.style.overflow = 'hidden';
         userBtn.style.borderRadius = '50%';
-      } else {
-        userBtn.innerHTML = `<span style="font-size:.9rem;font-weight:700;color:var(--rose-dark)">${u.first_name[0]}${u.last_name[0]}</span>`;
+      } else if (u) {
+        userBtn.innerHTML = `<span style="font-size:.9rem;font-weight:700;color:var(--rose-dark)">${(u.first_name||'?')[0]}${(u.last_name||'?')[0]}</span>`;
       }
-      userBtn.onclick = () => window.location.href = '/compte.html';
+      // Force redirect — use href anchor to avoid any onclick override
+      userBtn.setAttribute('role', 'link');
+      userBtn.setAttribute('aria-label', 'Mon compte');
+      userBtn.style.cursor = 'pointer';
+      userBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.location.href = '/compte.html'; return false; };
     } else {
       userBtn.onclick = openAuthModal;
     }
@@ -394,7 +398,7 @@ function initHeader() {
       const adminLink = document.createElement('a');
       adminLink.className = 'admin-nav-link';
       adminLink.textContent = '⚙️ Admin';
-      adminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:6px;padding:4px 10px;font-size:.85rem';
+      adminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:6px;padding:4px 10px;font-size:.85rem;margin-left:8px;order:99';
       // Récupérer le chemin admin depuis le serveur (suit automatiquement la variable ADMIN_PATH)
       apiFetch('/admin-path').then(d => {
         adminLink.href = '/' + d.path + '/';
@@ -715,22 +719,44 @@ function initImageZoom(mainEl) {
   if (!mainEl || window.innerWidth < 1025) return;
   mainEl.classList.add('zoomable');
 
+  // Lens must be OUTSIDE gallery-main (which has overflow:hidden)
+  // Attach to the product-layout grid instead
+  const layout = mainEl.closest('.product-layout') || mainEl.parentElement;
+  layout.style.position = 'relative';
+
   const lens = document.createElement('div');
   lens.className = 'gallery-zoom-lens';
-  mainEl.appendChild(lens);
+  // Position it to the right of the gallery column
+  lens.style.cssText = 'display:none;position:absolute;top:0;left:calc(50% + 16px);width:320px;height:320px;border-radius:12px;border:1px solid var(--border);overflow:hidden;background:white;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:20;background-repeat:no-repeat;pointer-events:none';
+  layout.appendChild(lens);
+
+  function getActiveImg() {
+    // Get the currently visible slide img
+    const carousel = mainEl.querySelector('.gallery-carousel');
+    if (carousel) {
+      const idx = Math.round(carousel.scrollLeft / Math.max(1, carousel.offsetWidth));
+      const slides = carousel.querySelectorAll('.gallery-slide img');
+      return slides[idx] || slides[0];
+    }
+    return mainEl.querySelector('img');
+  }
 
   mainEl.addEventListener('mouseenter', () => { lens.style.display = 'block'; });
   mainEl.addEventListener('mouseleave', () => { lens.style.display = 'none'; });
   mainEl.addEventListener('mousemove', (e) => {
-    const img = mainEl.querySelector('.gallery-slide img, img');
-    if (!img || !img.complete) return;
+    const img = getActiveImg();
+    if (!img || !img.complete || !img.src) return;
     const rect = mainEl.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    const zoomFactor = 2.5;
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    const zoomFactor = 2.8;
     lens.style.backgroundImage = `url('${img.src}')`;
     lens.style.backgroundSize = `${rect.width * zoomFactor}px ${rect.height * zoomFactor}px`;
     lens.style.backgroundPosition = `-${x * rect.width * (zoomFactor - 1)}px -${y * rect.height * (zoomFactor - 1)}px`;
+    // Position lens vertically aligned with cursor
+    const layoutRect = layout.getBoundingClientRect();
+    const lensY = Math.max(0, e.clientY - layoutRect.top - 160);
+    lens.style.top = lensY + 'px';
   });
 }
 

@@ -152,10 +152,12 @@ async function init() {
 
 function renderGifts() {
   const sort = document.getElementById('gift-sort').value;
+  const occasionTags = occasionFilter ? (occasionTagMap[occasionFilter] || []) : [];
   let filtered = allProducts.filter(p => {
     if (p.stock === 0) return false;
     if (p.price < budgetMin || p.price > budgetMax) return false;
     if (tagFilter && !(p.tags || []).some(t => t.toLowerCase().includes(tagFilter))) return false;
+    if (occasionTags.length && !occasionTags.some(ot => (p.tags || []).some(t => t.toLowerCase().includes(ot)))) return false;
     return true;
   });
   if (sort === 'price_asc') filtered.sort((a,b) => a.price - b.price);
@@ -171,6 +173,26 @@ function renderGifts() {
   }
   grid.innerHTML = filtered.map(renderProductCard).join('');
 }
+
+// Occasion chips — map occasion to relevant tags
+let occasionFilter = '';
+const occasionTagMap = {
+  'naissance': ['bébé', 'naissance', 'cadeau'],
+  'anniversaire': ['anniversaire', 'cadeau', 'enfant'],
+  'noel': ['cadeau', 'noël', 'noel'],
+  'fete-des-meres': ['adulte', 'cadeau'],
+  'saint-valentin': ['adulte', 'cadeau'],
+};
+
+const occasionSection = document.querySelector('[data-occasion]')?.closest('div');
+document.querySelectorAll('[data-occasion]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-occasion]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    occasionFilter = btn.dataset.occasion;
+    renderGifts();
+  });
+});
 
 // Budget chips
 document.getElementById('budget-chips').addEventListener('click', e => {

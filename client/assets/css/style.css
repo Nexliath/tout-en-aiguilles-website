@@ -1283,3 +1283,14 @@ p  { color: var(--text-light); }
   font-size: .85rem; cursor: pointer; background: white; transition: all .2s;
 }
 .gift-recipient-chip.active { border-color: var(--sage-dark); background: var(--sage-pale); color: var(--sage-dark); font-weight: 700; }
+
+/* ── Fix zoom — gallery-main overflow desktop ── */
+@media (min-width: 1025px) {
+  .gallery-main { overflow: visible !important; }
+  .product-layout { position: relative; }
+}
+
+/* ── Product info — tighter vertical rhythm ── */
+@media (min-width: 769px) {
+  .product-info > * + * { margin-top: 0; }
+}

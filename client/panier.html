@@ -159,52 +159,37 @@
 
             <!-- Checkout form -->
             <div style="margin-top:24px">
-              <h4 style="margin-bottom:16px;font-size:.95rem">Informations de livraison</h4>
-              <div id="guest-checkout-notice" style="display:none;background:var(--cream-dark);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:.82rem;color:var(--text-light)">
-                💡 Commandez sans créer de compte. <a href="#" onclick="openAuthModal();return false" style="color:var(--rose-dark)">Connexion</a> pour auto-remplir et suivre vos commandes.
+              <!-- Bandeau invité compact -->
+              <div id="guest-checkout-notice" style="display:none;background:var(--cream-dark);border-radius:var(--radius);padding:8px 12px;margin-bottom:12px;font-size:.8rem;color:var(--text-light)">
+                💡 <a href="#" onclick="openAuthModal();return false" style="color:var(--rose-dark);font-weight:700">Connectez-vous</a> pour auto-remplir vos infos.
               </div>
 
-              <!-- Adresses enregistrées (visible si connecté et au moins 1 adresse) -->
-              <div id="saved-addr-section" style="display:none;margin-bottom:20px">
-                <p style="font-size:.8rem;color:var(--text-light);margin-bottom:8px">Utiliser une adresse enregistrée :</p>
-                <div id="saved-addr-cards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="selectSavedAddress(null)" id="addr-manual-btn" style="font-size:.78rem">
-                  ✏️ Saisir manuellement
-                </button>
+              <!-- Adresses enregistrées -->
+              <div id="saved-addr-section" style="display:none;margin-bottom:12px">
+                <p style="font-size:.78rem;color:var(--text-light);margin-bottom:6px">📍 Adresse enregistrée :</p>
+                <div id="saved-addr-cards" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="selectSavedAddress(null)" id="addr-manual-btn" style="font-size:.76rem;padding:4px 10px">✏️ Saisir manuellement</button>
               </div>
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label">Prénom *</label>
-                  <input type="text" id="co-fname" class="form-input" placeholder="Marie">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Nom *</label>
-                  <input type="text" id="co-lname" class="form-input" placeholder="Dupont">
-                </div>
+              <!-- Grille compacte infos contact -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <div><input type="text" id="co-fname" class="form-input" placeholder="Prénom *" style="font-size:.85rem"></div>
+                <div><input type="text" id="co-lname" class="form-input" placeholder="Nom *" style="font-size:.85rem"></div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Email *</label>
-                <input type="email" id="co-email" class="form-input" placeholder="marie@email.fr">
+              <div style="margin-bottom:8px">
+                <input type="email" id="co-email" class="form-input" placeholder="Email *" style="font-size:.85rem">
               </div>
-              <div class="form-group">
-                <label class="form-label">Adresse *</label>
-                <input type="text" id="co-address" class="form-input" placeholder="12 rue des Lilas">
+              <div style="margin-bottom:8px">
+                <input type="text" id="co-address" class="form-input" placeholder="Adresse *" style="font-size:.85rem">
               </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label">Code postal *</label>
-                  <input type="text" id="co-postal" class="form-input" placeholder="75001">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Ville *</label>
-                  <input type="text" id="co-city" class="form-input" placeholder="Paris">
-                </div>
+              <div style="display:grid;grid-template-columns:120px 1fr;gap:8px;margin-bottom:4px">
+                <input type="text" id="co-postal" class="form-input" placeholder="Code postal *" style="font-size:.85rem">
+                <input type="text" id="co-city" class="form-input" placeholder="Ville *" style="font-size:.85rem">
               </div>
 
               <!-- ── Mode de livraison ───────────────────────── -->
-              <div style="margin-top:20px">
-                <h4 style="margin-bottom:10px;font-size:.95rem">Mode de livraison</h4>
+              <div style="margin-top:14px">
+                <div style="font-size:.82rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Livraison</div>
 
                 <!-- 1 · Domicile -->
                 <div class="delivery-opt is-selected" id="opt-home" onclick="selectDelivery('home')">
@@ -264,9 +249,8 @@
               </div>
               <!-- /Mode de livraison -->
 
-              <div class="form-group" style="margin-top:20px">
-                <label class="form-label">Note (optionnel)</label>
-                <textarea id="co-notes" class="form-textarea" style="min-height:72px" placeholder="Personnalisation, message cadeau…"></textarea>
+              <div style="margin-top:12px">
+                <textarea id="co-notes" class="form-textarea" style="min-height:56px;font-size:.83rem" placeholder="Note / personnalisation (optionnel)…"></textarea>
               </div>
 
               <div style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px">
