@@ -13,6 +13,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin — Tout en Aiguilles</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -51,6 +52,8 @@
       <a href="actualites.html">📝 Actualités</a>
       <a href="utilisateurs.html">👥 Utilisateurs</a>
       <a href="avis.html">⭐ Avis</a>
+      <a href="promo.html">🏷️ Codes promo</a>
+      <a href="newsletter.html">📧 Newsletter</a>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
       <a href="/" target="_blank">🌐 Voir le site</a>
       <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
@@ -119,6 +122,12 @@
       <div style="margin-top:16px">
         <a href="commandes.html" class="btn btn-secondary btn-sm">Voir toutes les commandes →</a>
       </div>
+    </div>
+
+    <!-- Revenue chart -->
+    <div class="admin-panel" style="margin-top:24px">
+      <div class="admin-panel-title">📈 Chiffre d'affaires — 12 derniers mois</div>
+      <div style="position:relative;height:260px"><canvas id="revenue-chart"></canvas></div>
     </div>
 
     <!-- Quick actions -->
@@ -262,6 +271,25 @@ async function loadDashboard() {
     updatePeriodStats();
 
     // Tableau dernières commandes
+    // Graphique 12 mois
+    const chartMonths = [], chartRevenues = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+      const y = d.getFullYear(), m = d.getMonth();
+      const mo = orders.filter(o => { const od = new Date(o.created_at); return od.getFullYear()===y && od.getMonth()===m && ['paid','shipped','delivered'].includes(o.status); });
+      chartMonths.push(new Intl.DateTimeFormat('fr-FR',{month:'short',year:'2-digit'}).format(d));
+      chartRevenues.push(Math.round(mo.reduce((s,o)=>s+Number(o.total),0)*100)/100);
+    }
+    if (window._revenueChart) window._revenueChart.destroy();
+    const ctx = document.getElementById('revenue-chart')?.getContext('2d');
+    if (ctx && typeof Chart !== 'undefined') {
+      window._revenueChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: chartMonths, datasets: [{ label: 'CA (€)', data: chartRevenues, backgroundColor: 'rgba(192,113,138,0.65)', borderColor: 'rgba(192,113,138,1)', borderWidth: 1, borderRadius: 6 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' €' } } } }
+      });
+    }
+
     const STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
     const recent = orders.slice(0, 5);
     document.getElementById('recent-orders-body').innerHTML = recent.length
