@@ -35,9 +35,12 @@ function slugify(str) {
 router.get('/', (req, res) => {
   const { category, type, search, featured, limit = 50, offset = 0 } = req.query;
   let query = `
-    SELECT p.*, c.name as category_name, c.slug as category_slug, c.type as category_type
+    SELECT p.*, c.name as category_name, c.slug as category_slug, c.type as category_type,
+      ROUND(AVG(CASE WHEN r.is_approved = 1 THEN r.rating END), 1) as avg_rating,
+      COUNT(CASE WHEN r.is_approved = 1 THEN r.id END) as review_count
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN reviews r ON r.product_id = p.id
     WHERE p.is_active = 1
   `;
   const params = [];
@@ -45,7 +48,7 @@ router.get('/', (req, res) => {
   if (type)     { query += ' AND c.type = ?'; params.push(type); }
   if (search)   { query += ' AND (p.name LIKE ? OR p.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   if (featured) { query += ' AND p.is_featured = 1'; }
-  query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
+  query += ' GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
   params.push(Number(limit), Number(offset));
 
   const products = db.prepare(query).all(...params).map(p => ({
