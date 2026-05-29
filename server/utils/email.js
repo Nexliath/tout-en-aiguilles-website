@@ -520,4 +520,55 @@ async function sendReviewRequestEmail(order) {
   );
 }
 
-module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendContactEmail, sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail };
+// ─── Email changement de point relais ───────────────────────────
+async function sendRelayChangeEmail(order, oldRelay, newRelay) {
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#fdf8f5;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f5;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+        ${emailHeader('📦', 'Modification de votre point relais')}
+        <tr><td style="padding:40px;">
+          <h2 style="margin:0 0 16px;color:#5a3e2b;font-size:20px;">Bonjour ${order.first_name} 👋</h2>
+          <p style="color:#6b5547;line-height:1.7;margin:0 0 24px;">
+            Le point relais initialement sélectionné pour votre commande <strong>#${order.id}</strong> n'est malheureusement pas disponible pour l'expédition.
+            Votre colis sera remis au point relais suivant :
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+            <tr>
+              <td style="padding:12px;background:#fff5f5;border-radius:8px 8px 0 0;border:1px solid #f0e8e0;border-bottom:none;">
+                <p style="margin:0;font-size:12px;color:#9e8070;">Point relais initial (non disponible)</p>
+                <p style="margin:4px 0 0;color:#b8a090;text-decoration:line-through;font-size:14px;">${(oldRelay || '—').replace(/</g,'&lt;')}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px;background:#f0fff4;border-radius:0 0 8px 8px;border:1px solid #b8dfc8;">
+                <p style="margin:0;font-size:12px;color:#4a6f5a;">Nouveau point relais</p>
+                <p style="margin:4px 0 0;color:#2d5a3d;font-weight:700;font-size:15px;">📍 ${(newRelay || '—').replace(/</g,'&lt;')}</p>
+              </td>
+            </tr>
+          </table>
+          <p style="color:#6b5547;line-height:1.7;margin:0 0 24px;">
+            Si ce changement vous pose un problème, n'hésitez pas à nous contacter directement en répondant à cet email.
+          </p>
+          ${invoiceBlock(order)}
+        </td></tr>
+        ${emailFooter()}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  if (!process.env.BREVO_API_KEY) {
+    console.log(`\n📧 [DEMO] Changement point relais commande #${order.id} : ${oldRelay} → ${newRelay}\n`);
+    return { demo: true };
+  }
+  return sendBrevo(
+    order.email, `${order.first_name} ${order.last_name}`,
+    `📦 Modification de votre point relais — Commande #${order.id}`,
+    html,
+    `Bonjour ${order.first_name},\n\nLe point relais de votre commande #${order.id} a été modifié.\nAncien : ${oldRelay}\nNouveau : ${newRelay}\n\n— Tout en Aiguilles`
+  );
+}
+
+module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendContactEmail, sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail };
