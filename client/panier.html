@@ -499,11 +499,15 @@ function renderCart() {
 
   document.getElementById('cart-items').innerHTML = items.map(item => `
     <div class="cart-item">
-      <div class="cart-item-img">
-        ${item.image ? `<img src="${item.image}" alt="${item.name}" onerror="this.parentElement.innerHTML='🧶'">` : '🧶'}
-      </div>
+      <a href="/produit.html?id=${item.product_id}" style="text-decoration:none;flex-shrink:0" title="Voir le produit">
+        <div class="cart-item-img">
+          ${item.image ? `<img src="${item.image}" alt="${item.name}" onerror="this.parentElement.innerHTML='🧶'">` : '🧶'}
+        </div>
+      </a>
       <div class="cart-item-info">
-        <div class="cart-item-name">${item.name}</div>
+        <a href="/produit.html?id=${item.product_id}" style="text-decoration:none;color:inherit">
+        <div class="cart-item-name" style="hover:text-decoration:underline">${item.name}</div>
+        </a>
         <div class="cart-item-price">${item.price.toFixed(2)} €</div>
         <div class="qty-control">
           <button class="qty-btn" onclick="updateQty(${item.product_id}, ${item.qty - 1})">−</button>
