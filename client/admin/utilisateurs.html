@@ -13,6 +13,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Utilisateurs — Admin Tout en Aiguilles</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     .sort-btn {
       background: none; border: 1px solid var(--border); border-radius: 6px;
@@ -80,7 +81,12 @@
   <main class="admin-main">
     <div class="admin-header">
       <h1>👥 Utilisateurs</h1>
-      <div id="user-count" style="font-size:.85rem;color:var(--text-light)"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="user-count" style="font-size:.85rem;color:var(--text-light)"></div>
+        <button class="btn btn-secondary btn-sm" onclick="exportXLS()" title="Exporter la liste filtrée au format Excel">
+          📥 Export XLS
+        </button>
+      </div>
     </div>
 
     <div class="admin-panel">
@@ -356,6 +362,50 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
     applyFiltersAndSort();
   });
 });
+
+// ─── Export XLS ──────────────────────────────────────────────
+function exportXLS() {
+  // Récupérer la liste courante filtrée/triée (même état que le tableau)
+  const q = document.getElementById('search-input').value.toLowerCase();
+  let list = allUsers.filter(u => {
+    const matchSearch = !q
+      || u.first_name.toLowerCase().includes(q)
+      || u.last_name.toLowerCase().includes(q)
+      || (u.username || '').toLowerCase().includes(q)
+      || u.email.toLowerCase().includes(q);
+    const matchRole  = !filterRole  || u.role === filterRole;
+    const matchEmail = filterEmail === '' || String(u.email_verified) === filterEmail;
+    return matchSearch && matchRole && matchEmail;
+  });
+
+  if (!list.length) { Toast.show('Aucun utilisateur à exporter', 'info'); return; }
+
+  const rows = list.map(u => ({
+    'ID':             u.id,
+    'Prénom':         u.first_name,
+    'Nom':            u.last_name,
+    'Pseudo':         u.username || '',
+    'Email':          u.email,
+    'Rôle':           u.role === 'admin' ? 'Administrateur' : 'Utilisateur',
+    'Email vérifié':  u.email_verified ? 'Oui' : 'Non',
+    'Date inscription': u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '',
+  }));
+
+  const ws   = XLSX.utils.json_to_sheet(rows);
+  // Largeurs colonnes
+  ws['!cols'] = [
+    {wch:6},{wch:14},{wch:16},{wch:16},{wch:30},
+    {wch:16},{wch:14},{wch:18}
+  ];
+  const wb   = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Utilisateurs');
+
+  const date = new Date().toISOString().split('T')[0];
+  const role  = filterRole  ? `_${filterRole}s`  : '';
+  const email = filterEmail === '1' ? '_vérifiés' : filterEmail === '0' ? '_en-attente' : '';
+  XLSX.writeFile(wb, `utilisateurs${role}${email}_${date}.xlsx`);
+  Toast.show(`📥 ${list.length} utilisateur(s) exporté(s)`, 'success');
+}
 
 checkAdmin();
 </script>
