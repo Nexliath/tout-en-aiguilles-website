@@ -434,4 +434,65 @@ async function sendOrderStatusEmail(order) {
     `Bonjour ${order.first_name},\n\nLe statut de votre commande #${order.id} est maintenant : ${statusLabel(status)}\n\n— Tout en Aiguilles`);
 }
 
-module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendContactEmail, sendNewOrderNotification, sendOrderStatusEmail };
+// ─── Email demande d'avis — J+8 après livraison ─────────────────
+async function sendReviewRequestEmail(order) {
+  const items = typeof order.items === 'string' ? JSON.parse(order.items || '[]') : (order.items || []);
+  const BASE = process.env.BASE_URL || 'https://tout-en-aiguilles.com';
+
+  const productLinks = items.map(i => `
+    <tr>
+      <td style="padding:12px;border-bottom:1px solid #f0e8e0;">
+        <table cellpadding="0" cellspacing="0" width="100%"><tr>
+          <td style="width:56px;vertical-align:top;">
+            ${i.image ? `<img src="${BASE}${i.image}" width="48" height="48" style="border-radius:8px;object-fit:cover;" alt="${i.name}">` : '<div style="width:48px;height:48px;background:#f0e8e0;border-radius:8px;"></div>'}
+          </td>
+          <td style="padding-left:12px;vertical-align:middle;">
+            <strong style="color:#5a3e2b;font-size:14px;">${i.name}</strong><br>
+            <a href="${BASE}/produit.html?id=${i.product_id}"
+               style="display:inline-block;margin-top:6px;background:#c0718a;color:#fff;text-decoration:none;padding:6px 16px;border-radius:20px;font-size:13px;font-family:Georgia,serif;">
+              ✍️ Laisser un avis
+            </a>
+          </td>
+        </tr></table>
+      </td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#fdf8f5;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f5;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+        ${emailHeader('⭐', 'Votre avis nous tient à cœur')}
+        <tr><td style="padding:40px;">
+          <h2 style="margin:0 0 16px;color:#5a3e2b;font-size:20px;">Bonjour ${order.first_name} 👋</h2>
+          <p style="color:#6b5547;line-height:1.7;margin:0 0 8px;">
+            Votre commande <strong>#${order.id}</strong> a été livrée il y a une semaine.<br>
+            Nous espérons qu'elle vous a plu ! Votre avis aide les autres clients et nous encourage beaucoup. 🌸
+          </p>
+          <p style="color:#9e8070;font-size:13px;margin:0 0 24px;">Cliquez sur un produit pour laisser votre étoiles et commentaire :</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0e8e0;border-radius:8px;overflow:hidden;">
+            ${productLinks}
+          </table>
+          <p style="color:#b8a090;font-size:12px;margin:28px 0 0;text-align:center;">
+            Merci pour votre confiance et à bientôt sur <a href="${BASE}" style="color:#c0718a;">tout-en-aiguilles.com</a> 🧶
+          </p>
+        </td></tr>
+        ${emailFooter()}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  if (!process.env.BREVO_API_KEY) {
+    console.log(`\n📧 [DEMO] Demande d'avis commande #${order.id} → ${order.email} (${items.length} produit(s))\n`);
+    return { demo: true };
+  }
+  return sendBrevo(
+    order.email, `${order.first_name} ${order.last_name}`,
+    `⭐ Votre avis sur votre commande #${order.id} — Tout en Aiguilles`,
+    html,
+    `Bonjour ${order.first_name},\n\nVotre commande #${order.id} a été livrée il y a une semaine. Votre avis nous tient à cœur !\n\nRetrouvez vos articles sur ${BASE}/boutique.html\n\n— Tout en Aiguilles`
+  );
+}
+
+module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendContactEmail, sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail };
