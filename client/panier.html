@@ -35,6 +35,17 @@
       font-size: .85rem; line-height: 1.55;
     }
     #delivery-row { color: #888; }
+    .payment-method-btn {
+      flex: 1; padding: 10px 14px; border-radius: 10px;
+      border: 2px solid var(--border); background: white;
+      font-size: .88rem; font-weight: 600; cursor: pointer;
+      color: var(--text-light); transition: border-color .15s, background .15s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .payment-method-btn.active {
+      border-color: var(--rose-dark); background: var(--rose-pale); color: var(--rose-dark);
+    }
+    .payment-method-btn:hover:not(.active) { border-color: #ccc; background: #fafafa; }
   </style>
 </head>
 <body>
@@ -222,13 +233,33 @@
 
               <div id="checkout-error" class="form-error" style="display:none;margin-bottom:12px"></div>
 
-              <button id="checkout-btn" class="btn btn-primary btn-block btn-lg" onclick="startCheckout()">
-                🔒 Payer en sécurité
-              </button>
+              <!-- Choix du mode de paiement -->
+              <div id="payment-methods" style="display:flex;gap:10px;margin-bottom:16px">
+                <button type="button" id="pm-card" class="payment-method-btn active" onclick="selectPaymentMethod('card')">
+                  💳 Carte bancaire
+                </button>
+                <button type="button" id="pm-paypal" class="payment-method-btn" onclick="selectPaymentMethod('paypal')">
+                  <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" style="height:20px;vertical-align:middle"> PayPal
+                </button>
+              </div>
 
-              <div class="stripe-badge">
-                <span>🔒</span>
-                <span>Paiement sécurisé par Stripe — CB, Visa, Mastercard</span>
+              <!-- Bouton Stripe -->
+              <div id="stripe-section">
+                <button id="checkout-btn" class="btn btn-primary btn-block btn-lg" onclick="startCheckout()">
+                  🔒 Payer en sécurité
+                </button>
+                <div class="stripe-badge">
+                  <span>🔒</span>
+                  <span>Paiement sécurisé par Stripe — CB, Visa, Mastercard</span>
+                </div>
+              </div>
+
+              <!-- Bouton PayPal (chargé dynamiquement) -->
+              <div id="paypal-section" style="display:none">
+                <div id="paypal-button-container"></div>
+                <p style="font-size:.75rem;color:var(--text-light);text-align:center;margin-top:8px">
+                  🔒 Paiement sécurisé par PayPal
+                </p>
               </div>
             </div>
           </div>
@@ -472,6 +503,109 @@ async function startCheckout() {
     btn.disabled = false;
     btn.innerHTML = '🔒 Payer en sécurité';
   }
+}
+
+// ── Mode de paiement ─────────────────────────────────────────
+let paymentMethod = 'card';
+let paypalLoaded  = false;
+let paypalOrderId = null;
+
+function selectPaymentMethod(mode) {
+  paymentMethod = mode;
+  document.getElementById('pm-card').classList.toggle('active',   mode === 'card');
+  document.getElementById('pm-paypal').classList.toggle('active', mode === 'paypal');
+  document.getElementById('stripe-section').style.display  = mode === 'card'   ? '' : 'none';
+  document.getElementById('paypal-section').style.display  = mode === 'paypal' ? '' : 'none';
+  if (mode === 'paypal' && !paypalLoaded) initPayPal();
+}
+
+function getCheckoutPayload() {
+  const fname   = document.getElementById('co-fname').value.trim();
+  const lname   = document.getElementById('co-lname').value.trim();
+  const email   = document.getElementById('co-email').value.trim();
+  const address = document.getElementById('co-address').value.trim();
+  const postal  = document.getElementById('co-postal').value.trim();
+  const city    = document.getElementById('co-city').value.trim();
+  const notes   = document.getElementById('co-notes').value.trim();
+  const relay   = (document.getElementById('co-relay')?.value || '').trim();
+  if (!fname || !lname || !email || !address || !postal || !city) return null;
+  if (selectedDelivery === 'relay' && !relay) return null;
+  return {
+    items: Cart.get().map(i => ({ product_id: i.product_id, qty: i.qty })),
+    delivery: { type: selectedDelivery, fee: DELIVERY_FEES[selectedDelivery], relay_point: relay || null },
+    customer: { user_id: Auth.getUser()?.id || null, email, first_name: fname, last_name: lname, address, city, postal_code: postal, country: 'France', notes },
+  };
+}
+
+async function initPayPal() {
+  try {
+    const cfg = await apiFetch('/orders/paypal/config');
+    if (!cfg.enabled) {
+      document.getElementById('paypal-section').innerHTML = '<p style="text-align:center;color:var(--text-light);font-size:.85rem;padding:12px">PayPal non configuré.</p>';
+      return;
+    }
+    // Charger le SDK PayPal dynamiquement
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = `https://www.paypal.com/sdk/js?client-id=${cfg.client_id}&currency=EUR&locale=fr_FR`;
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    paypalLoaded = true;
+    renderPayPalButton();
+  } catch(e) {
+    console.error('PayPal init error:', e);
+  }
+}
+
+function renderPayPalButton() {
+  const container = document.getElementById('paypal-button-container');
+  if (!container || !window.paypal) return;
+  container.innerHTML = '';
+  paypal.Buttons({
+    style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay', height: 48 },
+    createOrder: async () => {
+      const payload = getCheckoutPayload();
+      const errEl = document.getElementById('checkout-error');
+      if (!payload) {
+        errEl.textContent = 'Veuillez remplir tous les champs obligatoires (*)';
+        errEl.style.display = '';
+        throw new Error('Form incomplete');
+      }
+      errEl.style.display = 'none';
+      const result = await apiFetch('/orders/paypal/create', { method: 'POST', body: payload });
+      if (result.demo) {
+        Cart.clear();
+        window.location.href = `/commande-confirmee.html?order=${result.order_id}&demo=true`;
+        throw new Error('demo');
+      }
+      paypalOrderId = result.paypal_order_id;
+      window._pendingOrderId = result.order_id;
+      return result.paypal_order_id;
+    },
+    onApprove: async (data) => {
+      try {
+        const result = await apiFetch('/orders/paypal/capture', {
+          method: 'POST',
+          body: { paypal_order_id: data.orderID, order_id: window._pendingOrderId }
+        });
+        if (result.success) {
+          Cart.clear();
+          window.location.href = `/commande-confirmee.html?order=${result.order_id}`;
+        }
+      } catch(e) {
+        const errEl = document.getElementById('checkout-error');
+        errEl.textContent = e.message || 'Erreur lors de la capture du paiement PayPal.';
+        errEl.style.display = '';
+      }
+    },
+    onError: (err) => {
+      if (err.message === 'Form incomplete' || err.message === 'demo') return;
+      const errEl = document.getElementById('checkout-error');
+      errEl.textContent = 'Paiement PayPal annulé ou échoué. Réessayez ou choisissez une autre méthode.';
+      errEl.style.display = '';
+    }
+  }).render('#paypal-button-container');
 }
 
 renderCart();
