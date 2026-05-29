@@ -9,20 +9,10 @@ const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
 const { sendVerificationEmail, sendEmailChangeConfirmation } = require('../utils/email');
 
-// ─── Config upload avatar ────────────────────────────────────
-const avatarStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../client/assets/images/avatars');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    cb(null, `avatar_u${req.user ? req.user.id : 'x'}_${Date.now()}${ext}`);
-  }
-});
+// ─── Config upload avatar — stockage mémoire → base64 en DB ──
+// (évite la perte des fichiers à chaque redéploiement Railway)
 const uploadAvatar = multer({
-  storage: avatarStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 1 * 1024 * 1024 }, // 1 MB max (le client compresse déjà à ~200 KB)
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
@@ -188,20 +178,33 @@ router.post('/admin-cookie', (req, res) => {
 
 // ─── GET /api/auth/me ───────────────────────────────────────
 router.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT id, email, first_name, last_name, username, role, email_verified, created_at, avatar_url FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, email, first_name, last_name, username, role, email_verified, created_at, avatar_url, newsletter_opt_out FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
   res.json(user);
 });
 
 // ─── PUT /api/auth/me ───────────────────────────────────────
 router.put('/me', requireAuth, (req, res) => {
-  const { first_name, last_name, username } = req.body;
+  const { first_name, last_name, username, newsletter_opt_out } = req.body;
   const usernameClean = username?.trim() || null;
   if (usernameClean) {
     const conflict = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(usernameClean, req.user.id);
     if (conflict) return res.status(409).json({ error: 'Ce pseudo est déjà utilisé' });
   }
-  db.prepare('UPDATE users SET first_name = ?, last_name = ?, username = ? WHERE id = ?').run(first_name, last_name, usernameClean, req.user.id);
+  db.prepare('UPDATE users SET first_name = ?, last_name = ?, username = ?, newsletter_opt_out = ? WHERE id = ?')
+    .run(first_name, last_name, usernameClean, newsletter_opt_out !== undefined ? (newsletter_opt_out ? 1 : 0) : 0, req.user.id);
+  // Synchroniser le statut dans newsletter_subscribers
+  if (newsletter_opt_out !== undefined) {
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.id);
+    if (user) {
+      if (newsletter_opt_out) {
+        db.prepare('UPDATE newsletter_subscribers SET is_active = 0 WHERE email = ?').run(user.email);
+      } else {
+        db.prepare('INSERT OR IGNORE INTO newsletter_subscribers (email, first_name, source) VALUES (?, ?, \'user\')').run(user.email, first_name || '');
+        db.prepare('UPDATE newsletter_subscribers SET is_active = 1 WHERE email = ?').run(user.email);
+      }
+    }
+  }
   res.json({ success: true });
 });
 
@@ -259,19 +262,17 @@ router.get('/confirm-email-change', (req, res) => {
 });
 
 // ─── POST /api/auth/avatar ──────────────────────────────────
+// Stockage en base64 dans la DB — persiste entre les redéploiements Railway
 router.post('/avatar', requireAuth, uploadAvatar.single('avatar'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Fichier image requis' });
 
-  // Supprimer l'ancien avatar si présent
-  const user = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(req.user.id);
-  if (user && user.avatar_url) {
-    const oldPath = path.join(__dirname, '../../client', user.avatar_url);
-    if (fs.existsSync(oldPath)) { try { fs.unlinkSync(oldPath); } catch {} }
-  }
+  // Convertir en base64 data URL et stocker en DB (pas de fichier sur disque)
+  const mime = req.file.mimetype || 'image/jpeg';
+  const b64 = req.file.buffer.toString('base64');
+  const dataUrl = `data:${mime};base64,${b64}`;
 
-  const avatarUrl = `/assets/images/avatars/${req.file.filename}`;
-  db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.user.id);
-  res.json({ avatar_url: avatarUrl, message: 'Photo de profil mise à jour !' });
+  db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(dataUrl, req.user.id);
+  res.json({ avatar_url: dataUrl, message: 'Photo de profil mise à jour !' });
 });
 
 // ─── PUT /api/auth/password ─────────────────────────────────
