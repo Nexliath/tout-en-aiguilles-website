@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { sendNewOrderNotification, sendOrderStatusEmail } = require('../utils/email');
 
 const router = express.Router();
 
@@ -89,11 +90,21 @@ router.post('/checkout', async (req, res) => {
   // Mode démo (sans Stripe)
   if (!stripe) {
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
-    // Décrémenter le stock
     for (const item of items) {
       db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
     }
+    const demoOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    if (demoOrder) {
+      sendNewOrderNotification({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
+      sendOrderStatusEmail({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
+    }
     return res.json({ demo: true, order_id: orderId, message: 'Commande enregistrée (mode démo)' });
+  }
+
+  // Avec Stripe : envoyer notification boutique dès la création (statut pending)
+  const pendingOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+  if (pendingOrder) {
+    sendNewOrderNotification({ ...pendingOrder, items: JSON.parse(pendingOrder.items || '[]') }).catch(console.error);
   }
 
   // Session Stripe réelle
@@ -129,13 +140,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
     if (orderId) {
       db.prepare('UPDATE orders SET status = ?, stripe_payment_intent = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run('paid', session.payment_intent, orderId);
-      // Décrémenter le stock
-      const order = db.prepare('SELECT items FROM orders WHERE id = ?').get(orderId);
+      const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
       if (order) {
-        const items = JSON.parse(order.items);
-        for (const item of items) {
+        const parsedItems = JSON.parse(order.items || '[]');
+        for (const item of parsedItems) {
           db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
         }
+        // Email client : paiement confirmé + facture
+        sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
       }
     }
   }
@@ -178,6 +190,11 @@ router.put('/:id/status', requireAdmin, (req, res) => {
   const valid = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'];
   if (!valid.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
   db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(status, req.params.id);
+  // Email client à chaque changement de statut
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+  if (order && order.email) {
+    sendOrderStatusEmail({ ...order, items: JSON.parse(order.items || '[]') }).catch(console.error);
+  }
   res.json({ success: true });
 });
 
