@@ -299,6 +299,7 @@ p  { color: var(--text-light); }
   display: flex; align-items: center; justify-content: center;
   font-size: 3rem; box-shadow: 0 8px 32px var(--shadow);
 }
+.hero-float img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .hero-float:nth-child(2) { margin-top: 32px; }
 .hero-float:nth-child(4) { margin-top: -16px; }
 
