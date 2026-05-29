@@ -105,6 +105,21 @@
         <p class="form-hint">Max 5 photos — JPG, PNG, WebP (5 Mo max chacune)</p>
         <div id="current-images" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
       </div>
+      <!-- Variantes -->
+      <div style="background:var(--cream-dark);border-radius:var(--radius-lg);padding:16px;margin-bottom:20px">
+        <div style="font-size:.82rem;font-weight:700;margin-bottom:12px;color:var(--text)">🎨 Variantes (couleurs / motifs)</div>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">ID du groupe <span style="font-weight:400;color:var(--text-light)">(identique sur toutes les variantes)</span></label>
+            <input type="text" id="f-variant-group" class="form-input" placeholder="ex: doudou-singe" style="font-size:.85rem">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Étiquette de cette variante</label>
+            <input type="text" id="f-variant-label" class="form-input" placeholder="ex: Rose, Vert, Bleu marine" style="font-size:.85rem">
+          </div>
+        </div>
+        <p style="font-size:.75rem;color:var(--text-light);margin-top:8px">Remplissez les deux champs pour lier plusieurs produits ensemble. Laissez vide si pas de variantes.</p>
+      </div>
       <div style="display:flex;gap:16px;margin-bottom:20px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
           <input type="checkbox" id="f-featured"> <span class="form-label" style="margin:0">⭐ Mettre en avant</span>
@@ -222,6 +237,8 @@ function hideForm() {
   document.getElementById('f-category').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-tags').value = '';
+  document.getElementById('f-variant-group').value = '';
+  document.getElementById('f-variant-label').value = '';
   document.getElementById('f-featured').checked = false;
   document.getElementById('f-active').checked = true;
   document.getElementById('f-images').value = '';
@@ -241,6 +258,8 @@ function editProduct(id) {
   document.getElementById('f-category').value = p.category_id || '';
   document.getElementById('f-desc').value = p.description || '';
   document.getElementById('f-tags').value = (p.tags || []).join(', ');
+  document.getElementById('f-variant-group').value = p.variant_group_id || '';
+  document.getElementById('f-variant-label').value = p.variant_label || '';
   document.getElementById('f-featured').checked = !!p.is_featured;
   document.getElementById('f-active').checked = !!p.is_active;
 
@@ -282,8 +301,10 @@ async function saveProduct() {
   formData.append('category_id', document.getElementById('f-category').value);
   formData.append('description', document.getElementById('f-desc').value);
   formData.append('tags',        JSON.stringify(document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean)));
-  formData.append('is_featured', document.getElementById('f-featured').checked ? '1' : '0');
-  formData.append('is_active',   document.getElementById('f-active').checked ? '1' : '0');
+  formData.append('is_featured',     document.getElementById('f-featured').checked ? '1' : '0');
+  formData.append('is_active',       document.getElementById('f-active').checked ? '1' : '0');
+  formData.append('variant_group_id', document.getElementById('f-variant-group').value.trim().toLowerCase().replace(/\s+/g, '-') || '');
+  formData.append('variant_label',    document.getElementById('f-variant-label').value.trim() || '');
   const files = document.getElementById('f-images').files;
   for (const f of files) formData.append('images', f);
   // Envoyer les images à conserver (après suppressions individuelles)
