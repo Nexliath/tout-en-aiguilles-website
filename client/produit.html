@@ -166,6 +166,9 @@
       background: var(--cream); border-radius: 16px; padding: 24px;
       margin-bottom: 28px; border: 1px solid var(--border);
     }
+  @media (max-width: 768px) {
+    #trust-strip { grid-template-columns: 1fr !important; gap: 8px !important; }
+  }
   </style>
 </head>
 <body>
@@ -239,7 +242,7 @@
         </div>
 
         <!-- Info -->
-        <div class="product-info">
+        <div class="product-info" style="padding-top:0">
           <div id="prod-cat" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sage-dark);margin-bottom:8px"></div>
           <h1 id="prod-name" style="font-size:clamp(1.4rem,3vw,2rem);margin-bottom:12px"></h1>
 
@@ -285,20 +288,33 @@
           </div>
           <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="window.location='/panier.html'">Voir mon panier →</button>
 
-          <!-- Shipping info -->
-          <div style="margin-top:12px;padding:12px 16px;background:var(--sage-pale);border-radius:var(--radius-lg)">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:.85rem;font-weight:700;color:var(--sage-dark)">🚚 Livraison</div>
-            <p style="font-size:.82rem;color:var(--text-light)">Livraison en France métropolitaine.</p>
-            <div id="delivery-estimate"></div>
-          </div>
-
-          <!-- Custom order note -->
-          <div style="margin-top:8px;padding:10px 14px;background:var(--rose-pale);border-radius:var(--radius-lg)">
-            <div style="font-size:.85rem;font-weight:700;color:var(--rose-dark);margin-bottom:4px">🎨 Personnalisation</div>
-            <p style="font-size:.82rem;color:var(--text-light)">Couleur différente, prénom brodé… <a href="/#contact" style="color:var(--rose-dark);font-weight:700">Contactez-nous</a> pour une commande personnalisée !</p>
-          </div>
           <!-- Boutons de partage -->
-          <div id="share-buttons-wrap"></div>
+          <div id="share-buttons-wrap" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <!-- ── Infos livraison + perso (compact) ── -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:32px;margin-bottom:8px" id="trust-strip">
+        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px">
+          <span style="font-size:1.4rem;flex-shrink:0">🚚</span>
+          <div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--sage-dark);margin-bottom:3px">Livraison France</div>
+            <div id="delivery-estimate" style="font-size:.78rem;color:var(--text-light)">Expédition 3–5 jours ouvrés</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--rose-pale);border-radius:var(--radius-lg);padding:14px">
+          <span style="font-size:1.4rem;flex-shrink:0">🎨</span>
+          <div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--rose-dark);margin-bottom:3px">Personnalisation</div>
+            <div style="font-size:.78rem;color:var(--text-light)">Couleur, prénom… <a href="/#contact" style="color:var(--rose-dark);font-weight:700">Contactez-nous</a></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--cream-dark);border-radius:var(--radius-lg);padding:14px">
+          <span style="font-size:1.4rem;flex-shrink:0">🤲</span>
+          <div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:3px">Fait main</div>
+            <div style="font-size:.78rem;color:var(--text-light)">Chaque pièce est unique</div>
+          </div>
         </div>
       </div>
 
@@ -411,7 +427,12 @@ async function loadProduct() {
     document.getElementById('product-detail').style.display = '';
     document.title = `${product.name} — Création crochet faite main | Tout en Aiguilles`;
   // Delivery estimator
-  renderDeliveryEstimator('delivery-estimate');
+  // Delivery estimator — compact text version for trust strip
+  const de = document.getElementById('delivery-estimate');
+  if (de) {
+    const est = getDeliveryEstimate();
+    de.textContent = `Expédié le ${est.ship}`;
+  }
   // Share buttons
   renderShareButtons('share-buttons-wrap', product.name, `https://tout-en-aiguilles.com/produit.html?id=${product.id}`);
   // Recently viewed
@@ -485,7 +506,24 @@ function renderProduct(p) {
   document.getElementById('prod-cat').textContent = p.category_name || '';
   document.getElementById('prod-name').textContent = p.name;
   document.getElementById('prod-price').textContent = p.price.toFixed(2) + ' €';
-  document.getElementById('prod-desc').textContent = p.description || '';
+  // Description collapsible — affiche 4 lignes max avec "Lire plus"
+  const descEl = document.getElementById('prod-desc');
+  const fullDesc = p.description || '';
+  descEl.textContent = fullDesc;
+  descEl.style.cssText = 'color:var(--text);font-size:.9rem;line-height:1.65;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden';
+  if (fullDesc.length > 300) {
+    const readMore = document.createElement('button');
+    readMore.style.cssText = 'display:block;margin-top:6px;background:none;border:none;color:var(--rose-dark);font-size:.82rem;font-weight:700;cursor:pointer;padding:0';
+    readMore.textContent = '▼ Lire plus';
+    let expanded = false;
+    readMore.onclick = () => {
+      expanded = !expanded;
+      descEl.style.webkitLineClamp = expanded ? 'unset' : '5';
+      descEl.style.overflow = expanded ? 'visible' : 'hidden';
+      readMore.textContent = expanded ? '▲ Réduire' : '▼ Lire plus';
+    };
+    descEl.parentElement.appendChild(readMore);
+  }
 
   // Stock badge
   const stockEl = document.getElementById('prod-stock');

@@ -393,17 +393,19 @@ function initHeader() {
   }
   // Lien Admin dans la nav (admin uniquement) — chemin récupéré depuis le serveur
   if (Auth.isAdmin()) {
-    const nav = document.querySelector('.nav');
-    if (nav && !nav.querySelector('.admin-nav-link')) {
+    const actions = document.querySelector('.header-actions');
+    if (actions && !actions.querySelector('.admin-nav-link')) {
       const adminLink = document.createElement('a');
       adminLink.className = 'admin-nav-link';
-      adminLink.textContent = '⚙️ Admin';
-      adminLink.style.cssText = 'color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:6px;padding:4px 10px;font-size:.85rem;margin-left:8px;order:99';
-      // Récupérer le chemin admin depuis le serveur (suit automatiquement la variable ADMIN_PATH)
+      adminLink.innerHTML = '⚙️ <span style="font-size:.8rem">Admin</span>';
+      adminLink.style.cssText = 'display:flex;align-items:center;gap:3px;color:var(--rose-dark)!important;font-weight:700;border:1px solid var(--rose-dark);border-radius:8px;padding:5px 10px;font-size:.82rem;white-space:nowrap;text-decoration:none;margin-left:4px;flex-shrink:0';
       apiFetch('/admin-path').then(d => {
         adminLink.href = '/' + d.path + '/';
       }).catch(() => { adminLink.href = '/gestion-tea/'; });
-      nav.appendChild(adminLink);
+      // Insert BEFORE the hamburger button (last child)
+      const hamburger = actions.querySelector('.hamburger');
+      if (hamburger) actions.insertBefore(adminLink, hamburger);
+      else actions.appendChild(adminLink);
     }
   }
   // Highlight active nav
