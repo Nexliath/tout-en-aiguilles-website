@@ -151,8 +151,8 @@ router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
   `).run(name || existing.name, description ?? existing.description, Number(price) || existing.price,
          Number(stock) ?? existing.stock, category_id || existing.category_id,
          JSON.stringify(images), tags || existing.tags,
-         is_featured !== undefined ? (is_featured ? 1 : 0) : existing.is_featured,
-         is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active,
+         is_featured !== undefined ? (is_featured === '1' || is_featured === 1 || is_featured === true ? 1 : 0) : existing.is_featured,
+         is_active !== undefined   ? (is_active   === '1' || is_active   === 1 || is_active   === true ? 1 : 0) : existing.is_active,
          req.params.id);
   res.json({ success: true });
 });
@@ -210,6 +210,16 @@ router.post('/import/xls', requireAdmin, multer({ storage: multer.memoryStorage(
   } catch (e) {
     res.status(500).json({ error: `Erreur lecture Excel : ${e.message}` });
   }
+});
+
+router.post('/stock-alert', (req, res) => {
+  const { product_id, email } = req.body;
+  if (!product_id || !email) return res.status(400).json({ error: 'product_id et email requis' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Email invalide' });
+  try {
+    db.prepare('INSERT OR IGNORE INTO stock_alerts (product_id, email) VALUES (?, ?)').run(Number(product_id), email.trim().toLowerCase());
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
