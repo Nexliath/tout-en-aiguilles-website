@@ -68,6 +68,59 @@ const migrations = [
     is_primary INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS promo_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    discount_type TEXT NOT NULL DEFAULT 'percent',
+    value REAL NOT NULL,
+    min_order REAL DEFAULT 0,
+    max_uses INTEGER DEFAULT NULL,
+    uses_count INTEGER DEFAULT 0,
+    expires_at TEXT DEFAULT NULL,
+    is_active INTEGER DEFAULT 1,
+    description TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    first_name TEXT DEFAULT '',
+    source TEXT DEFAULT 'website',
+    is_active INTEGER DEFAULT 1,
+    subscribed_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS stock_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    notified INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(product_id, email)
+  )`,
+  `CREATE TABLE IF NOT EXISTS cart_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_key TEXT NOT NULL UNIQUE,
+    user_id INTEGER DEFAULT NULL,
+    email TEXT DEFAULT NULL,
+    items_json TEXT DEFAULT '[]',
+    email_1h_sent INTEGER DEFAULT 0,
+    email_24h_sent INTEGER DEFAULT 0,
+    converted INTEGER DEFAULT 0,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`,
+  "ALTER TABLE orders ADD COLUMN gift_wrap INTEGER DEFAULT 0",
+  "ALTER TABLE orders ADD COLUMN gift_message TEXT DEFAULT NULL",
+  "ALTER TABLE orders ADD COLUMN gift_wrap_fee REAL DEFAULT 0",
+  "ALTER TABLE orders ADD COLUMN promo_code TEXT DEFAULT NULL",
+  "ALTER TABLE orders ADD COLUMN promo_discount REAL DEFAULT 0",
+  "ALTER TABLE products ADD COLUMN options_json TEXT DEFAULT NULL",
+  "ALTER TABLE products ADD COLUMN video_url TEXT DEFAULT NULL",
+  // Préférence newsletter des utilisateurs
+  "ALTER TABLE users ADD COLUMN newsletter_opt_out INTEGER DEFAULT 0",
+  // Onboarder les utilisateurs vérifiés existants comme subscribers (source 'user')
+  `INSERT OR IGNORE INTO newsletter_subscribers (email, first_name, source)
+   SELECT email, first_name, 'user' FROM users WHERE email_verified = 1`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
