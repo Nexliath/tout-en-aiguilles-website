@@ -1,4 +1,8 @@
 const express = require('express');
+let _loyaltyAward = null;
+function awardLoyalty(userId, action, pts, ref) {
+  try { if (!_loyaltyAward) _loyaltyAward = require('./loyalty').awardPoints; _loyaltyAward(userId, action, pts, ref); } catch {}
+}
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -91,9 +95,12 @@ router.post('/', requireAuth, upload.array('photos', 3), (req, res) => {
     }
   }
 
+  // +10 points fidélité pour l'avis
+  awardLoyalty(req.user.id, 'review', 10, String(product_id));
+
   res.status(201).json({
     id: reviewId,
-    message: 'Avis enregistré ! Il sera visible après validation.',
+    message: 'Avis enregistré ! Il sera visible après validation. +10 points fidélité 🌸',
     pending: true
   });
 });

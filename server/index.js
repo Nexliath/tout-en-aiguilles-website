@@ -109,6 +109,8 @@ app.use('/api/cart',       require('./routes/cart'));
 app.use('/api/news',            require('./routes/news'));
 app.use('/api/admin',           require('./routes/admin'));
 app.use('/api/reviews',         reviewLimiter, require('./routes/reviews'));
+app.use('/api/loyalty',         require('./routes/loyalty'));
+app.use('/api/push',            require('./routes/push'));
 
 // ─── Formulaire de contact ───────────────────────────────────
 app.post('/api/contact', contactLimiter, async (req, res) => {
@@ -137,10 +139,19 @@ app.get('/sitemap.xml', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
 
   const staticPages = [
-    { url: '/',              priority: '1.0', changefreq: 'weekly'  },
-    { url: '/boutique.html', priority: '0.9', changefreq: 'daily'   },
-    { url: '/actualites.html',priority:'0.7', changefreq: 'weekly'  },
+    { url: '/',                  priority: '1.0', changefreq: 'weekly'  },
+    { url: '/boutique.html',     priority: '0.9', changefreq: 'daily'   },
+    { url: '/actualites.html',   priority: '0.7', changefreq: 'weekly'  },
+    { url: '/cadeaux.html',      priority: '0.8', changefreq: 'weekly'  },
+    { url: '/materiaux.html',    priority: '0.6', changefreq: 'monthly' },
+    { url: '/livraison.html',    priority: '0.5', changefreq: 'monthly' },
+    { url: '/cgv.html',          priority: '0.4', changefreq: 'monthly' },
+    { url: '/mentions-legales.html', priority: '0.3', changefreq: 'monthly' },
   ];
+
+  const newsArticles = db.prepare(
+    "SELECT slug, updated_at FROM news WHERE published = 1 ORDER BY updated_at DESC"
+  ).all();
 
   const products = db.prepare(
     "SELECT slug, updated_at FROM products WHERE is_active = 1 ORDER BY updated_at DESC"
@@ -160,6 +171,13 @@ app.get('/sitemap.xml', (req, res) => {
     <lastmod>${(p.updated_at || today).split('T')[0]}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>`),
+    ...(newsArticles || []).map(a => `
+  <url>
+    <loc>${BASE}/actualites.html?slug=${a.slug}</loc>
+    <lastmod>${(a.updated_at || today).split('T')[0]}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>`),
   ];
 

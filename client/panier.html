@@ -70,8 +70,15 @@
     <nav class="nav">
       <a href="/">Accueil</a>
       <a href="/boutique.html">Boutique</a>
+      <a href="/cadeaux.html">🎁 Cadeaux</a>
       <a href="/actualites.html">Actualités</a>
     </nav>
+    
+        <div class="header-search-wrap">
+          <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
+          <span class="header-search-icon">🔍</span>
+          <div class="header-search-dropdown" id="header-search-dropdown"></div>
+        </div>
     <div class="header-actions">
       <button class="icon-btn" id="user-btn">👤</button>
       <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
@@ -781,6 +788,8 @@ loadSavedAddresses();
 // Écoute du code postal & ville pour la vérification de zone
 document.getElementById('co-postal').addEventListener('input', scheduleGeoCheck);
 document.getElementById('co-city').addEventListener('input',   scheduleGeoCheck);
+initHeaderSearch();
+renderDeliveryEstimator('delivery-estimate-cart');
 </script>
 </body>
 </html>

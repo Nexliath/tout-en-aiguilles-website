@@ -1,4 +1,11 @@
 const express = require('express');
+let _loyaltyAward = null;
+function awardLoyaltyPoints(userId, action, points, ref) {
+  try {
+    if (!_loyaltyAward) _loyaltyAward = require('./loyalty').awardPoints;
+    _loyaltyAward(userId, action, points, ref);
+  } catch {}
+}
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail } = require('../utils/email');
@@ -129,6 +136,7 @@ router.post('/checkout', async (req, res) => {
     if (demoOrder) {
       sendNewOrderNotification({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
       sendOrderStatusEmail({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
+      if (demoOrder.user_id) awardLoyaltyPoints(demoOrder.user_id, 'purchase', Math.floor(demoOrder.total), String(orderId));
     }
     return res.json({ demo: true, order_id: orderId, message: 'Commande enregistrée (mode démo)' });
   }
@@ -206,6 +214,12 @@ router.get('/:id', requireAuth, (req, res) => {
 // ─── Admin ──────────────────────────────────────────────────
 
 // GET /api/orders — toutes les commandes (admin)
+router.get('/admin/all', requireAdmin, (req, res) => {
+  const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all()
+    .map(o => ({ ...o, items: JSON.parse(o.items || '[]') }));
+  res.json(orders);
+});
+
 router.get('/', requireAdmin, (req, res) => {
   const { status } = req.query;
   let query = 'SELECT * FROM orders';

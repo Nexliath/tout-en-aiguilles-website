@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idées cadeaux — Créations crochet faites main | Tout en Aiguilles</title>
+  <meta name="description" content="Trouvez le cadeau parfait parmi nos créations crochet et couture artisanales. Filtrez par budget et destinataire — bébé, enfant, adulte. Livraison France.">
+  <link rel="canonical" href="https://tout-en-aiguilles.com/cadeaux.html">
+  <meta property="og:title" content="Idées cadeaux — Tout en Aiguilles">
+  <meta property="og:description" content="Cadeaux faits main pour tous les budgets. Doudous, tote bags, accessoires bébé.">
+  <meta property="og:url" content="https://tout-en-aiguilles.com/cadeaux.html">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
+    <nav class="nav">
+      <a href="/">Accueil</a>
+      <a href="/boutique.html">Boutique</a>
+      <a href="/cadeaux.html">🎁 Cadeaux</a>
+      <a href="/actualites.html">Actualités</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header-search-wrap">
+      <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
+      <span class="header-search-icon">🔍</span>
+      <div class="header-search-dropdown" id="header-search-dropdown"></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="user-btn">👤</button>
+      <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
+      <button class="hamburger icon-btn" onclick="openMobileNav()" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav-overlay" id="mobile-nav" onclick="closeMobileNav()">
+  <div class="mobile-nav-panel" onclick="event.stopPropagation()">
+    <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
+    <div style="font-family:var(--font-title);font-size:1.05rem;color:var(--rose-dark);margin-bottom:8px">🧶 Tout en Aiguilles</div>
+    <nav class="mobile-nav-links">
+      <a href="/">🏠 Accueil</a>
+      <a href="/boutique.html">🛍️ Boutique</a>
+      <a href="/actualites.html">📰 Actualités</a>
+      <a href="/#contact">✉️ Contact</a>
+      <div class="mobile-nav-divider"></div>
+      <a href="/compte.html">👤 Mon compte</a>
+      <a href="/panier.html">🛒 Mon panier</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page-hero" style="text-align:center">
+  <div class="container">
+    <div class="section-tag" style="margin:0 auto 12px">🎁 Idées cadeaux</div>
+    <h1>Trouver le cadeau parfait</h1>
+    <p style="max-width:520px;margin:0 auto">Des créations faites main, uniques et mémorables — pour tous les budgets et tous les proches.</p>
+  </div>
+</div>
+
+<main class="section">
+  <div class="container">
+
+    <!-- Occasions -->
+    <div class="section-header" style="margin-bottom:20px">
+      <h2 style="font-size:1.1rem;color:var(--text-light)">Pour quelle occasion ?</h2>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:36px">
+      <button class="gift-recipient-chip active" data-occasion="">🌸 Tout</button>
+      <button class="gift-recipient-chip" data-occasion="naissance">👶 Naissance</button>
+      <button class="gift-recipient-chip" data-occasion="anniversaire">🎂 Anniversaire</button>
+      <button class="gift-recipient-chip" data-occasion="noel">🎄 Noël</button>
+      <button class="gift-recipient-chip" data-occasion="fete-des-meres">💐 Fête des mères</button>
+      <button class="gift-recipient-chip" data-occasion="saint-valentin">❤️ Saint-Valentin</button>
+    </div>
+
+    <!-- Budget -->
+    <div class="section-header" style="margin-bottom:20px">
+      <h2 style="font-size:1.1rem;color:var(--text-light)">Votre budget</h2>
+    </div>
+    <div class="gift-budget-chips" id="budget-chips">
+      <button class="gift-budget-chip active" data-min="0" data-max="999">💛 Tous les prix</button>
+      <button class="gift-budget-chip" data-min="0" data-max="20">🌷 Moins de 20 €</button>
+      <button class="gift-budget-chip" data-min="20" data-max="40">🌸 20 – 40 €</button>
+      <button class="gift-budget-chip" data-min="40" data-max="999">💎 Plus de 40 €</button>
+    </div>
+
+    <!-- Destinataire -->
+    <div class="section-header" style="margin-bottom:20px">
+      <h2 style="font-size:1.1rem;color:var(--text-light)">Pour qui ?</h2>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:40px" id="recipient-chips">
+      <button class="gift-recipient-chip active" data-tag="">🧑 Tout le monde</button>
+      <button class="gift-recipient-chip" data-tag="bébé">👶 Bébé</button>
+      <button class="gift-recipient-chip" data-tag="enfant">🧒 Enfant</button>
+      <button class="gift-recipient-chip" data-tag="adulte">🙋 Adulte</button>
+      <button class="gift-recipient-chip" data-tag="cadeau">🎁 Cadeau naissance</button>
+    </div>
+
+    <!-- Résultats -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <p id="gift-count" style="font-size:.875rem;color:var(--text-light)"></p>
+      <select id="gift-sort" class="form-select" style="max-width:180px" onchange="renderGifts()">
+        <option value="featured">Coups de cœur d'abord</option>
+        <option value="price_asc">Prix croissant</option>
+        <option value="price_desc">Prix décroissant</option>
+        <option value="newest">Nouveautés</option>
+      </select>
+    </div>
+
+    <div id="gifts-grid" class="grid-4">
+      <div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Chargement des idées cadeaux…</div>
+    </div>
+
+    <div style="margin-top:48px;background:var(--rose-pale);border-radius:var(--radius-xl);padding:32px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:12px">🎨</div>
+      <h3 style="margin-bottom:8px">Vous avez un projet personnalisé ?</h3>
+      <p style="max-width:460px;margin:0 auto 20px;font-size:.9rem">Couleur spécifique, prénom brodé, taille sur-mesure… Chaque création peut être adaptée à votre demande.</p>
+      <a href="/#contact" class="btn btn-primary">Contactez-nous pour une commande perso 🌸</a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
+      <span>© <span id="fy"></span> Tout en Aiguilles</span>
+      <a href="/boutique.html" style="color:rgba(255,255,255,.6)">← Toute la boutique</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/main.js"></script>
+<script>
+let allProducts = [];
+let budgetMin = 0, budgetMax = 999, tagFilter = '';
+
+async function init() {
+  document.getElementById('fy').textContent = new Date().getFullYear();
+  try {
+    allProducts = await apiFetch('/products?limit=200');
+  } catch {}
+  renderGifts();
+  initHeaderSearch();
+}
+
+function renderGifts() {
+  const sort = document.getElementById('gift-sort').value;
+  let filtered = allProducts.filter(p => {
+    if (p.stock === 0) return false;
+    if (p.price < budgetMin || p.price > budgetMax) return false;
+    if (tagFilter && !(p.tags || []).some(t => t.toLowerCase().includes(tagFilter))) return false;
+    return true;
+  });
+  if (sort === 'price_asc') filtered.sort((a,b) => a.price - b.price);
+  else if (sort === 'price_desc') filtered.sort((a,b) => b.price - a.price);
+  else if (sort === 'newest') filtered.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  else filtered.sort((a,b) => (b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0));
+
+  const grid = document.getElementById('gifts-grid');
+  document.getElementById('gift-count').textContent = `${filtered.length} idée${filtered.length > 1 ? 's' : ''} cadeau trouvée${filtered.length > 1 ? 's' : ''}`;
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🎁</div><h3>Aucun cadeau dans ce budget</h3><p>Essayez un autre budget ou <a href="/#contact">contactez-nous</a> pour une commande personnalisée.</p></div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(renderProductCard).join('');
+}
+
+// Budget chips
+document.getElementById('budget-chips').addEventListener('click', e => {
+  const chip = e.target.closest('.gift-budget-chip');
+  if (!chip) return;
+  document.querySelectorAll('.gift-budget-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  budgetMin = Number(chip.dataset.min);
+  budgetMax = Number(chip.dataset.max);
+  renderGifts();
+});
+
+// Recipient chips
+document.getElementById('recipient-chips').addEventListener('click', e => {
+  const chip = e.target.closest('.gift-recipient-chip');
+  if (!chip) return;
+  document.querySelectorAll('#recipient-chips .gift-recipient-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  tagFilter = chip.dataset.tag;
+  renderGifts();
+});
+
+init();
+</script>
+</body>
+</html>

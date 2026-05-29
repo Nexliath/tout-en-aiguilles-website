@@ -97,9 +97,16 @@
     <nav class="nav">
       <a href="/" class="active">Accueil</a>
       <a href="/boutique.html">Boutique</a>
+      <a href="/cadeaux.html">🎁 Cadeaux</a>
       <a href="/actualites.html">Actualités</a>
       <a href="#contact">Contact</a>
     </nav>
+    
+        <div class="header-search-wrap">
+          <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
+          <span class="header-search-icon">🔍</span>
+          <div class="header-search-dropdown" id="header-search-dropdown"></div>
+        </div>
     <div class="header-actions">
       <button class="icon-btn" id="user-btn" title="Mon compte">👤</button>
       <a href="/panier.html" class="icon-btn" title="Mon panier">
@@ -351,6 +358,8 @@
         <h4 class="footer-toggle" onclick="toggleFooterCol(this)">Infos <span class="footer-arrow">▾</span></h4>
         <div class="footer-links">
           <a href="/actualites.html">Actualités</a>
+          <a href="/cadeaux.html">Idées cadeaux</a>
+          <a href="/materiaux.html">Nos matériaux</a>
           <a href="#contact">Contact</a>
           <a href="/livraison.html">Livraison & retours</a>
           <a href="/mentions-legales.html">Mentions légales</a>
@@ -489,6 +498,7 @@ if (fyEl) fyEl.textContent = new Date().getFullYear();
 
 loadFeaturedProducts();
 loadNews();
+initHeaderSearch();
 </script>
 </body>
 </html>

@@ -548,3 +548,230 @@ document.addEventListener('DOMContentLoaded', () => {
   initBackToTop();
   initCookieBanner();
 });
+
+// ═══════════════════════════════════════════════════════════
+// NOUVELLES FEATURES
+// ═══════════════════════════════════════════════════════════
+
+// ─── Recherche globale header ─────────────────────────────────
+function initHeaderSearch() {
+  const wrap = document.querySelector('.header-search-wrap');
+  const input = document.querySelector('.header-search-input');
+  const dropdown = document.querySelector('.header-search-dropdown');
+  if (!input || !dropdown) return;
+
+  let timer, allCached = null;
+
+  async function getProducts() {
+    if (allCached) return allCached;
+    try { allCached = await apiFetch('/products?limit=200'); } catch { allCached = []; }
+    return allCached;
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { dropdown.classList.remove('open'); return; }
+    timer = setTimeout(async () => {
+      const products = await getProducts();
+      const results = products.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.description || '').toLowerCase().includes(q) ||
+        (p.tags || []).some(t => t.toLowerCase().includes(q))
+      ).slice(0, 6);
+
+      if (!results.length) {
+        dropdown.innerHTML = `<div class="search-result-empty">Aucun résultat pour "${q}"</div>`;
+      } else {
+        dropdown.innerHTML = results.map(p => `
+          <a class="search-result-item" href="/produit.html?id=${p.id}">
+            ${p.images && p.images[0]
+              ? `<img src="${p.images[0]}" class="search-result-img" alt="${p.name}">`
+              : `<div class="search-result-img" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem">🧶</div>`}
+            <div>
+              <div class="search-result-name">${p.name}</div>
+              <div class="search-result-price">${Number(p.price).toFixed(2)} €</div>
+            </div>
+          </a>`).join('');
+        const seeAll = document.createElement('a');
+        seeAll.href = `/boutique.html?search=${encodeURIComponent(q)}`;
+        seeAll.className = 'search-result-item';
+        seeAll.style.cssText = 'justify-content:center;color:var(--rose-dark);font-weight:700;font-size:.82rem';
+        seeAll.textContent = `Voir tous les résultats pour "${q}" →`;
+        dropdown.appendChild(seeAll);
+      }
+      dropdown.classList.add('open');
+    }, 250);
+  });
+
+  document.addEventListener('click', e => {
+    if (!wrap.contains(e.target)) dropdown.classList.remove('open');
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      window.location.href = `/boutique.html?search=${encodeURIComponent(input.value.trim())}`;
+    }
+    if (e.key === 'Escape') dropdown.classList.remove('open');
+  });
+}
+
+// ─── Historique de navigation (localStorage) ─────────────────
+const RecentlyViewed = {
+  MAX: 6,
+  get: () => { try { return JSON.parse(localStorage.getItem('tea_recently') || '[]'); } catch { return []; } },
+  add: (product) => {
+    let items = RecentlyViewed.get().filter(p => p.id !== product.id);
+    items.unshift({ id: product.id, name: product.name, price: product.price, image: (product.images || [])[0] || '' });
+    if (items.length > RecentlyViewed.MAX) items = items.slice(0, RecentlyViewed.MAX);
+    localStorage.setItem('tea_recently', JSON.stringify(items));
+  },
+  render: (containerId, excludeId) => {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const items = RecentlyViewed.get().filter(p => p.id !== excludeId);
+    if (!items.length) { el.closest('.recently-viewed') && (el.closest('.recently-viewed').style.display = 'none'); return; }
+    el.innerHTML = items.map(p => `
+      <a class="rv-card" href="/produit.html?id=${p.id}">
+        ${p.image
+          ? `<img src="${p.image}" alt="${p.name}" loading="lazy">`
+          : `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--cream-dark)">🧶</div>`}
+        <div class="rv-card-name">${p.name}</div>
+        <div class="rv-card-price">${Number(p.price).toFixed(2)} €</div>
+      </a>`).join('');
+  }
+};
+
+// ─── Estimateur délai de livraison ────────────────────────────
+function getDeliveryEstimate() {
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay(); // 0=dim, 6=sam
+  const isWeekend = day === 0 || day === 6;
+  const cutoff = 16; // commande avant 16h
+
+  let prepDays = (hour < cutoff && !isWeekend) ? 3 : 4;
+  if (isWeekend) prepDays = (day === 6 ? 4 : 3);
+
+  // Calcul date d'expédition (skip week-end)
+  const shipDate = new Date(now);
+  let added = 0;
+  while (added < prepDays) {
+    shipDate.setDate(shipDate.getDate() + 1);
+    const d = shipDate.getDay();
+    if (d !== 0 && d !== 6) added++;
+  }
+
+  // Date de livraison = +2 jours ouvrés
+  const delivDate = new Date(shipDate);
+  let d2 = 0;
+  while (d2 < 2) {
+    delivDate.setDate(delivDate.getDate() + 1);
+    const d = delivDate.getDay();
+    if (d !== 0 && d !== 6) d2++;
+  }
+
+  const fmt = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return {
+    ship: fmt(shipDate),
+    delivery: fmt(delivDate),
+    sameDayCutoff: !isWeekend && hour < cutoff
+  };
+}
+
+function renderDeliveryEstimator(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const { ship, delivery, sameDayCutoff } = getDeliveryEstimate();
+  el.innerHTML = `
+    <div class="delivery-estimator">
+      🚚 <strong>Expédié le ${ship}</strong> · Livraison estimée le <strong>${delivery}</strong>
+      ${sameDayCutoff ? '<br><span style="color:var(--sage-dark);font-size:.78rem">✓ Commandez maintenant pour cette date</span>' : ''}
+    </div>`;
+}
+
+// ─── Boutons de partage ───────────────────────────────────────
+function renderShareButtons(containerId, productName, productUrl) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const url = encodeURIComponent(productUrl || location.href);
+  const text = encodeURIComponent(`Regarde cette création : ${productName}`);
+  el.innerHTML = `
+    <div class="share-buttons">
+      <span class="share-label">Partager :</span>
+      <a class="share-btn share-wa" href="https://api.whatsapp.com/send?text=${text}%20${url}" target="_blank" rel="noopener">📱 WhatsApp</a>
+      <a class="share-btn share-pin" href="https://pinterest.com/pin/create/button/?url=${url}&description=${text}" target="_blank" rel="noopener">📌 Pinterest</a>
+      <a class="share-btn share-fb" href="https://www.facebook.com/sharer/sharer.php?u=${url}" target="_blank" rel="noopener">👍 Facebook</a>
+      <button class="share-btn share-copy" onclick="copyProductLink('${productUrl || location.href}')">🔗 Copier</button>
+    </div>`;
+}
+
+function copyProductLink(url) {
+  navigator.clipboard.writeText(url).then(() => Toast.show('Lien copié ! 🔗', 'success'));
+}
+
+// ─── Zoom image produit (desktop) ────────────────────────────
+function initImageZoom(mainEl) {
+  if (!mainEl || window.innerWidth < 1025) return;
+  mainEl.classList.add('zoomable');
+
+  const lens = document.createElement('div');
+  lens.className = 'gallery-zoom-lens';
+  mainEl.appendChild(lens);
+
+  mainEl.addEventListener('mouseenter', () => { lens.style.display = 'block'; });
+  mainEl.addEventListener('mouseleave', () => { lens.style.display = 'none'; });
+  mainEl.addEventListener('mousemove', (e) => {
+    const img = mainEl.querySelector('.gallery-slide img, img');
+    if (!img || !img.complete) return;
+    const rect = mainEl.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const zoomFactor = 2.5;
+    lens.style.backgroundImage = `url('${img.src}')`;
+    lens.style.backgroundSize = `${rect.width * zoomFactor}px ${rect.height * zoomFactor}px`;
+    lens.style.backgroundPosition = `-${x * rect.width * (zoomFactor - 1)}px -${y * rect.height * (zoomFactor - 1)}px`;
+  });
+}
+
+// ─── Loyalty Points (client-side display) ────────────────────
+const Loyalty = {
+  getPoints: async () => {
+    if (!Auth.isLoggedIn()) return null;
+    try { return await apiFetch('/loyalty/me'); } catch { return null; }
+  }
+};
+
+// ─── Push Notifications (admin) ──────────────────────────────
+const PushNotif = {
+  async init() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!Auth.isAdmin()) return;
+    try {
+      const reg = await navigator.serviceWorker.register('/sw-push.js');
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) return; // déjà abonné
+      const { publicKey } = await apiFetch('/push/vapid-public');
+      if (!publicKey) return; // VAPID non configuré
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: PushNotif.urlBase64ToUint8Array(publicKey),
+      });
+      await apiFetch('/push/subscribe', {
+        method: 'POST',
+        body: { endpoint: sub.endpoint, keys: { p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')))), auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')))) } },
+      });
+    } catch {}
+  },
+  urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  },
+};
+
+// Init push en admin automatiquement
+document.addEventListener('DOMContentLoaded', () => {
+  if (Auth.isAdmin()) PushNotif.init();
+});

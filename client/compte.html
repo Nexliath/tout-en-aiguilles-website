@@ -26,9 +26,16 @@
     <nav class="nav">
       <a href="/">Accueil</a>
       <a href="/boutique.html">Boutique</a>
+      <a href="/cadeaux.html">🎁 Cadeaux</a>
       <a href="/actualites.html">Actualités</a>
       <a href="/#contact">Contact</a>
     </nav>
+    
+        <div class="header-search-wrap">
+          <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
+          <span class="header-search-icon">🔍</span>
+          <div class="header-search-dropdown" id="header-search-dropdown"></div>
+        </div>
     <div class="header-actions">
       <button class="icon-btn" id="user-btn">👤</button>
       <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
@@ -102,6 +109,7 @@
               <a href="#" data-tab="addresses" onclick="showTab('addresses',this)">📍 Mes adresses</a>
               <a href="#" data-tab="profile" onclick="showTab('profile',this)">✏️ Mon profil</a>
               <a href="#" data-tab="security" onclick="showTab('security',this)">🔒 Sécurité</a>
+              <a href="#" data-tab="loyalty" onclick="showTab('loyalty',this)">⭐ Fidélité</a>
               <a href="#" onclick="Auth.logout()" style="color:#d9534f!important">🚪 Se déconnecter</a>
             </nav>
           </div>
@@ -207,6 +215,59 @@
               <div id="profile-success" class="form-hint" style="display:none;color:var(--sage-dark);margin-bottom:12px">✓ Profil mis à jour !</div>
               <button class="btn btn-primary" onclick="saveProfile()">Enregistrer les modifications</button>
             </div>
+          </div>
+
+          <!-- Loyalty tab -->
+          <div id="tab-loyalty" class="account-panel" style="display:none">
+            <div class="account-panel-title">⭐ Mon programme de fidélité</div>
+            <div id="loyalty-loading" style="text-align:center;padding:32px"><div class="spinner" style="margin:0 auto"></div></div>
+            <div id="loyalty-content" style="display:none">
+              <!-- Points solde -->
+              <div class="loyalty-points-section" style="margin-bottom:24px">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                  <div>
+                    <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--rose-dark);margin-bottom:4px">Votre solde</div>
+                    <div style="font-size:2.4rem;font-weight:800;color:var(--rose-dark)" id="loyalty-points-display">0</div>
+                    <div style="font-size:.85rem;color:var(--text-light)" id="loyalty-euro-value"></div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font-size:.78rem;color:var(--text-light);margin-bottom:6px">100 points = 1 € de réduction</div>
+                    <button class="btn btn-primary btn-sm" id="redeem-btn" onclick="redeemPoints()" style="display:none">
+                      Obtenir un code de réduction →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Comment gagner des points -->
+              <div style="background:white;border-radius:var(--radius-lg);border:1px solid var(--border);padding:20px;margin-bottom:24px">
+                <h3 style="font-size:.95rem;margin-bottom:16px">Comment gagner des points ?</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+                  <div style="background:var(--cream);border-radius:var(--radius);padding:14px;text-align:center">
+                    <div style="font-size:1.6rem;margin-bottom:6px">🛒</div>
+                    <div style="font-weight:700;font-size:.85rem;margin-bottom:3px">1 pt par euro</div>
+                    <div style="font-size:.75rem;color:var(--text-light)">À chaque achat</div>
+                  </div>
+                  <div style="background:var(--cream);border-radius:var(--radius);padding:14px;text-align:center">
+                    <div style="font-size:1.6rem;margin-bottom:6px">⭐</div>
+                    <div style="font-weight:700;font-size:.85rem;margin-bottom:3px">+10 pts</div>
+                    <div style="font-size:.75rem;color:var(--text-light)">Par avis laissé</div>
+                  </div>
+                  <div style="background:var(--cream);border-radius:var(--radius);padding:14px;text-align:center">
+                    <div style="font-size:1.6rem;margin-bottom:6px">👋</div>
+                    <div style="font-weight:700;font-size:.85rem;margin-bottom:3px">+20 pts</div>
+                    <div style="font-size:.75rem;color:var(--text-light)">Inscription</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Historique -->
+              <div>
+                <h3 style="font-size:.95rem;margin-bottom:12px">Historique des points</h3>
+                <div id="loyalty-history"></div>
+              </div>
+            </div>
+            <div id="loyalty-error" style="display:none;color:var(--text-light);text-align:center;padding:24px">Impossible de charger les données de fidélité.</div>
           </div>
 
           <!-- Security tab -->
@@ -326,6 +387,56 @@ async function uploadAvatar(input) {
   input.value = '';
 }
 
+async function loadLoyalty() {
+  const loadEl = document.getElementById('loyalty-loading');
+  const contentEl = document.getElementById('loyalty-content');
+  const errorEl = document.getElementById('loyalty-error');
+  if (!loadEl) return;
+  loadEl.style.display = '';
+  contentEl.style.display = 'none';
+  errorEl.style.display = 'none';
+  try {
+    const data = await apiFetch('/loyalty/me');
+    document.getElementById('loyalty-points-display').textContent = data.points;
+    const euros = Math.floor(data.points / (data.config?.redeem_rate || 100));
+    document.getElementById('loyalty-euro-value').textContent = data.points > 0
+      ? `Équivalent à ${euros} € de réduction`
+      : 'Passez commande pour commencer à gagner des points !';
+    const redeemBtn = document.getElementById('redeem-btn');
+    if (redeemBtn) redeemBtn.style.display = data.points >= (data.config?.min_redeem || 500) ? '' : 'none';
+
+    const histEl = document.getElementById('loyalty-history');
+    const actionLabels = { purchase: '🛒 Achat', review: '⭐ Avis laissé', signup: '👋 Inscription', redeem: '🎟 Réduction utilisée' };
+    if (data.history && data.history.length) {
+      histEl.innerHTML = data.history.map(h => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:.85rem;font-weight:700">${actionLabels[h.action] || h.action}</div>
+            ${h.reference ? `<div style="font-size:.75rem;color:var(--text-light)">Réf. ${h.reference}</div>` : ''}
+          </div>
+          <div style="font-weight:700;color:${h.points > 0 ? 'var(--sage-dark)' : '#d9534f'}">
+            ${h.points > 0 ? '+' : ''}${h.points} pts
+          </div>
+        </div>`).join('');
+    } else {
+      histEl.innerHTML = '<p style="color:var(--text-light);font-size:.85rem;text-align:center;padding:16px">Aucun historique pour l'instant.</p>';
+    }
+    loadEl.style.display = 'none';
+    contentEl.style.display = '';
+  } catch {
+    loadEl.style.display = 'none';
+    errorEl.style.display = '';
+  }
+}
+
+async function redeemPoints() {
+  try {
+    const data = await apiFetch('/loyalty/redeem', { method: 'POST', body: { points_to_use: 500 } });
+    Toast.show(`Code créé : ${data.code} — ${data.euroValue} € de réduction 🎟`, 'success');
+    loadLoyalty();
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
 async function initAccount() {
   if (!Auth.isLoggedIn()) {
     document.getElementById('not-logged-in').style.display = '';
@@ -390,6 +501,7 @@ function showTab(tab, link) {
 
   if (tab === 'favorites')  loadFavorites();
   if (tab === 'addresses')  loadAddresses();
+  if (tab === 'loyalty')    loadLoyalty();
   return false;
 }
 
@@ -637,6 +749,7 @@ async function openInvoice(orderId) {
 }
 
 initAccount();
+initHeaderSearch();
 </script>
 </body>
 </html>
