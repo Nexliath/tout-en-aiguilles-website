@@ -514,14 +514,17 @@ p  { color: var(--text-light); }
 }
 
 /* ─── Pagination ─────────────────────────────────────────────── */
-.pagination { display: flex; justify-content: center; gap: 6px; padding: 32px 0; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 4px; padding: 32px 0; flex-wrap: wrap; }
+.pagination-info { font-size: .8rem; color: var(--text-light); margin-right: 6px; white-space: nowrap; }
 .page-btn {
-  width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
-  background: white; font-size: 0.875rem; color: var(--text-light);
+  min-width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
+  background: white; font-size: 0.875rem; color: var(--text-light); padding: 0 8px;
   display: flex; align-items: center; justify-content: center;
   transition: all var(--transition);
 }
-.page-btn:hover, .page-btn.active { background: var(--rose-dark); color: white; border-color: var(--rose-dark); }
+.page-btn:hover:not(.disabled), .page-btn.active { background: var(--rose-dark); color: white; border-color: var(--rose-dark); }
+.page-btn.disabled { opacity: .4; cursor: default; }
+.page-ellipsis { width: 28px; text-align: center; color: var(--text-light); font-size: .9rem; }
 
 /* ─── Cart ───────────────────────────────────────────────────── */
 .cart-layout { display: grid; grid-template-columns: 1fr 360px; gap: 32px; align-items: start; }
