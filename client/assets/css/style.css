@@ -1294,3 +1294,135 @@ p  { color: var(--text-light); }
 @media (min-width: 769px) {
   .product-info > * + * { margin-top: 0; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ADMIN MOBILE — responsive redesign
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Mobile top bar ── */
+.admin-mobile-bar {
+  display: none;
+  position: sticky; top: 0; z-index: 300;
+  height: 52px; background: var(--text);
+  align-items: center; justify-content: space-between;
+  padding: 0 16px; gap: 12px;
+}
+.admin-mobile-bar-title {
+  color: white; font-family: var(--font-title);
+  font-size: .95rem; flex: 1; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.admin-hamburger {
+  background: none; border: none; color: white;
+  font-size: 1.4rem; cursor: pointer; padding: 6px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; flex-shrink: 0;
+}
+.admin-hamburger:hover { background: rgba(255,255,255,.1); }
+
+/* ── Drawer overlay ── */
+.admin-drawer-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 400;
+}
+.admin-drawer-overlay.open { display: block; }
+
+/* ── Sidebar as drawer on mobile ── */
+@media (max-width: 768px) {
+  .admin-mobile-bar { display: flex; }
+
+  .admin-layout {
+    display: block !important;
+    grid-template-columns: none !important;
+  }
+
+  .admin-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; height: 100vh !important;
+    width: 260px; z-index: 500;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.open { transform: translateX(0); }
+
+  .admin-main {
+    padding: 16px !important;
+    min-height: calc(100vh - 52px);
+  }
+
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .admin-header h1 { font-size: 1.2rem !important; }
+
+  /* ── Stats grid ── */
+  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .stat-val { font-size: 1.4rem !important; }
+
+  /* ── Tables → card list ── */
+  .admin-table-wrap { border-radius: var(--radius-lg); overflow: hidden; }
+
+  .admin-table thead { display: none; }
+
+  .admin-table tr {
+    display: flex; flex-direction: column;
+    border-bottom: 2px solid var(--border);
+    padding: 12px 14px; gap: 4px;
+    background: white;
+  }
+  .admin-table tr:hover td { background: none; }
+
+  .admin-table td {
+    display: flex; align-items: center;
+    padding: 3px 0 !important; border: none !important;
+    font-size: .83rem !important;
+  }
+
+  /* First cell (photo or icon) stays small */
+  .admin-table td:first-child { margin-bottom: 4px; }
+
+  /* Label each cell with data-label */
+  .admin-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: .7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .05em;
+    color: var(--text-light); min-width: 80px; flex-shrink: 0;
+  }
+
+  /* Hide low-priority columns on mobile */
+  .admin-table td.td-hide-mobile { display: none; }
+
+  /* Actions cell */
+  .admin-table td:last-child { margin-top: 6px; }
+  .admin-actions { flex-wrap: wrap; gap: 6px; }
+  .admin-actions .btn { font-size: .75rem; padding: 5px 10px; }
+
+  /* ── Panel ── */
+  .admin-panel { padding: 16px !important; }
+  .admin-panel-title { font-size: 1rem !important; margin-bottom: 14px !important; padding-bottom: 10px !important; }
+
+  /* ── Form ── */
+  .form-row { grid-template-columns: 1fr !important; gap: 0 !important; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .admin-main { padding: 12px !important; }
+}
+
+/* Admin stat card — used in dashboard */
+.admin-stat-card {
+  background: white; border-radius: var(--radius-lg);
+  padding: 18px 20px; border: 1px solid var(--border);
+}
+.admin-stat-card .stat-value {
+  font-family: var(--font-title); font-size: 1.8rem;
+  font-weight: 700; color: var(--rose-dark);
+}
+.admin-stat-card .stat-label {
+  font-size: .78rem; color: var(--text-light); margin-top: 4px;
+}
