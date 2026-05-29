@@ -46,6 +46,16 @@
       border-color: var(--rose-dark); background: var(--rose-pale); color: var(--rose-dark);
     }
     .payment-method-btn:hover:not(.active) { border-color: #ccc; background: #fafafa; }
+    .saved-addr-card {
+      padding: 10px 14px; border-radius: 10px;
+      border: 2px solid var(--border); background: white;
+      font-size: .82rem; cursor: pointer; transition: border-color .15s, background .15s;
+      max-width: 200px;
+    }
+    .saved-addr-card.selected { border-color: var(--rose-dark); background: var(--rose-pale); }
+    .saved-addr-card:hover:not(.selected) { border-color: #ccc; background: #fafafa; }
+    .saved-addr-card-label { font-weight: 700; margin-bottom: 2px; color: var(--text); }
+    .saved-addr-card-addr { color: var(--text-light); font-size: .76rem; line-height: 1.4; }
   </style>
 </head>
 <body>
@@ -135,6 +145,16 @@
             <!-- Checkout form -->
             <div style="margin-top:24px">
               <h4 style="margin-bottom:16px;font-size:.95rem">Informations de livraison</h4>
+
+              <!-- Adresses enregistrées (visible si connecté et au moins 1 adresse) -->
+              <div id="saved-addr-section" style="display:none;margin-bottom:20px">
+                <p style="font-size:.8rem;color:var(--text-light);margin-bottom:8px">Utiliser une adresse enregistrée :</p>
+                <div id="saved-addr-cards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="selectSavedAddress(null)" id="addr-manual-btn" style="font-size:.78rem">
+                  ✏️ Saisir manuellement
+                </button>
+              </div>
+
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label">Prénom *</label>
@@ -608,7 +628,65 @@ function renderPayPalButton() {
   }).render('#paypal-button-container');
 }
 
+// ── Adresses enregistrées ────────────────────────────────────
+let _savedAddresses = [];
+
+async function loadSavedAddresses() {
+  if (!Auth.isLoggedIn()) return;
+  try {
+    _savedAddresses = await apiFetch('/addresses');
+    if (!_savedAddresses.length) return;
+
+    const section = document.getElementById('saved-addr-section');
+    const container = document.getElementById('saved-addr-cards');
+    section.style.display = '';
+
+    container.innerHTML = _savedAddresses.map(a => `
+      <div class="saved-addr-card${a.is_primary ? ' selected' : ''}" id="addr-card-${a.id}" onclick="selectSavedAddress(${a.id})">
+        <div class="saved-addr-card-label">📍 ${a.label}${a.is_primary ? ' ★' : ''}</div>
+        <div class="saved-addr-card-addr">${a.first_name} ${a.last_name}<br>${a.address}<br>${a.postal_code} ${a.city}</div>
+      </div>`).join('');
+
+    // Auto-remplir avec l'adresse principale
+    const primary = _savedAddresses.find(a => a.is_primary) || _savedAddresses[0];
+    if (primary) selectSavedAddress(primary.id, true);
+  } catch(e) {}
+}
+
+function selectSavedAddress(id, silent) {
+  // Désélectionner toutes les cartes
+  document.querySelectorAll('.saved-addr-card').forEach(c => c.classList.remove('selected'));
+
+  if (id === null) {
+    // Mode manuel — vider les champs
+    ['co-fname','co-lname','co-address','co-postal','co-city'].forEach(f => {
+      if (!Auth.getUser()) document.getElementById(f).value = '';
+    });
+    if (!silent) Toast.show('Saisissez votre adresse manuellement', 'info');
+    return;
+  }
+
+  const addr = _savedAddresses.find(a => a.id === id);
+  if (!addr) return;
+
+  // Sélectionner la carte
+  const card = document.getElementById(`addr-card-${id}`);
+  if (card) card.classList.add('selected');
+
+  // Remplir les champs
+  document.getElementById('co-fname').value    = addr.first_name;
+  document.getElementById('co-lname').value    = addr.last_name;
+  document.getElementById('co-address').value  = addr.address;
+  document.getElementById('co-postal').value   = addr.postal_code;
+  document.getElementById('co-city').value     = addr.city;
+
+  // Déclencher la vérification de zone (remise en main propre)
+  checkHandoverEligibility();
+  updateDeliveryRow();
+}
+
 renderCart();
+loadSavedAddresses();
 
 // Écoute du code postal & ville pour la vérification de zone
 document.getElementById('co-postal').addEventListener('input', scheduleGeoCheck);
