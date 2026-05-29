@@ -1426,3 +1426,6 @@ p  { color: var(--text-light); }
 .admin-stat-card .stat-label {
   font-size: .78rem; color: var(--text-light); margin-top: 4px;
 }
+
+/* ── Anchor scroll offset — compense le header sticky ── */
+[id] { scroll-margin-top: calc(var(--header-h) + 12px); }
