@@ -29,19 +29,37 @@
     </div>
   </div>
 </header>
-<main style="min-height:70vh;display:flex;align-items:center">
+<main style="min-height:70vh">
   <div class="container">
-    <div style="max-width:560px;margin:0 auto;text-align:center;padding:64px 24px">
-      <div style="font-size:5rem;margin-bottom:24px">🎉</div>
-      <h1 style="margin-bottom:16px;color:var(--sage-dark)">Commande confirmée !</h1>
-      <p style="font-size:1.1rem;margin-bottom:8px">Merci pour votre achat, <span id="customer-name" style="font-weight:700;color:var(--rose-dark)"></span> ! 🌸</p>
-      <p style="margin-bottom:32px">Votre commande <strong id="order-ref"></strong> a bien été enregistrée. Vous recevrez un email de confirmation prochainement.</p>
-      <div style="background:var(--sage-pale);border-radius:var(--radius-xl);padding:28px;margin-bottom:32px;text-align:left">
-        <h3 style="margin-bottom:12px;font-size:1rem">🚚 Et maintenant ?</h3>
-        <p style="font-size:.9rem;margin-bottom:8px">✓ Votre commande est en cours de préparation dans notre atelier</p>
-        <p style="font-size:.9rem;margin-bottom:8px">✓ Expédition sous 3–5 jours ouvrés</p>
-        <p style="font-size:.9rem">✓ Suivi de commande disponible dans votre espace compte</p>
+    <div style="max-width:600px;margin:0 auto;padding:48px 24px">
+      <div style="text-align:center;margin-bottom:32px">
+        <div style="font-size:4rem;margin-bottom:16px">🎉</div>
+        <h1 style="margin-bottom:8px;color:var(--sage-dark)">Commande confirmée !</h1>
+        <p style="font-size:1.1rem;color:var(--text)">Merci pour votre achat, <span id="customer-name" style="font-weight:700;color:var(--rose-dark)"></span> ! 🌸</p>
+        <p style="color:var(--text-light)">Un email de confirmation vient de vous être envoyé.</p>
       </div>
+
+      <!-- Récap commande -->
+      <div id="order-summary" style="display:none;background:white;border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="font-family:var(--font-title);margin:0" id="order-ref-title">Commande</h3>
+          <span id="order-date" style="font-size:.85rem;color:var(--text-light)"></span>
+        </div>
+        <div id="order-items-list" style="margin-bottom:16px"></div>
+        <div style="border-top:1px solid var(--border);padding-top:12px">
+          <div id="order-delivery-line" style="display:flex;justify-content:space-between;font-size:.9rem;color:var(--text-light);margin-bottom:6px"></div>
+          <div style="display:flex;justify-content:space-between;font-weight:700;font-size:1.05rem">
+            <span>Total</span><span style="color:var(--rose-dark)" id="order-total-amount"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prochaines étapes -->
+      <div id="next-steps" style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:24px;margin-bottom:32px">
+        <h3 style="margin-bottom:12px;font-size:1rem">Et maintenant ?</h3>
+        <div id="steps-content"></div>
+      </div>
+
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <a href="/compte.html?tab=orders" class="btn btn-primary">Voir mes commandes</a>
         <a href="/boutique.html" class="btn btn-secondary">Continuer mes achats</a>
@@ -53,9 +71,56 @@
 <script>
 const params = new URLSearchParams(location.search);
 const orderId = params.get('order');
-if (orderId) document.getElementById('order-ref').textContent = `#${orderId}`;
 const u = Auth.getUser();
 if (u) document.getElementById('customer-name').textContent = u.first_name;
+
+const STEPS = {
+  home:     ['✓ Votre commande est en cours de préparation', '✓ Expédition sous 3–5 jours ouvrés (Mondial Relay)', '✓ Suivi disponible dans votre espace compte'],
+  relay:    ['✓ Votre commande est en cours de préparation', '✓ Livraison en point relais sous 3–5 jours ouvrés', '✓ Suivi disponible dans votre espace compte'],
+  handover: ['✓ Votre commande est confirmée et en cours de préparation', '✓ Nous vous contacterons pour convenir d\'un rendez-vous de remise en main propre', '✓ Suivi disponible dans votre espace compte'],
+};
+
+async function loadOrder() {
+  if (!orderId) return;
+  try {
+    const o = await apiFetch(`/orders/${orderId}`);
+    // Titre
+    document.getElementById('order-ref-title').textContent = `Commande #${o.id}`;
+    document.getElementById('order-date').textContent = new Date(o.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' });
+
+    // Articles
+    document.getElementById('order-items-list').innerHTML = (o.items || []).map(i => `
+      <div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="width:44px;height:44px;border-radius:8px;background:var(--cream-dark);overflow:hidden;flex-shrink:0">
+          ${i.image ? `<img src="${i.image}" style="width:100%;height:100%;object-fit:cover" alt="${i.name}">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">🧶</div>'}
+        </div>
+        <div style="flex:1"><div style="font-weight:700;font-size:.9rem">${i.name}</div><div style="font-size:.8rem;color:var(--text-light)">× ${i.qty} — ${Number(i.price).toFixed(2)} €/unité</div></div>
+        <div style="font-weight:700;color:var(--rose-dark)">${(i.qty * i.price).toFixed(2)} €</div>
+      </div>`).join('');
+
+    // Livraison
+    const fee = Number(o.delivery_fee || 0);
+    const deliveryLabels = { home:'🏠 Livraison à domicile', relay:'📦 Point Relais', handover:'🤝 Remise en main propre' };
+    document.getElementById('order-delivery-line').innerHTML = fee > 0
+      ? `<span>${deliveryLabels[o.delivery_type] || 'Livraison'}</span><span>+${fee.toFixed(2)} €</span>`
+      : `<span>${deliveryLabels[o.delivery_type] || 'Livraison'}</span><span style="color:var(--sage-dark)">Gratuit</span>`;
+    document.getElementById('order-total-amount').textContent = `${Number(o.total).toFixed(2)} €`;
+    document.getElementById('order-summary').style.display = '';
+
+    // Prochaines étapes selon type de livraison
+    const steps = STEPS[o.delivery_type] || STEPS.home;
+    document.getElementById('steps-content').innerHTML = steps.map(s => `<p style="font-size:.9rem;margin-bottom:8px">${s}</p>`).join('');
+  } catch(e) {
+    // Fallback si pas connecté ou commande inaccessible
+    if (orderId) document.getElementById('order-ref-title').textContent = `Commande #${orderId}`;
+    document.getElementById('steps-content').innerHTML = `
+      <p style="font-size:.9rem;margin-bottom:8px">✓ Votre commande est en cours de préparation dans notre atelier</p>
+      <p style="font-size:.9rem;margin-bottom:8px">✓ Expédition sous 3–5 jours ouvrés</p>
+      <p style="font-size:.9rem">✓ Suivi disponible dans votre espace compte</p>`;
+  }
+}
+
+loadOrder();
 </script>
 </body>
 </html>
