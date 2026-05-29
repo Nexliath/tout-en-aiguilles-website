@@ -703,12 +703,16 @@ function renderShareButtons(containerId, productName, productUrl) {
   const url = encodeURIComponent(productUrl || location.href);
   const text = encodeURIComponent(`Regarde cette création : ${productName}`);
   el.innerHTML = `
-    <div class="share-buttons">
-      <span class="share-label">Partager :</span>
-      <a class="share-btn share-wa" href="https://api.whatsapp.com/send?text=${text}%20${url}" target="_blank" rel="noopener">📱 WhatsApp</a>
-      <a class="share-btn share-pin" href="https://pinterest.com/pin/create/button/?url=${url}&description=${text}" target="_blank" rel="noopener">📌 Pinterest</a>
-      <a class="share-btn share-fb" href="https://www.facebook.com/sharer/sharer.php?u=${url}" target="_blank" rel="noopener">👍 Facebook</a>
-      <button class="share-btn share-copy" onclick="copyProductLink('${productUrl || location.href}')">🔗 Copier</button>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:10px">
+      <span style="font-size:.73rem;color:var(--text-light);font-weight:600;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0">Partager</span>
+      <a href="https://api.whatsapp.com/send?text=${text}%20${url}" target="_blank" rel="noopener" title="WhatsApp"
+        style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#25D366;color:white;font-size:.85rem;text-decoration:none;opacity:.85;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='.85'">W</a>
+      <a href="https://pinterest.com/pin/create/button/?url=${url}&description=${text}" target="_blank" rel="noopener" title="Pinterest"
+        style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#E60023;color:white;font-size:.85rem;text-decoration:none;opacity:.85;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='.85'">P</a>
+      <a href="https://www.facebook.com/sharer/sharer.php?u=${url}" target="_blank" rel="noopener" title="Facebook"
+        style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#1877F2;color:white;font-size:.85rem;text-decoration:none;opacity:.85;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='.85'">f</a>
+      <button onclick="copyProductLink('${productUrl || location.href}')" title="Copier le lien"
+        style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--cream-dark);border:1px solid var(--border);font-size:.8rem;cursor:pointer;opacity:.85;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='.85'">🔗</button>
     </div>`;
 }
 

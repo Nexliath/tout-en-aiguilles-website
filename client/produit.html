@@ -538,11 +538,31 @@ function renderProduct(p) {
   if (alertSection) alertSection.style.display = p.stock === 0 ? '' : 'none';
   window._currentProductId = p.id;
 
-  // Tags
+  // Tags — max 3 visibles + badge "+N"
   const tags = p.tags || [];
-  document.getElementById('prod-tags').innerHTML = tags.map(t =>
-    `<span style="background:var(--cream-dark);padding:4px 12px;border-radius:20px;font-size:.78rem;color:var(--text-light)">${t}</span>`
+  const MAX_TAGS = 3;
+  const visible = tags.slice(0, MAX_TAGS);
+  const hidden  = tags.slice(MAX_TAGS);
+  const tagsEl  = document.getElementById('prod-tags');
+  tagsEl.innerHTML = visible.map(t =>
+    `<span style="background:var(--cream-dark);padding:3px 10px;border-radius:20px;font-size:.75rem;color:var(--text-light)">${t}</span>`
   ).join('');
+  if (hidden.length) {
+    const more = document.createElement('span');
+    more.style.cssText = 'background:var(--cream-dark);padding:3px 10px;border-radius:20px;font-size:.75rem;color:var(--text-light);cursor:pointer;border:1px dashed var(--border)';
+    more.title = hidden.join(', ');
+    more.textContent = `+${hidden.length}`;
+    let expanded = false;
+    more.onclick = () => {
+      if (!expanded) {
+        expanded = true;
+        tagsEl.innerHTML = tags.map(t =>
+          `<span style="background:var(--cream-dark);padding:3px 10px;border-radius:20px;font-size:.75rem;color:var(--text-light)">${t}</span>`
+        ).join('');
+      }
+    };
+    tagsEl.appendChild(more);
+  }
 
   // Gallery
   const images = p.images || [];
