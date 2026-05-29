@@ -3,8 +3,9 @@ const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail } = require('../utils/email');
 
-// ─── Migration : colonne review_requested_at ─────────────────
-try { db.exec('ALTER TABLE orders ADD COLUMN review_requested_at TEXT'); } catch(e) { /* déjà présente */ }
+// ─── Migrations colonnes supplémentaires ─────────────────────
+try { db.exec('ALTER TABLE orders ADD COLUMN review_requested_at TEXT'); } catch(e) {}
+try { db.exec('ALTER TABLE orders ADD COLUMN tracking_number TEXT'); } catch(e) {}
 
 const router = express.Router();
 
@@ -187,12 +188,17 @@ router.get('/', requireAdmin, (req, res) => {
   res.json(orders);
 });
 
-// PUT /api/orders/:id/status — changer le statut
+// PUT /api/orders/:id/status — changer le statut (+ tracking_number optionnel)
 router.put('/:id/status', requireAdmin, (req, res) => {
-  const { status } = req.body;
+  const { status, tracking_number } = req.body;
   const valid = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'];
   if (!valid.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
-  db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(status, req.params.id);
+  if (tracking_number !== undefined) {
+    db.prepare('UPDATE orders SET status = ?, tracking_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(status, tracking_number || null, req.params.id);
+  } else {
+    db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(status, req.params.id);
+  }
   // Email client à chaque changement de statut
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (order && order.email) {
