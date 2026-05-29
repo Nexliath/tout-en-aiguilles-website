@@ -99,6 +99,7 @@
             <nav class="account-nav">
               <a href="#" class="active" data-tab="orders" onclick="showTab('orders',this)">📦 Mes commandes</a>
               <a href="#" data-tab="favorites" onclick="showTab('favorites',this)">❤️ Mes favoris</a>
+              <a href="#" data-tab="addresses" onclick="showTab('addresses',this)">📍 Mes adresses</a>
               <a href="#" data-tab="profile" onclick="showTab('profile',this)">✏️ Mon profil</a>
               <a href="#" data-tab="security" onclick="showTab('security',this)">🔒 Sécurité</a>
               <a href="#" onclick="Auth.logout()" style="color:#d9534f!important">🚪 Se déconnecter</a>
@@ -118,6 +119,56 @@
           <div id="tab-favorites" class="account-panel" style="display:none">
             <div class="account-panel-title">❤️ Mes favoris</div>
             <div id="favorites-grid" class="grid-3"><div class="loading"><div class="spinner"></div></div></div>
+          </div>
+
+          <!-- Addresses tab -->
+          <div id="tab-addresses" class="account-panel" style="display:none">
+            <div class="account-panel-title">📍 Mes adresses</div>
+
+            <div id="addresses-list" style="margin-bottom:28px"></div>
+
+            <!-- Formulaire ajout/édition -->
+            <div id="addr-form-wrap" style="background:var(--cream);border-radius:var(--radius-lg);padding:24px;max-width:480px">
+              <h4 id="addr-form-title" style="margin-bottom:20px;font-size:1rem">➕ Ajouter une adresse</h4>
+              <input type="hidden" id="addr-edit-id">
+              <div class="form-group">
+                <label class="form-label">Étiquette</label>
+                <input type="text" id="addr-label" class="form-input" placeholder="Maison, Bureau, Parents…" maxlength="30">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Prénom</label>
+                  <input type="text" id="addr-fname" class="form-input" placeholder="Marie">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Nom</label>
+                  <input type="text" id="addr-lname" class="form-input" placeholder="Dupont">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Adresse *</label>
+                <input type="text" id="addr-address" class="form-input" placeholder="12 rue des Lilas">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Code postal *</label>
+                  <input type="text" id="addr-postal" class="form-input" placeholder="75001" maxlength="10">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Ville *</label>
+                  <input type="text" id="addr-city" class="form-input" placeholder="Paris">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pays</label>
+                <input type="text" id="addr-country" class="form-input" value="France">
+              </div>
+              <div id="addr-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+              <div style="display:flex;gap:10px">
+                <button class="btn btn-primary" onclick="saveAddress()">Enregistrer</button>
+                <button class="btn btn-ghost btn-sm" id="addr-cancel-btn" style="display:none" onclick="resetAddrForm()">Annuler</button>
+              </div>
+            </div>
           </div>
 
           <!-- Profile tab -->
@@ -325,7 +376,8 @@ function showTab(tab, link) {
   document.getElementById(`tab-${tab}`).style.display = '';
   if (link) link.classList.add('active');
 
-  if (tab === 'favorites') loadFavorites();
+  if (tab === 'favorites')  loadFavorites();
+  if (tab === 'addresses')  loadAddresses();
   return false;
 }
 
@@ -422,6 +474,109 @@ async function changePassword() {
     document.getElementById('pw-new').value = '';
     document.getElementById('pw-confirm').value = '';
   } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+// ─── Adresses ─────────────────────────────────────────────────
+let _addresses = [];
+
+async function loadAddresses() {
+  try {
+    _addresses = await apiFetch('/addresses');
+    renderAddresses();
+  } catch(e) {
+    document.getElementById('addresses-list').innerHTML = '<p class="text-muted">Impossible de charger les adresses.</p>';
+  }
+}
+
+function renderAddresses() {
+  const el = document.getElementById('addresses-list');
+  if (!_addresses.length) {
+    el.innerHTML = '<p style="color:var(--text-light);font-size:.9rem;margin-bottom:8px">Aucune adresse enregistrée. Ajoutez votre première adresse ci-dessous.</p>';
+    return;
+  }
+  el.innerHTML = _addresses.map(a => `
+    <div style="background:white;border:2px solid ${a.is_primary ? 'var(--rose-dark)' : 'var(--border)'};border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:12px;display:flex;gap:16px;align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-weight:700;font-size:.9rem">📍 ${a.label}</span>
+          ${a.is_primary ? '<span style="font-size:.7rem;background:var(--rose-pale);color:var(--rose-dark);padding:2px 8px;border-radius:20px;font-weight:700">Principale</span>' : ''}
+        </div>
+        <div style="font-size:.88rem;color:var(--text)">${a.first_name} ${a.last_name}</div>
+        <div style="font-size:.85rem;color:var(--text-light)">${a.address}, ${a.postal_code} ${a.city}, ${a.country}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+        ${!a.is_primary ? `<button class="btn btn-ghost btn-sm" onclick="setPrimary(${a.id})" style="font-size:.75rem;padding:4px 10px">⭐ Principale</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="editAddress(${a.id})" style="font-size:.75rem;padding:4px 10px">✏️ Modifier</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteAddress(${a.id})" style="font-size:.75rem;padding:4px 10px;color:#d9534f">🗑️ Supprimer</button>
+      </div>
+    </div>`).join('');
+}
+
+async function saveAddress() {
+  const id      = document.getElementById('addr-edit-id').value;
+  const payload = {
+    label:       document.getElementById('addr-label').value.trim() || 'Maison',
+    first_name:  document.getElementById('addr-fname').value.trim(),
+    last_name:   document.getElementById('addr-lname').value.trim(),
+    address:     document.getElementById('addr-address').value.trim(),
+    city:        document.getElementById('addr-city').value.trim(),
+    postal_code: document.getElementById('addr-postal').value.trim(),
+    country:     document.getElementById('addr-country').value.trim() || 'France',
+  };
+  const errEl = document.getElementById('addr-error');
+  errEl.style.display = 'none';
+  if (!payload.address || !payload.city || !payload.postal_code) {
+    errEl.textContent = 'Adresse, ville et code postal sont requis';
+    errEl.style.display = '';
+    return;
+  }
+  try {
+    if (id) {
+      await apiFetch(`/addresses/${id}`, { method: 'PUT', body: payload });
+      Toast.show('Adresse mise à jour ✓', 'success');
+    } else {
+      await apiFetch('/addresses', { method: 'POST', body: payload });
+      Toast.show('Adresse ajoutée ✓', 'success');
+    }
+    resetAddrForm();
+    await loadAddresses();
+  } catch(e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+async function setPrimary(id) {
+  await apiFetch(`/addresses/${id}/primary`, { method: 'PUT', body: {} });
+  await loadAddresses();
+}
+
+async function deleteAddress(id) {
+  if (!confirm('Supprimer cette adresse ?')) return;
+  await apiFetch(`/addresses/${id}`, { method: 'DELETE', body: {} });
+  await loadAddresses();
+}
+
+function editAddress(id) {
+  const a = _addresses.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('addr-edit-id').value   = a.id;
+  document.getElementById('addr-label').value     = a.label;
+  document.getElementById('addr-fname').value     = a.first_name;
+  document.getElementById('addr-lname').value     = a.last_name;
+  document.getElementById('addr-address').value   = a.address;
+  document.getElementById('addr-postal').value    = a.postal_code;
+  document.getElementById('addr-city').value      = a.city;
+  document.getElementById('addr-country').value   = a.country;
+  document.getElementById('addr-form-title').textContent = '✏️ Modifier l\'adresse';
+  document.getElementById('addr-cancel-btn').style.display = '';
+  document.getElementById('addr-form-wrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetAddrForm() {
+  document.getElementById('addr-edit-id').value = '';
+  ['addr-label','addr-fname','addr-lname','addr-address','addr-postal','addr-city'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('addr-country').value = 'France';
+  document.getElementById('addr-error').style.display = 'none';
+  document.getElementById('addr-form-title').textContent = '➕ Ajouter une adresse';
+  document.getElementById('addr-cancel-btn').style.display = 'none';
 }
 
 initAccount();
