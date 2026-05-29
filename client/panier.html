@@ -177,12 +177,21 @@
                   <div style="font-weight:700;color:var(--rose-dark);font-size:.9rem;white-space:nowrap">+4,10 €</div>
                 </div>
                 <div class="relay-detail-box" id="relay-details" style="display:none">
-                  <p style="margin-bottom:8px">Trouvez le point relais le plus proche de chez vous, puis indiquez son nom ci-dessous :</p>
-                  <a href="https://www.mondialrelay.fr/trouver-le-point-relais/" target="_blank" rel="noopener"
-                     style="display:inline-block;margin-bottom:10px;font-size:.82rem;color:#c06060;font-weight:600;text-decoration:none">
-                    🗺️ Trouver un point relais sur Mondial Relay →
-                  </a>
-                  <input type="text" id="co-relay" class="form-input" placeholder="Ex : Tabac des Fleurs — 12 rue Victor Hugo, 75011 Paris">
+                  <p style="margin-bottom:10px;font-size:.85rem">
+                    1️⃣ Cherchez un point relais près de chez vous, notez son nom et adresse.<br>
+                    2️⃣ Revenez ici et saisissez-le dans le champ ci-dessous.
+                  </p>
+                  <button type="button" onclick="window.open('https://www.mondialrelay.fr/trouver-le-point-relais/','_blank','noopener,noreferrer')"
+                    style="display:block;width:100%;margin-bottom:12px;padding:10px 14px;background:#fff;border:1.5px solid #c06060;border-radius:8px;color:#c06060;font-weight:700;font-size:.85rem;cursor:pointer;text-align:center">
+                    🗺️ Trouver mon point relais Mondial Relay
+                  </button>
+                  <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Nom + adresse du point relais choisi *</label>
+                  <input type="text" id="co-relay" class="form-input"
+                    placeholder="Ex : Tabac des Fleurs — 12 rue Victor Hugo, 75011 Paris"
+                    style="font-size:.88rem">
+                  <p style="font-size:.75rem;color:#aaa;margin-top:6px">
+                    ⚠️ Si le point relais est indisponible au moment de l'expédition, nous vous proposerons une alternative et vous en informerons par email.
+                  </p>
                 </div>
 
                 <!-- 3 · Remise en main propre -->
