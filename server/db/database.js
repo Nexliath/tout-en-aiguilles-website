@@ -116,6 +116,8 @@ const migrations = [
   "ALTER TABLE orders ADD COLUMN promo_discount REAL DEFAULT 0",
   "ALTER TABLE products ADD COLUMN options_json TEXT DEFAULT NULL",
   "ALTER TABLE products ADD COLUMN video_url TEXT DEFAULT NULL",
+  "ALTER TABLE products ADD COLUMN variant_group_id TEXT DEFAULT NULL",
+  "ALTER TABLE products ADD COLUMN variant_label TEXT DEFAULT NULL",
   // Préférence newsletter des utilisateurs
   "ALTER TABLE users ADD COLUMN newsletter_opt_out INTEGER DEFAULT 0",
   // Onboarder les utilisateurs vérifiés existants comme subscribers (source 'user')
