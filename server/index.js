@@ -102,6 +102,7 @@ app.use('/api/auth',            authLimiter, require('./routes/auth'));
 app.use('/api/products',        require('./routes/products'));
 app.use('/api/orders/checkout', checkoutLimiter);
 app.use('/api/orders',          require('./routes/orders'));
+app.use('/api/addresses',       require('./routes/addresses'));
 app.use('/api/news',            require('./routes/news'));
 app.use('/api/admin',           require('./routes/admin'));
 app.use('/api/reviews',         reviewLimiter, require('./routes/reviews'));
