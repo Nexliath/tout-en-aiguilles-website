@@ -226,6 +226,7 @@ function hideForm() {
   document.getElementById('f-active').checked = true;
   document.getElementById('f-images').value = '';
   document.getElementById('current-images').innerHTML = '';
+  window._currentProductImages = [];
   document.getElementById('form-error').style.display = 'none';
 }
 
@@ -243,12 +244,26 @@ function editProduct(id) {
   document.getElementById('f-featured').checked = !!p.is_featured;
   document.getElementById('f-active').checked = !!p.is_active;
 
-  // Show current images
-  const imgs = p.images || [];
-  document.getElementById('current-images').innerHTML = imgs.map((img, i) => `
-    <div style="position:relative">
-      <img src="${img}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:2px solid var(--border)">
+  // Show current images with delete buttons
+  window._currentProductImages = [...(p.images || [])];
+  renderCurrentImages();
+}
+
+function renderCurrentImages() {
+  document.getElementById('current-images').innerHTML = (window._currentProductImages || []).map((img, i) => `
+    <div style="position:relative;display:inline-block">
+      <img src="${img}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:2px solid var(--border);display:block">
+      <button type="button" onclick="removeProductImage(${i})" title="Supprimer cette photo"
+        style="position:absolute;top:-6px;left:-6px;width:20px;height:20px;border-radius:50%;background:#d9534f;color:white;border:none;cursor:pointer;font-size:.75rem;line-height:1;display:flex;align-items:center;justify-content:center;font-weight:700;padding:0">
+        ✕
+      </button>
     </div>`).join('');
+}
+
+function removeProductImage(index) {
+  if (!window._currentProductImages) return;
+  window._currentProductImages.splice(index, 1);
+  renderCurrentImages();
 }
 
 async function saveProduct() {
@@ -271,6 +286,10 @@ async function saveProduct() {
   formData.append('is_active',   document.getElementById('f-active').checked ? '1' : '0');
   const files = document.getElementById('f-images').files;
   for (const f of files) formData.append('images', f);
+  // Envoyer les images à conserver (après suppressions individuelles)
+  if (window._currentProductImages) {
+    formData.append('keep_images', JSON.stringify(window._currentProductImages));
+  }
 
   try {
     if (id) {
