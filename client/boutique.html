@@ -155,6 +155,7 @@
           <div class="filter-group-label">Trier par</div>
           <select id="sort-select" class="form-select">
             <option value="newest">Plus récent</option>
+            <option value="best_rated">Mieux notés</option>
             <option value="price_asc">Prix croissant</option>
             <option value="price_desc">Prix décroissant</option>
           </select>
@@ -273,6 +274,7 @@ async function loadProducts() {
     var sort = document.getElementById('sort-select').value;
     if (sort === 'price_asc')  products.sort(function(a,b) { return a.price - b.price; });
     if (sort === 'price_desc') products.sort(function(a,b) { return b.price - a.price; });
+    if (sort === 'best_rated') products.sort(function(a,b) { return (Number(b.avg_rating)||0) - (Number(a.avg_rating)||0); });
 
     state.total = products.length;
     document.getElementById('results-count').textContent = products.length + ' création' + (products.length !== 1 ? 's' : '') + ' trouvée' + (products.length !== 1 ? 's' : '');
