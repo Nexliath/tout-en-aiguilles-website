@@ -66,23 +66,40 @@
       </div>
     </div>
 
-    <!-- Stats -->
-    <div class="stats-grid">
+    <!-- Stats ligne 1 : permanent + sélecteur de période -->
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr;margin-bottom:0">
       <div class="stat-card">
         <div class="stat-val" id="stat-products">—</div>
         <div class="stat-label">🧶 Produits actifs</div>
       </div>
+      <a href="commandes.html?status=pending" class="stat-card" style="text-decoration:none;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(192,113,138,.2)'" onmouseout="this.style.boxShadow=''">
+        <div class="stat-val" id="stat-pending">—</div>
+        <div class="stat-label">⏳ En attente <span style="font-size:.7rem;margin-left:4px;opacity:.6">→ Voir</span></div>
+      </a>
+    </div>
+
+    <!-- Sélecteur de période -->
+    <div style="display:flex;align-items:center;gap:0;background:white;border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 20px;margin:12px 0;flex-wrap:wrap;gap:12px">
+      <div style="display:flex;align-items:center;gap:6px;flex:1">
+        <button id="btn-prev-period" onclick="changePeriod(-1)" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:white;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">‹</button>
+        <span id="period-label" style="font-weight:700;min-width:130px;text-align:center;font-size:.95rem;color:var(--text)">Mai 2026</span>
+        <button id="btn-next-period" onclick="changePeriod(1)" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:white;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">›</button>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button id="btn-view-month" onclick="setViewMode('month')" class="btn btn-primary btn-sm" style="font-size:.75rem;padding:5px 12px">Mensuel</button>
+        <button id="btn-view-year"  onclick="setViewMode('year')"  class="btn btn-ghost  btn-sm" style="font-size:.75rem;padding:5px 12px">Annuel</button>
+      </div>
+    </div>
+
+    <!-- Stats ligne 2 : commandes + CA de la période -->
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr;margin-top:0">
       <div class="stat-card">
         <div class="stat-val" id="stat-orders">—</div>
-        <div class="stat-label">📦 Commandes totales</div>
+        <div class="stat-label" id="stat-orders-label">📦 Commandes du mois</div>
       </div>
       <div class="stat-card">
         <div class="stat-val" id="stat-revenue">—</div>
-        <div class="stat-label">💰 Chiffre d'affaires</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="stat-pending">—</div>
-        <div class="stat-label">⏳ Commandes en attente</div>
+        <div class="stat-label" id="stat-revenue-label">💰 CA du mois</div>
       </div>
     </div>
 
@@ -165,6 +182,65 @@ document.getElementById('guard-password').addEventListener('keydown', function(e
   if (e.key === 'Enter') document.getElementById('guard-btn').click();
 });
 
+// ─── Gestion de la période ────────────────────────────────────
+let _allOrders  = [];
+let _viewMode   = 'month';   // 'month' | 'year'
+let _periodDate = new Date(); // date représentant le mois/an courant
+
+const MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+function periodLabel() {
+  if (_viewMode === 'year')  return String(_periodDate.getFullYear());
+  return `${MOIS[_periodDate.getMonth()]} ${_periodDate.getFullYear()}`;
+}
+
+function ordersInPeriod() {
+  return _allOrders.filter(o => {
+    const d = new Date(o.created_at);
+    if (_viewMode === 'year')  return d.getFullYear() === _periodDate.getFullYear();
+    return d.getFullYear() === _periodDate.getFullYear() && d.getMonth() === _periodDate.getMonth();
+  });
+}
+
+function changePeriod(dir) {
+  if (_viewMode === 'year') {
+    _periodDate = new Date(_periodDate.getFullYear() + dir, 0, 1);
+  } else {
+    _periodDate = new Date(_periodDate.getFullYear(), _periodDate.getMonth() + dir, 1);
+  }
+  updatePeriodStats();
+}
+
+function setViewMode(mode) {
+  _viewMode = mode;
+  document.getElementById('btn-view-month').className = `btn btn-sm ${mode === 'month' ? 'btn-primary' : 'btn-ghost'}`;
+  document.getElementById('btn-view-year').className  = `btn btn-sm ${mode === 'year'  ? 'btn-primary' : 'btn-ghost'}`;
+  updatePeriodStats();
+}
+
+function updatePeriodStats() {
+  const label  = periodLabel();
+  const isYear = _viewMode === 'year';
+  document.getElementById('period-label').textContent = label;
+  document.getElementById('stat-orders-label').textContent = `📦 Commandes — ${label}`;
+  document.getElementById('stat-revenue-label').textContent = `💰 CA — ${label}`;
+
+  // Désactiver "Suivant" si on est sur le mois/an courant ou futur
+  const now = new Date();
+  const atNow = isYear
+    ? _periodDate.getFullYear() >= now.getFullYear()
+    : (_periodDate.getFullYear() > now.getFullYear() || (_periodDate.getFullYear() === now.getFullYear() && _periodDate.getMonth() >= now.getMonth()));
+  document.getElementById('btn-next-period').disabled = atNow;
+  document.getElementById('btn-next-period').style.opacity = atNow ? '.35' : '1';
+
+  const periodOrders = ordersInPeriod();
+  const paidOrders   = periodOrders.filter(o => ['paid','shipped','delivered'].includes(o.status));
+  const revenue      = paidOrders.reduce((s, o) => s + Number(o.total), 0);
+
+  document.getElementById('stat-orders').textContent  = periodOrders.length;
+  document.getElementById('stat-revenue').textContent = revenue.toFixed(0) + ' €';
+}
+
 async function loadDashboard() {
   document.getElementById('admin-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
@@ -174,16 +250,18 @@ async function loadDashboard() {
       apiFetch('/orders')
     ]);
 
-    const active = products.filter(p => p.is_active);
-    const paid = orders.filter(o => ['paid','shipped','delivered'].includes(o.status));
-    const revenue = paid.reduce((s, o) => s + Number(o.total), 0);
-    const pending = orders.filter(o => o.status === 'pending' || o.status === 'paid');
+    _allOrders = orders;
 
+    // Stats permanentes
+    const active  = products.filter(p => p.is_active);
+    const pending = orders.filter(o => o.status === 'pending');
     document.getElementById('stat-products').textContent = active.length;
-    document.getElementById('stat-orders').textContent = orders.length;
-    document.getElementById('stat-revenue').textContent = revenue.toFixed(0) + ' €';
-    document.getElementById('stat-pending').textContent = pending.length;
+    document.getElementById('stat-pending').textContent  = pending.length;
 
+    // Stats de période (mois courant par défaut)
+    updatePeriodStats();
+
+    // Tableau dernières commandes
     const STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
     const recent = orders.slice(0, 5);
     document.getElementById('recent-orders-body').innerHTML = recent.length
