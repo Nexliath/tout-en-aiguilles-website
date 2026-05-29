@@ -149,7 +149,7 @@
     <div class="hero-floats">
       <div class="hero-float hf-main"><img src="/assets/images/victorine-marche.jpg" alt="Victorine et ses créations" loading="eager"></div>
       <div class="hero-float hf-accent1"><img src="/assets/images/hero-1.jpg" alt="Créations crochet colorées" loading="eager"></div>
-      <div class="hero-float hf-accent2"><img src="/assets/images/hero-2.jpg" alt="Peluches au crochet" loading="eager"></div>
+      <div class="hero-float hf-accent2"><img src="/assets/images/hero-accent2.jpg" alt="Stand du marché" loading="eager"></div>
     </div>
   </div>
 </section>
@@ -194,7 +194,9 @@
       <!-- Crochet -->
       <a href="/boutique.html?type=crochet" style="text-decoration:none">
         <div class="card" style="overflow:hidden;cursor:pointer">
-          <div id="cat-img-crochet" style="height:200px;background:linear-gradient(135deg,var(--rose-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem;overflow:hidden">🧶</div>
+          <div style="height:220px;overflow:hidden">
+            <img src="/assets/images/cat-crochet.jpg" alt="Univers Crochet — doudous et peluches" style="width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s ease" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+          </div>
           <div style="padding:28px">
             <h3 style="margin-bottom:8px">Univers Crochet</h3>
             <p style="font-size:.9rem;margin-bottom:16px">Doudous, peluches, accessoires et déco au crochet. Créations tendres et colorées par Victorine.</p>
@@ -205,7 +207,9 @@
       <!-- Couture -->
       <a href="/boutique.html?type=couture" style="text-decoration:none">
         <div class="card" style="overflow:hidden;cursor:pointer">
-          <div id="cat-img-couture" style="height:200px;background:linear-gradient(135deg,var(--sage-pale),var(--cream));display:flex;align-items:center;justify-content:center;font-size:5rem;overflow:hidden">✂️</div>
+          <div style="height:220px;overflow:hidden">
+            <img src="/assets/images/cat-couture.jpg" alt="Univers Couture — tote bags et accessoires" style="width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s ease" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+          </div>
           <div style="padding:28px">
             <h3 style="margin-bottom:8px">Univers Couture</h3>
             <p style="font-size:.9rem;margin-bottom:16px">Tote bags, sorties de bain, bananes et lingettes cousus avec amour par la maman de Victorine.</p>
@@ -483,29 +487,8 @@ async function sendContact() {
 const fyEl = document.getElementById('footer-year');
 if (fyEl) fyEl.textContent = new Date().getFullYear();
 
-// Chargement des vraies photos pour les catégories
-async function loadCategoryImages() {
-  try {
-    const [crochet, couture] = await Promise.all([
-      apiFetch('/products?type=crochet&limit=1&featured=true'),
-      apiFetch('/products?type=couture&limit=1&featured=true'),
-    ]);
-    const crochetImg = crochet[0]?.images?.[0];
-    const coutureImg = couture[0]?.images?.[0];
-    if (crochetImg) {
-      const el = document.getElementById('cat-img-crochet');
-      el.innerHTML = `<img src="${crochetImg}" alt="Crochet" style="width:100%;height:100%;object-fit:cover">`;
-    }
-    if (coutureImg) {
-      const el = document.getElementById('cat-img-couture');
-      el.innerHTML = `<img src="${coutureImg}" alt="Couture" style="width:100%;height:100%;object-fit:cover">`;
-    }
-  } catch(e) {}
-}
-
 loadFeaturedProducts();
 loadNews();
-loadCategoryImages();
 </script>
 </body>
 </html>
