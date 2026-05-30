@@ -315,10 +315,13 @@
       <div style="background:white;border-radius:var(--radius-xl);border:1px solid var(--border);padding:32px">
         <h3 style="margin-bottom:24px">Envoyer un message</h3>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Prénom</label><input type="text" class="form-input" id="contact-name" placeholder="Marie"></div>
+          <div class="form-group"><label class="form-label">Prénom</label><input type="text" class="form-input" id="contact-name" placeholder="Marie" onfocus="if(!document.getElementById('contact-time').value)document.getElementById('contact-time').value=Date.now()"></div>
           <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="contact-email" placeholder="marie@email.fr"></div>
         </div>
         <div class="form-group"><label class="form-label">Message</label><textarea class="form-textarea" id="contact-msg" placeholder="Bonjour, je souhaiterais commander un doudou personnalisé…"></textarea></div>
+        <!-- Anti-bot -->
+        <input type="text" name="website" class="hp-field" autocomplete="off" tabindex="-1">
+        <input type="hidden" id="contact-time" value="">
         <button class="btn btn-primary btn-block" onclick="sendContact()">Envoyer le message 🌸</button>
       </div>
     </div>
@@ -466,6 +469,12 @@ async function sendContact() {
   const email = document.getElementById('contact-email').value.trim();
   const msg = document.getElementById('contact-msg').value.trim();
   if (!name || !email || !msg) { Toast.show('Veuillez remplir tous les champs', 'error'); return; }
+  // Anti-bot: honeypot check
+  const hp = document.querySelector('input[name="website"]');
+  if (hp && hp.value) return;
+  // Anti-bot: timing check (< 3s = bot)
+  const t = document.getElementById('contact-time')?.value;
+  if (t && Date.now() - Number(t) < 3000) { Toast.show('Veuillez patienter un instant…', 'error'); return; }
 
   const btn = document.querySelector('[onclick="sendContact()"]');
   const originalText = btn ? btn.textContent : '';

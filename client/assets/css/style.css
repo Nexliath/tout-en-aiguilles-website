@@ -1429,3 +1429,6 @@ p  { color: var(--text-light); }
 
 /* ── Anchor scroll offset — compense le header sticky ── */
 [id] { scroll-margin-top: calc(var(--header-h) + 12px); }
+
+/* ── Anti-bot honeypot (visuellement caché) ── */
+.hp-field { position:absolute; left:-9999px; top:-9999px; opacity:0; pointer-events:none; tab-index:-1; }
