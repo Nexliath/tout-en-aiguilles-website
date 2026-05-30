@@ -570,6 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Favorites.loadFromServer();
   initBackToTop();
   initCookieBanner();
+  initBottomNav();
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -825,3 +826,131 @@ const PushNotif = {
 document.addEventListener('DOMContentLoaded', () => {
   if (Auth.isAdmin()) PushNotif.init();
 });
+
+// ─── Bottom navigation mobile ─────────────────────────────────
+function initBottomNav() {
+  if (document.querySelector('.bottom-nav')) return;
+  const path = location.pathname;
+  const isHome    = path === '/' || path.endsWith('index.html');
+  const isShop    = path.includes('boutique');
+  const isCart    = path.includes('panier');
+  const isAccount = path.includes('compte');
+
+  const nav = document.createElement('nav');
+  nav.className = 'bottom-nav';
+  nav.setAttribute('aria-label', 'Navigation principale');
+  nav.innerHTML = `
+    <a href="/" class="bottom-nav-item ${isHome ? 'active' : ''}" aria-label="Accueil">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Accueil</span>
+    </a>
+    <a href="/boutique.html" class="bottom-nav-item ${isShop ? 'active' : ''}" aria-label="Boutique">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      <span>Boutique</span>
+    </a>
+    <a href="/panier.html" class="bottom-nav-item ${isCart ? 'active' : ''}" aria-label="Panier" id="bottom-nav-cart">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 001.98-1.68l1.62-10.32H6"/></svg>
+      <span>Panier</span>
+    </a>
+    <a href="/compte.html" class="bottom-nav-item ${isAccount ? 'active' : ''}" aria-label="Compte">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Compte</span>
+    </a>`;
+  document.body.appendChild(nav);
+
+  // Sync cart badge
+  function syncCartBadge() {
+    const n = Cart.count();
+    const cartItem = document.getElementById('bottom-nav-cart');
+    if (!cartItem) return;
+    let badge = cartItem.querySelector('.bottom-nav-badge');
+    if (n > 0) {
+      if (!badge) { badge = document.createElement('span'); badge.className = 'bottom-nav-badge'; cartItem.appendChild(badge); }
+      badge.textContent = n;
+    } else if (badge) badge.remove();
+  }
+  syncCartBadge();
+  // Watch cart changes
+  const origSave = Cart.save.bind(Cart);
+  Cart.save = (items) => { origSave(items); syncCartBadge(); };
+}
+
+// ─── Skeleton loading cards ───────────────────────────────────
+function renderSkeletonCards(count = 8) {
+  return Array.from({ length: count }, () => `
+    <div class="skeleton-card">
+      <div class="skeleton skeleton-img"></div>
+      <div class="skeleton-body">
+        <div class="skeleton skeleton-line w80"></div>
+        <div class="skeleton skeleton-line w50"></div>
+        <div class="skeleton skeleton-line w30"></div>
+      </div>
+    </div>`).join('');
+}
+
+// ─── Scroll position preservation (boutique) ─────────────────
+const ScrollMemory = {
+  save: (key) => sessionStorage.setItem('scroll_' + key, String(window.scrollY)),
+  restore: (key) => {
+    const y = sessionStorage.getItem('scroll_' + key);
+    if (y) { setTimeout(() => window.scrollTo({ top: Number(y), behavior: 'instant' }), 80); sessionStorage.removeItem('scroll_' + key); }
+  },
+};
+
+// ─── Quick view modal ─────────────────────────────────────────
+const QuickView = {
+  open: async (productId) => {
+    let overlay = document.getElementById('qv-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'qv-overlay';
+      overlay.className = 'qv-overlay';
+      overlay.innerHTML = `<div class="qv-modal" id="qv-modal">
+        <button class="qv-close" onclick="QuickView.close()" aria-label="Fermer">✕</button>
+        <div id="qv-content"><div class="loading"><div class="spinner"></div></div></div>
+      </div>`;
+      overlay.addEventListener('click', e => { if (e.target === overlay) QuickView.close(); });
+      document.body.appendChild(overlay);
+    }
+    requestAnimationFrame(() => overlay.classList.add('open'));
+    document.body.style.overflow = 'hidden';
+    try {
+      const p = window._pcache[productId] || await apiFetch(`/products?limit=200`).then(ps => ps.find(x => x.id == productId));
+      if (!p) throw new Error('Produit introuvable');
+      const img = p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.name}" style="width:100%;border-radius:var(--radius-lg);object-fit:cover;aspect-ratio:1">` : '<div style="aspect-ratio:1;background:var(--cream-dark);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:4rem">🧶</div>';
+      document.getElementById('qv-content').innerHTML = `
+        <div class="qv-layout">
+          <div>${img}</div>
+          <div>
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--sage-dark);margin-bottom:6px">${p.category_name || ''}</div>
+            <h2 style="font-size:1.3rem;margin-bottom:10px">${p.name}</h2>
+            <div style="font-size:1.6rem;font-weight:700;color:var(--rose-dark);margin-bottom:14px">${Number(p.price).toFixed(2)} €</div>
+            <p style="font-size:.85rem;color:var(--text);line-height:1.6;margin-bottom:16px">${(p.description || '').slice(0, 200)}${p.description?.length > 200 ? '…' : ''}</p>
+            ${p.stock > 0
+              ? `<div style="display:flex;gap:10px;align-items:center">
+                  <button class="btn btn-primary" style="flex:1" onclick="Cart.add(${JSON.stringify(p).replace(/"/g,'&quot;')});QuickView.close()">🛒 Ajouter au panier</button>
+                  <a href="/produit.html?id=${p.id}" class="btn btn-secondary btn-sm">Voir détails →</a>
+                </div>`
+              : `<div style="color:#d9534f;font-weight:700;margin-bottom:10px">Rupture de stock</div>
+                 <a href="/produit.html?id=${p.id}" class="btn btn-secondary">Voir la fiche produit</a>`}
+          </div>
+        </div>`;
+    } catch { document.getElementById('qv-content').innerHTML = '<p style="text-align:center;padding:24px;color:var(--text-light)">Impossible de charger ce produit.</p>'; }
+  },
+  close: () => {
+    const overlay = document.getElementById('qv-overlay');
+    if (overlay) { overlay.classList.remove('open'); document.body.style.overflow = ''; }
+  },
+};
+
+// ─── Preload critical images ──────────────────────────────────
+function preloadImages(urls) {
+  urls.filter(Boolean).slice(0, 6).forEach(url => {
+    if (!url.startsWith('http') && !url.startsWith('/')) return;
+    const link = document.createElement('link');
+    link.rel = 'preload'; link.as = 'image'; link.href = url;
+    document.head.appendChild(link);
+  });
+}
+
+

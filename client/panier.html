@@ -137,6 +137,20 @@
         <!-- Summary & checkout -->
         <div>
           <div class="cart-sidebar">
+            <!-- Checkout steps -->
+            <div class="checkout-steps">
+              <div class="checkout-step done" id="step-cart">
+                <div class="step-num">✓</div><span>Panier</span>
+              </div>
+              <div class="step-sep"></div>
+              <div class="checkout-step active" id="step-delivery">
+                <div class="step-num">2</div><span>Livraison</span>
+              </div>
+              <div class="step-sep"></div>
+              <div class="checkout-step" id="step-payment">
+                <div class="step-num">3</div><span>Paiement</span>
+              </div>
+            </div>
             <h3 style="font-family:var(--font-title);margin-bottom:20px">Récapitulatif</h3>
             <div id="cart-summary"></div>
             <div id="delivery-row" class="cart-total-row" style="display:none">
@@ -179,8 +193,10 @@
               <div style="margin-bottom:8px">
                 <input type="email" id="co-email" class="form-input" placeholder="Email *" style="font-size:.85rem">
               </div>
-              <div style="margin-bottom:8px">
-                <input type="text" id="co-address" class="form-input" placeholder="Adresse *" style="font-size:.85rem">
+              <div class="addr-wrap" style="margin-bottom:8px">
+                <input type="text" id="co-address" class="form-input" placeholder="Adresse *" style="font-size:.85rem"
+                  autocomplete="off" oninput="autocompleteAddress(this.value)" onblur="setTimeout(closeAddrSuggestions,200)">
+                <div class="addr-suggestions" id="addr-suggestions"></div>
               </div>
               <div style="display:grid;grid-template-columns:120px 1fr;gap:8px;margin-bottom:4px">
                 <input type="text" id="co-postal" class="form-input" placeholder="Code postal *" style="font-size:.85rem">
@@ -774,6 +790,43 @@ document.getElementById('co-postal').addEventListener('input', scheduleGeoCheck)
 document.getElementById('co-city').addEventListener('input',   scheduleGeoCheck);
 initHeaderSearch();
 renderDeliveryEstimator('delivery-estimate-cart');
+
+// Address autocomplete — API adresse.data.gouv.fr (gratuit, officiel)
+let _addrTimer;
+async function autocompleteAddress(q) {
+  clearTimeout(_addrTimer);
+  const box = document.getElementById('addr-suggestions');
+  if (!q || q.length < 4) { box.style.display = 'none'; return; }
+  _addrTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=5&type=housenumber`);
+      const data = await r.json();
+      const features = data.features || [];
+      if (!features.length) { box.style.display = 'none'; return; }
+      box.innerHTML = features.map(f => {
+        const p = f.properties;
+        return `<div class="addr-suggestion" onclick="selectAddress('${p.name?.replace(/'/g,"\'")||''}','${p.postcode||''}','${p.city?.replace(/'/g,"\'")||''}')">
+          ${p.label}
+        </div>`;
+      }).join('');
+      box.style.display = 'block';
+    } catch {}
+  }, 300);
+}
+
+function selectAddress(street, postal, city) {
+  document.getElementById('co-address').value = street;
+  document.getElementById('co-postal').value  = postal;
+  document.getElementById('co-city').value    = city;
+  closeAddrSuggestions();
+  // Trigger handover eligibility check
+  checkHandoverEligibility?.();
+}
+
+function closeAddrSuggestions() {
+  const box = document.getElementById('addr-suggestions');
+  if (box) box.style.display = 'none';
+}
 </script>
 </body>
 </html>

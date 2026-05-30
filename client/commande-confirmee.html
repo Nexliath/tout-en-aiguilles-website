@@ -68,8 +68,35 @@
 
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <a href="/compte.html?tab=orders" class="btn btn-primary">Voir mes commandes</a>
-        <a href="/boutique.html" class="btn btn-secondary">Continuer mes achats</a>
+        <!-- Social sharing -->
+        <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+          <p style="font-size:.82rem;color:var(--text-light);margin-bottom:10px;text-align:center">Partagez votre découverte ✨</p>
+          <div class="share-confirm">
+            <a class="share-confirm-btn" style="background:#25D366;color:white"
+              href="https://api.whatsapp.com/send?text=Je%20viens%20de%20commander%20chez%20Tout%20en%20Aiguilles%20%F0%9F%A7%B6%20https://tout-en-aiguilles.com" target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.558 4.122 1.533 5.857L0 24l6.335-1.51A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.6a9.573 9.573 0 01-4.948-1.375l-.355-.211-3.666.874.934-3.562-.232-.366A9.557 9.557 0 012.4 12C2.4 6.698 6.698 2.4 12 2.4S21.6 6.698 21.6 12 17.302 21.6 12 21.6z"/></svg>
+              WhatsApp
+            </a>
+            <a class="share-confirm-btn" style="background:#E1306C;color:white"
+              href="https://www.instagram.com/tout.en.aiguilles/" target="_blank" rel="noopener">
+              📸 Instagram
+            </a>
+            <button class="share-confirm-btn" style="background:var(--cream-dark);color:var(--text)"
+              onclick="navigator.clipboard.writeText('https://tout-en-aiguilles.com').then(()=>Toast.show('Lien copié !','success'))">
+              🔗 Copier le lien
+            </button>
+          </div>
+        </div>
+        <div style="margin-top:16px;text-align:center">
+          <a href="/boutique.html" class="btn btn-secondary">Continuer mes achats</a>
+        </div>
       </div>
+    </div>
+
+    <!-- Upsell -->
+    <div id="upsell-section" style="display:none;margin-top:40px">
+      <h3 style="font-family:var(--font-title);text-align:center;margin-bottom:20px">Vous aimerez aussi ✨</h3>
+      <div id="upsell-grid" class="grid-4"></div>
     </div>
   </div>
 </main>
@@ -128,6 +155,22 @@ async function loadOrder() {
 
 loadOrder();
 initHeaderSearch();
+
+// Upsell — produits complémentaires
+async function loadUpsell() {
+  try {
+    const products = await apiFetch('/products?featured=true&limit=8');
+    const filtered = products.filter(p => p.stock > 0).slice(0, 4);
+    if (!filtered.length) return;
+    const section = document.getElementById('upsell-section');
+    const grid    = document.getElementById('upsell-grid');
+    if (section && grid) {
+      grid.innerHTML = filtered.map(renderProductCard).join('');
+      section.style.display = '';
+    }
+  } catch {}
+}
+loadUpsell();
 </script>
 </body>
 </html>

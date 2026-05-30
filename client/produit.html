@@ -376,6 +376,13 @@
   </div>
 </div>
 
+<!-- Sticky ATC bar (mobile) -->
+<div class="sticky-atc" id="sticky-atc">
+  <div class="sticky-atc-name" id="sticky-atc-name"></div>
+  <div class="sticky-atc-price" id="sticky-atc-price"></div>
+  <button class="btn btn-primary btn-sm" id="sticky-atc-btn" onclick="addToCartFromPage()" style="flex-shrink:0">🛒 Ajouter</button>
+</div>
+
 <footer class="site-footer">
   <div class="container">
     <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
@@ -389,6 +396,50 @@
 <script>
 let currentProduct = null;
 let currentQty = 1;
+
+let _mainImgBackup = null;
+function previewVariantImg(images) {
+  if (!images || !images[0]) return;
+  const carousel = document.getElementById('gallery-carousel');
+  if (!carousel) return;
+  const first = carousel.querySelector('.gallery-slide img');
+  if (first) { _mainImgBackup = _mainImgBackup || first.src; first.src = images[0]; }
+}
+function restoreMainImg() {
+  if (!_mainImgBackup) return;
+  const first = document.querySelector('#gallery-carousel .gallery-slide img');
+  if (first) first.src = _mainImgBackup;
+  _mainImgBackup = null;
+}
+
+function switchProdTab(id, btn) {
+  document.querySelectorAll('.prod-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.prod-tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+  // If switching to avis tab, move reviews content there
+  if (id === 'avis-tab') {
+    const reviewsSection = document.getElementById('reviews-section');
+    const inline = document.getElementById('prod-reviews-inline');
+    if (reviewsSection && inline && !inline.hasChildNodes()) {
+      inline.appendChild(reviewsSection);
+    }
+  }
+}
+
+function initStickyATC(product) {
+  const btn = document.getElementById('add-cart-btn');
+  const sticky = document.getElementById('sticky-atc');
+  if (!sticky || !btn) return;
+  document.getElementById('sticky-atc-name').textContent = product.name;
+  document.getElementById('sticky-atc-price').textContent = product.price.toFixed(2) + ' €';
+  if (product.stock === 0) document.getElementById('sticky-atc-btn').disabled = true;
+
+  const observer = new IntersectionObserver(([e]) => {
+    sticky.style.display = e.isIntersecting ? 'none' : 'flex';
+  }, { threshold: 0.1 });
+  observer.observe(btn);
+}
 
 async function loadProduct() {
   const params = new URLSearchParams(location.search);
@@ -427,7 +478,13 @@ async function loadProduct() {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('product-detail').style.display = '';
     document.title = `${product.name} — Création crochet faite main | Tout en Aiguilles`;
+  // Sticky ATC
+  initStickyATC(product);
+  // Update avis count in tab when reviews load
   // Delivery estimator
+  // Sticky ATC
+  initStickyATC(product);
+  // Update avis count in tab when reviews load
   // Delivery estimator — compact text version for trust strip
   const de = document.getElementById('delivery-estimate');
   if (de) {
@@ -507,7 +564,7 @@ function renderProduct(p) {
   document.getElementById('prod-cat').textContent = p.category_name || '';
   document.getElementById('prod-name').textContent = p.name;
   document.getElementById('prod-price').textContent = p.price.toFixed(2) + ' €';
-  // Description collapsible — affiche 4 lignes max avec "Lire plus"
+  // Description collapsible
   const descEl = document.getElementById('prod-desc');
   const fullDesc = p.description || '';
   descEl.textContent = fullDesc;
@@ -524,6 +581,18 @@ function renderProduct(p) {
       readMore.textContent = expanded ? '▲ Réduire' : '▼ Lire plus';
     };
     descEl.parentElement.appendChild(readMore);
+  }
+  // Caractéristiques tab
+  const caractEl = document.getElementById('prod-caract');
+  if (caractEl) {
+    const lines = [];
+    if (p.category_name) lines.push(`<div><strong>Catégorie :</strong> ${p.category_name}</div>`);
+    if (p.stock > 0) lines.push(`<div><strong>Disponibilité :</strong> <span style="color:var(--sage-dark)">En stock (${p.stock} dispo.)</span></div>`);
+    const tags = p.tags || [];
+    if (tags.length) lines.push(`<div><strong>Tags :</strong> ${tags.join(', ')}</div>`);
+    lines.push(`<div><strong>Fabrication :</strong> 100% fait main en France 🇫🇷</div>`);
+    lines.push(`<div><strong>Matériaux :</strong> <a href="/materiaux.html" style="color:var(--rose-dark)">Voir nos matériaux →</a></div>`);
+    caractEl.innerHTML = lines.join('');
   }
 
   // Stock badge
