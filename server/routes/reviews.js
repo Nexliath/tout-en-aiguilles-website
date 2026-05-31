@@ -154,27 +154,35 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
 // ─── GET /api/reviews/admin ─────────────────────────────────
 // Admin : tous les avis avec photos
 router.get('/admin', requireAdmin, (req, res) => {
-  const reviews = db.prepare(`
-    SELECT r.id, r.rating, r.comment, r.is_approved, r.created_at,
-           COALESCE(r.verified_purchase, 0) as verified_purchase,
-           u.first_name, u.last_name, u.email,
-           p.name AS product_name, p.id AS product_id,
-           GROUP_CONCAT(rp.photo_url) AS photos_raw
-    FROM reviews r
-    JOIN users u ON u.id = r.user_id
-    JOIN products p ON p.id = r.product_id
-    LEFT JOIN review_photos rp ON rp.review_id = r.id
-    GROUP BY r.id
-    ORDER BY r.is_approved ASC, r.created_at DESC
-  `).all();
+  try {
+    // Migration défensive : s'assurer que verified_purchase existe
+    try { db.exec('ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0'); } catch {}
 
-  const parsed = reviews.map(r => ({
-    ...r,
-    photos: r.photos_raw ? r.photos_raw.split(',') : [],
-    photos_raw: undefined
-  }));
+    const reviews = db.prepare(`
+      SELECT r.id, r.rating, r.comment, r.is_approved, r.created_at,
+             COALESCE(r.verified_purchase, 0) as verified_purchase,
+             u.first_name, u.last_name, u.email,
+             p.name AS product_name, p.id AS product_id,
+             GROUP_CONCAT(rp.photo_url) AS photos_raw
+      FROM reviews r
+      JOIN users u ON u.id = r.user_id
+      JOIN products p ON p.id = r.product_id
+      LEFT JOIN review_photos rp ON rp.review_id = r.id
+      GROUP BY r.id
+      ORDER BY r.is_approved ASC, r.created_at DESC
+    `).all();
 
-  res.json(parsed);
+    const parsed = reviews.map(r => ({
+      ...r,
+      photos: r.photos_raw ? r.photos_raw.split(',') : [],
+      photos_raw: undefined
+    }));
+
+    res.json(parsed);
+  } catch (e) {
+    console.error('[GET /reviews/admin]', e.message);
+    res.status(500).json({ error: 'Erreur lors du chargement des avis : ' + e.message });
+  }
 });
 
 // ─── PUT /api/reviews/:id/approve ──────────────────────────
@@ -208,6 +216,21 @@ router.delete('/:id', requireAdmin, (req, res) => {
 
   db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
   res.json({ message: 'Avis supprimé' });
+});
+
+
+// ─── GET /api/reviews/global-stats ──────────────────────────
+// Statistiques globales pour le header (étoiles du site)
+router.get('/global-stats', (req, res) => {
+  try {
+    const stats = db.prepare(`
+      SELECT COUNT(*) as count, ROUND(AVG(rating * 1.0), 1) as average
+      FROM reviews WHERE is_approved = 1
+    `).get();
+    res.json({ count: stats.count || 0, average: stats.average || 0 });
+  } catch (e) {
+    res.json({ count: 0, average: 0 });
+  }
 });
 
 module.exports = router;

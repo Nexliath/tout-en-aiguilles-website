@@ -120,6 +120,8 @@ const migrations = [
   "ALTER TABLE products ADD COLUMN variant_label TEXT DEFAULT NULL",
   // Préférence newsletter des utilisateurs
   "ALTER TABLE users ADD COLUMN newsletter_opt_out INTEGER DEFAULT 0",
+  // verified_purchase sur avis existants
+  "ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0",
   // Onboarder les utilisateurs vérifiés existants comme subscribers (source 'user')
   `INSERT OR IGNORE INTO newsletter_subscribers (email, first_name, source)
    SELECT email, first_name, 'user' FROM users WHERE email_verified = 1`,

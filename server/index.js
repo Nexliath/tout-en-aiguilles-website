@@ -325,6 +325,17 @@ async function checkStockAlerts() {
   } catch(e) {}
 }
 
+
+// ─── Error handler global — garantit JSON pour les routes /api ──
+// Sans ça, Express renvoie du HTML en cas d'erreur non gérée
+app.use((err, req, res, next) => {
+  console.error('[Express error]', req.method, req.path, err.message);
+  if (req.path.startsWith('/api')) {
+    return res.status(err.status || 500).json({ error: err.message || 'Erreur serveur' });
+  }
+  next(err);
+});
+
 // ─── Démarrage ──────────────────────────────────────────────
 app.listen(PORT, async () => {
   const db = require('./db/database');
