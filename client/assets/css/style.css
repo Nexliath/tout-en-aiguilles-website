@@ -1684,9 +1684,9 @@ p  { color: var(--text-light); }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
 /* ── Panier suggestions ── */
-.cart-suggestions { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
-.cart-suggestions-title { font-size: .82rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
-.cart-sugg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cart-suggestions { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.cart-suggestions-title { font-size: .72rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+.cart-sugg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .cart-sugg-item {
   border: 1px solid var(--border); border-radius: var(--radius-lg);
   overflow: hidden; cursor: pointer; transition: border-color .15s;
@@ -1694,10 +1694,10 @@ p  { color: var(--text-light); }
 }
 .cart-sugg-item:hover { border-color: var(--rose); }
 .cart-sugg-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
-.cart-sugg-item-info { padding: 6px 8px; }
-.cart-sugg-item-name { font-size: .72rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cart-sugg-item-price { font-size: .7rem; color: var(--rose-dark); font-weight: 700; }
-.cart-sugg-item-btn { width: 100%; padding: 5px; border: none; background: var(--rose-pale); color: var(--rose-dark); font-size: .7rem; font-weight: 700; cursor: pointer; }
+.cart-sugg-item-info { padding: 4px 6px; }
+.cart-sugg-item-name { font-size: .68rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cart-sugg-item-price { font-size: .66rem; color: var(--rose-dark); font-weight: 700; }
+.cart-sugg-item-btn { width: 100%; padding: 3px; border: none; background: var(--rose-pale); color: var(--rose-dark); font-size: .66rem; font-weight: 700; cursor: pointer; }
 .cart-sugg-item-btn:hover { background: var(--rose); color: white; }
 
 /* ── Product image dimensions fix (CLS) ── */
