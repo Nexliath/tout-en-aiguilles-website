@@ -1,74 +1,47 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <!-- Google Tag Manager -->
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
-  <!-- End Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mon panier — Tout en Aiguilles</title>
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
+    /* Delivery options */
     .delivery-opt {
-      display: flex; align-items: flex-start; gap: 12px;
-      padding: 12px 16px; border: 2px solid #f0e8e0; border-radius: 10px;
-      cursor: pointer; transition: border-color .15s, background .15s;
-      background: #fff; margin-bottom: 6px; user-select: none;
+      display:flex;align-items:flex-start;gap:12px;padding:12px 16px;
+      border:2px solid #f0e8e0;border-radius:10px;cursor:pointer;
+      transition:border-color .15s,background .15s;background:#fff;margin-bottom:6px;user-select:none;
     }
-    .delivery-opt:hover { border-color: #e8a0a0; background: #fff9f7; }
-    .delivery-opt.is-selected { border-color: #c06060; background: #fff5f5; }
-    .delivery-opt.is-disabled { opacity: .42; cursor: not-allowed; pointer-events: none; }
-    .delivery-opt input[type=radio] { margin-top: 3px; flex-shrink: 0; accent-color: #c06060; }
-    .relay-detail-box {
-      margin: -2px 0 8px 32px; padding: 12px 14px;
-      background: #fdf8f5; border: 1px solid #e8d5c8; border-radius: 8px;
-      font-size: .85rem; line-height: 1.55;
-    }
-    .handover-info-box {
-      margin: -2px 0 8px 32px; padding: 12px 14px;
-      background: #f0fff4; border: 1px solid #b8dfc8; border-radius: 8px;
-      font-size: .85rem; line-height: 1.55;
-    }
-    #delivery-row { color: #888; }
-    .payment-method-btn {
-      flex: 1; padding: 10px 14px; border-radius: 10px;
-      border: 2px solid var(--border); background: white;
-      font-size: .88rem; font-weight: 600; cursor: pointer;
-      color: var(--text-light); transition: border-color .15s, background .15s;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-    }
-    .payment-method-btn.active { border-color: var(--rose-dark); background: var(--rose-pale); color: var(--rose-dark); }
-    .payment-method-btn:hover:not(.active) { border-color: #ccc; background: #fafafa; }
-    .saved-addr-card {
-      padding: 10px 14px; border-radius: 10px;
-      border: 2px solid var(--border); background: white;
-      font-size: .82rem; cursor: pointer; transition: border-color .15s, background .15s;
-      max-width: 200px;
-    }
-    .saved-addr-card.selected { border-color: var(--rose-dark); background: var(--rose-pale); }
-    .saved-addr-card:hover:not(.selected) { border-color: #ccc; background: #fafafa; }
-    .saved-addr-card-label { font-weight: 700; margin-bottom: 2px; color: var(--text); }
-    .saved-addr-card-addr { color: var(--text-light); font-size: .76rem; line-height: 1.4; }
+    .delivery-opt:hover{border-color:#e8a0a0;background:#fff9f7;}
+    .delivery-opt.is-selected{border-color:#c06060;background:#fff5f5;}
+    .delivery-opt.is-disabled{opacity:.42;cursor:not-allowed;pointer-events:none;}
+    .delivery-opt input[type=radio]{margin-top:3px;flex-shrink:0;accent-color:#c06060;}
+    .relay-detail-box{margin:-2px 0 8px 32px;padding:12px 14px;background:#fdf8f5;border:1px solid #e8d5c8;border-radius:8px;font-size:.85rem;line-height:1.55;}
+    .handover-info-box{margin:-2px 0 8px 32px;padding:12px 14px;background:#f0fff4;border:1px solid #b8dfc8;border-radius:8px;font-size:.85rem;line-height:1.55;}
+    /* Payment */
+    .payment-method-btn{flex:1;padding:10px 14px;border-radius:10px;border:2px solid var(--border);background:white;font-size:.88rem;font-weight:600;cursor:pointer;color:var(--text-light);transition:border-color .15s,background .15s;display:flex;align-items:center;justify-content:center;gap:6px;}
+    .payment-method-btn.active{border-color:var(--rose-dark);background:var(--rose-pale);color:var(--rose-dark);}
+    .payment-method-btn:hover:not(.active){border-color:#ccc;background:#fafafa;}
+    /* Saved addresses */
+    .saved-addr-card{padding:10px 14px;border-radius:10px;border:2px solid var(--border);background:white;font-size:.82rem;cursor:pointer;transition:border-color .15s,background .15s;max-width:200px;}
+    .saved-addr-card.selected{border-color:var(--rose-dark);background:var(--rose-pale);}
+    .saved-addr-card:hover:not(.selected){border-color:#ccc;background:#fafafa;}
+    .saved-addr-card-label{font-weight:700;margin-bottom:2px;color:var(--text);}
+    .saved-addr-card-addr{color:var(--text-light);font-size:.76rem;line-height:1.4;}
   </style>
 </head>
 <body>
-  <!-- Google Tag Manager (noscript) -->
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
+<!-- HEADER -->
 <header class="site-header">
   <div class="header-inner">
     <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
     <nav class="nav">
-      <a href="/">Accueil</a>
-      <a href="/boutique.html">Boutique</a>
-      <a href="/cadeaux.html">🎁 Cadeaux</a>
-      <a href="/actualites.html">Actualités</a>
+      <a href="/">Accueil</a><a href="/boutique.html">Boutique</a>
+      <a href="/cadeaux.html">🎁 Cadeaux</a><a href="/actualites.html">Actualités</a>
     </nav>
     <div class="header-search-wrap">
       <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
@@ -88,10 +61,8 @@
     <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
     <div style="font-family:var(--font-title);font-size:1.05rem;color:var(--rose-dark);margin-bottom:8px">🧶 Tout en Aiguilles</div>
     <nav class="mobile-nav-links">
-      <a href="/">🏠 Accueil</a>
-      <a href="/boutique.html">🛍️ Boutique</a>
-      <a href="/actualites.html">📰 Actualités</a>
-      <a href="/#contact">✉️ Contact</a>
+      <a href="/">🏠 Accueil</a><a href="/boutique.html">🛍️ Boutique</a>
+      <a href="/actualites.html">📰 Actualités</a><a href="/#contact">✉️ Contact</a>
       <div class="mobile-nav-divider"></div>
       <a href="/compte.html">👤 Mon compte</a>
       <a href="/panier.html" class="active">🛒 Mon panier</a>
@@ -101,15 +72,15 @@
 
 <div class="page-hero">
   <div class="container">
-    <h1>Mon panier 🛒</h1>
-    <p>Vérifiez votre sélection avant de passer commande</p>
+    <h1>Commande 🛒</h1>
+    <p>Suivez les étapes pour finaliser votre achat</p>
   </div>
 </div>
 
 <main class="section">
   <div class="container">
 
-    <!-- Panier vide -->
+    <!-- PANIER VIDE -->
     <div id="empty-cart" style="display:none" class="empty-state">
       <div class="empty-state-icon">🛒</div>
       <h3>Votre panier est vide</h3>
@@ -117,163 +88,216 @@
       <a href="/boutique.html" class="btn btn-primary mt-md">Découvrir la boutique</a>
     </div>
 
-    <!-- Contenu panier -->
+    <!-- TUNNEL DE COMMANDE -->
     <div id="cart-content" style="display:none">
       <div class="cart-layout">
 
-        <!-- ════ COLONNE GAUCHE : articles + formulaire ════ -->
-        <div class="cart-left">
+        <!-- ══════ COLONNE GAUCHE : accordéon 3 étapes ══════ -->
+        <div>
 
-          <!-- Articles -->
-          <div id="cart-items"></div>
-          <div class="cart-actions">
-            <button class="btn btn-ghost btn-sm" onclick="clearCart()">🗑️ Vider le panier</button>
-            <a href="/boutique.html" class="btn btn-ghost btn-sm">← Continuer mes achats</a>
-          </div>
-
-          <!-- Suggestions -->
-          <div id="cart-suggestions-wrap"></div>
-
-          <!-- ════ FORMULAIRE LIVRAISON ════ -->
-          <div class="checkout-form-card" id="checkout-form-section">
-            <h3>📦 Informations de livraison</h3>
-
-            <!-- Bandeau invité -->
-            <div id="guest-checkout-notice" style="display:none;background:var(--cream-dark);border-radius:var(--radius);padding:8px 12px;margin-bottom:14px;font-size:.8rem;color:var(--text-light)">
-              💡 <a href="#" onclick="openAuthModal();return false" style="color:var(--rose-dark);font-weight:700">Connectez-vous</a> pour auto-remplir vos informations.
-            </div>
-
-            <!-- Adresses enregistrées -->
-            <div id="saved-addr-section" style="display:none;margin-bottom:14px">
-              <p style="font-size:.78rem;color:var(--text-light);margin-bottom:6px">📍 Adresse enregistrée :</p>
-              <div id="saved-addr-cards" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="selectSavedAddress(null)" id="addr-manual-btn" style="font-size:.76rem;padding:4px 10px">✏️ Saisir manuellement</button>
-            </div>
-
-            <!-- Nom / Email -->
-            <div class="checkout-section-label">Contact</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-              <input type="text" id="co-fname" class="form-input" placeholder="Prénom *" style="font-size:.88rem">
-              <input type="text" id="co-lname" class="form-input" placeholder="Nom *" style="font-size:.88rem">
-            </div>
-            <div style="margin-bottom:14px">
-              <input type="email" id="co-email" class="form-input" placeholder="Email *" style="font-size:.88rem">
-            </div>
-
-            <!-- Adresse -->
-            <div class="checkout-section-label">Adresse de livraison</div>
-            <div class="addr-wrap" style="margin-bottom:8px">
-              <input type="text" id="co-address" class="form-input" placeholder="Adresse *" style="font-size:.88rem"
-                autocomplete="off" oninput="autocompleteAddress(this.value)" onblur="setTimeout(closeAddrSuggestions,200)">
-              <div class="addr-suggestions" id="addr-suggestions"></div>
-            </div>
-            <div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-bottom:14px">
-              <input type="text" id="co-postal" class="form-input" placeholder="Code postal *" style="font-size:.88rem">
-              <input type="text" id="co-city" class="form-input" placeholder="Ville *" style="font-size:.88rem">
-            </div>
-
-            <!-- Mode de livraison -->
-            <div class="checkout-section-label">Mode de livraison</div>
-
-            <div class="delivery-opt is-selected" id="opt-home" onclick="selectDelivery('home')">
-              <input type="radio" name="delivery" id="del-home" value="home" checked>
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:600;font-size:.88rem">🏠 Livraison à domicile</div>
-                <div style="font-size:.78rem;color:#888;margin-top:2px">Mondial Relay — 2 à 5 jours ouvrés</div>
+          <!-- ── ÉTAPE 1 : Panier ── -->
+          <div class="checkout-accordion" id="acc-1">
+            <div class="acc-header active" id="acc-hdr-1">
+              <div class="acc-step-bubble">1</div>
+              <div class="acc-step-info">
+                <div class="acc-step-title">Mon panier</div>
+                <div class="acc-step-recap" id="acc-recap-1" style="display:none"></div>
               </div>
-              <div style="font-weight:700;color:var(--rose-dark);font-size:.9rem;white-space:nowrap">+8,00 €</div>
+              <button class="acc-edit-btn" id="acc-edit-1" style="display:none" onclick="goToStep(1)">Modifier</button>
             </div>
-
-            <div class="delivery-opt" id="opt-relay" onclick="selectDelivery('relay')">
-              <input type="radio" name="delivery" id="del-relay" value="relay">
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:600;font-size:.88rem">📦 Point Relais Mondial Relay</div>
-                <div style="font-size:.78rem;color:#888;margin-top:2px">Retrait en point relais — 2 à 5 jours ouvrés</div>
+            <div class="acc-body" id="acc-body-1">
+              <div id="cart-items"></div>
+              <div class="cart-actions">
+                <button class="btn btn-ghost btn-sm" onclick="clearCart()">🗑️ Vider le panier</button>
+                <a href="/boutique.html" class="btn btn-ghost btn-sm">← Continuer mes achats</a>
               </div>
-              <div style="font-weight:700;color:var(--rose-dark);font-size:.9rem;white-space:nowrap">+4,10 €</div>
-            </div>
-            <div class="relay-detail-box" id="relay-details" style="display:none">
-              <p style="margin-bottom:10px;font-size:.85rem">
-                1️⃣ Cherchez un point relais près de chez vous, notez son nom et adresse.<br>
-                2️⃣ Revenez ici et saisissez-le dans le champ ci-dessous.
-              </p>
-              <button type="button" onclick="window.open('https://www.mondialrelay.fr/trouver-le-point-relais-le-plus-proche-de-chez-moi/','_blank','noopener,noreferrer')"
-                style="display:block;width:100%;margin-bottom:12px;padding:10px 14px;background:#fff;border:1.5px solid #c06060;border-radius:8px;color:#c06060;font-weight:700;font-size:.85rem;cursor:pointer;text-align:center">
-                🗺️ Trouver mon point relais Mondial Relay
+              <div id="cart-suggestions-wrap" style="margin-top:16px"></div>
+              <button class="btn btn-primary acc-continue-btn" onclick="goToStep(2)">
+                Continuer vers la livraison →
               </button>
-              <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Nom + adresse du point relais choisi *</label>
-              <input type="text" id="co-relay" class="form-input" placeholder="Ex : Tabac des Fleurs — 12 rue Victor Hugo, 75011 Paris" style="font-size:.88rem">
-              <p style="font-size:.75rem;color:#aaa;margin-top:6px">⚠️ Si le point relais est indisponible au moment de l'expédition, nous vous proposerons une alternative.</p>
             </div>
-
-            <div class="delivery-opt is-disabled" id="opt-handover" onclick="selectDelivery('handover')">
-              <input type="radio" name="delivery" id="del-handover" value="handover" disabled>
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:600;font-size:.88rem">
-                  🤝 Remise en main propre
-                  <span style="font-size:.72rem;background:#d4edda;color:#155724;padding:1px 7px;border-radius:12px;margin-left:5px;font-weight:700">Gratuit</span>
-                </div>
-                <div style="font-size:.78rem;color:#888;margin-top:2px" id="handover-zone-msg">Renseignez votre adresse pour vérifier l'éligibilité</div>
-              </div>
-              <div style="font-weight:700;color:#28a745;font-size:.9rem;white-space:nowrap">Gratuit</div>
-            </div>
-            <div class="handover-info-box" id="handover-info" style="display:none">
-              <p>📍 <strong>Lieu de remise :</strong> Paris 8<sup>e</sup> — Gare Saint-Lazare (point de rendez-vous exact communiqué par email après validation).</p>
-              <p style="margin-top:8px;color:#4a6f5a">⚠️ Disponible uniquement si vous résidez ou pouvez vous déplacer à Paris ou dans un rayon de 2 km.</p>
-            </div>
-
-            <!-- Note / personnalisation -->
-            <div class="checkout-section-label" style="margin-top:18px">Note & personnalisation</div>
-            <textarea id="co-notes" class="form-textarea" style="min-height:60px;font-size:.85rem" placeholder="Couleur, prénom à broder, message… (optionnel)"></textarea>
-
-            <!-- Emballage cadeau -->
-            <div style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px 16px;margin-top:12px">
-              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
-                <input type="checkbox" id="co-gift-wrap" style="margin-top:3px" onchange="toggleGiftMessage()">
-                <div>
-                  <div style="font-weight:600;font-size:.88rem">🎁 Emballage cadeau — +2,00 €</div>
-                  <div style="font-size:.76rem;color:var(--text-light)">Papier de soie, ruban et carte personnalisée</div>
-                </div>
-              </label>
-              <input type="text" id="co-gift-message" class="form-input" style="margin-top:10px;display:none;font-size:.85rem" placeholder="Message pour la carte cadeau (optionnel)" maxlength="120">
-            </div>
-
-            <!-- Estimateur de délai -->
-            <div id="delivery-estimate-cart" style="margin-top:12px"></div>
           </div>
-          <!-- /checkout-form-card -->
+
+          <!-- ── ÉTAPE 2 : Livraison ── -->
+          <div class="checkout-accordion" id="acc-2">
+            <div class="acc-header locked" id="acc-hdr-2">
+              <div class="acc-step-bubble">2</div>
+              <div class="acc-step-info">
+                <div class="acc-step-title">Livraison</div>
+                <div class="acc-step-recap" id="acc-recap-2" style="display:none"></div>
+              </div>
+              <button class="acc-edit-btn" id="acc-edit-2" style="display:none" onclick="goToStep(2)">Modifier</button>
+            </div>
+            <div class="acc-body" id="acc-body-2" style="display:none">
+
+              <!-- Bandeau invité -->
+              <div id="guest-checkout-notice" style="display:none;background:var(--cream-dark);border-radius:var(--radius);padding:8px 12px;margin-bottom:14px;font-size:.8rem;color:var(--text-light)">
+                💡 <a href="#" onclick="openAuthModal();return false" style="color:var(--rose-dark);font-weight:700">Connectez-vous</a> pour auto-remplir vos informations.
+              </div>
+
+              <!-- Adresses enregistrées -->
+              <div id="saved-addr-section" style="display:none;margin-bottom:14px">
+                <p style="font-size:.78rem;color:var(--text-light);margin-bottom:6px">📍 Adresse enregistrée :</p>
+                <div id="saved-addr-cards" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="selectSavedAddress(null)" style="font-size:.76rem;padding:4px 10px">✏️ Saisir manuellement</button>
+              </div>
+
+              <!-- Contact -->
+              <div class="form-section-label">Contact</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <input type="text" id="co-fname" class="form-input" placeholder="Prénom *">
+                <input type="text" id="co-lname" class="form-input" placeholder="Nom *">
+              </div>
+              <div style="margin-bottom:16px">
+                <input type="email" id="co-email" class="form-input" placeholder="Email *">
+              </div>
+
+              <!-- Adresse -->
+              <div class="form-section-label">Adresse de livraison</div>
+              <div class="addr-wrap" style="margin-bottom:8px">
+                <input type="text" id="co-address" class="form-input" placeholder="Adresse *"
+                  autocomplete="off" oninput="autocompleteAddress(this.value)" onblur="setTimeout(closeAddrSuggestions,200)">
+                <div class="addr-suggestions" id="addr-suggestions"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-bottom:16px">
+                <input type="text" id="co-postal" class="form-input" placeholder="Code postal *">
+                <input type="text" id="co-city"   class="form-input" placeholder="Ville *">
+              </div>
+
+              <!-- Mode de livraison -->
+              <div class="form-section-label">Mode de livraison</div>
+              <div class="delivery-opt is-selected" id="opt-home" onclick="selectDelivery('home')">
+                <input type="radio" name="delivery" id="del-home" value="home" checked>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;font-size:.88rem">🏠 Livraison à domicile</div>
+                  <div style="font-size:.78rem;color:#888;margin-top:2px">Mondial Relay — 2 à 5 jours ouvrés</div>
+                </div>
+                <div style="font-weight:700;color:var(--rose-dark);font-size:.9rem;white-space:nowrap">+8,00 €</div>
+              </div>
+              <div class="delivery-opt" id="opt-relay" onclick="selectDelivery('relay')">
+                <input type="radio" name="delivery" id="del-relay" value="relay">
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;font-size:.88rem">📦 Point Relais Mondial Relay</div>
+                  <div style="font-size:.78rem;color:#888;margin-top:2px">Retrait en point relais — 2 à 5 jours ouvrés</div>
+                </div>
+                <div style="font-weight:700;color:var(--rose-dark);font-size:.9rem;white-space:nowrap">+4,10 €</div>
+              </div>
+              <div class="relay-detail-box" id="relay-details" style="display:none">
+                <p style="margin-bottom:10px;font-size:.85rem">1️⃣ Cherchez un point relais près de chez vous.<br>2️⃣ Notez son nom et adresse, puis saisissez-le ci-dessous.</p>
+                <button type="button" onclick="window.open('https://www.mondialrelay.fr/trouver-le-point-relais-le-plus-proche-de-chez-moi/','_blank','noopener')"
+                  style="display:block;width:100%;margin-bottom:12px;padding:10px 14px;background:#fff;border:1.5px solid #c06060;border-radius:8px;color:#c06060;font-weight:700;font-size:.85rem;cursor:pointer;text-align:center">
+                  🗺️ Trouver mon point relais Mondial Relay
+                </button>
+                <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Nom + adresse du point relais *</label>
+                <input type="text" id="co-relay" class="form-input" placeholder="Ex : Tabac des Fleurs — 12 rue Victor Hugo, 75011 Paris" style="font-size:.88rem">
+                <p style="font-size:.75rem;color:#aaa;margin-top:6px">⚠️ Si le point relais est indisponible, nous vous proposerons une alternative par email.</p>
+              </div>
+              <div class="delivery-opt is-disabled" id="opt-handover" onclick="selectDelivery('handover')">
+                <input type="radio" name="delivery" id="del-handover" value="handover" disabled>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;font-size:.88rem">🤝 Remise en main propre <span style="font-size:.72rem;background:#d4edda;color:#155724;padding:1px 7px;border-radius:12px;margin-left:5px;font-weight:700">Gratuit</span></div>
+                  <div style="font-size:.78rem;color:#888;margin-top:2px" id="handover-zone-msg">Renseignez votre adresse pour vérifier l'éligibilité</div>
+                </div>
+                <div style="font-weight:700;color:#28a745;font-size:.9rem;white-space:nowrap">Gratuit</div>
+              </div>
+              <div class="handover-info-box" id="handover-info" style="display:none">
+                <p>📍 <strong>Lieu de remise :</strong> Paris 8<sup>e</sup> — Gare Saint-Lazare (point exact communiqué par email).</p>
+                <p style="margin-top:8px;color:#4a6f5a">⚠️ Disponible uniquement à Paris ou dans un rayon de 2 km.</p>
+              </div>
+
+              <!-- Note -->
+              <div class="form-section-label" style="margin-top:16px">Note & personnalisation</div>
+              <textarea id="co-notes" class="form-textarea" style="min-height:60px;font-size:.85rem" placeholder="Couleur, prénom à broder, message… (optionnel)"></textarea>
+
+              <!-- Emballage cadeau -->
+              <div style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px 16px;margin-top:12px">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+                  <input type="checkbox" id="co-gift-wrap" style="margin-top:3px" onchange="toggleGiftMessage()">
+                  <div>
+                    <div style="font-weight:600;font-size:.88rem">🎁 Emballage cadeau — +2,00 €</div>
+                    <div style="font-size:.76rem;color:var(--text-light)">Papier de soie, ruban et carte personnalisée</div>
+                  </div>
+                </label>
+                <input type="text" id="co-gift-message" class="form-input" style="margin-top:10px;display:none;font-size:.85rem" placeholder="Message pour la carte cadeau (optionnel)" maxlength="120">
+              </div>
+
+              <div id="delivery-estimate-cart" style="margin-top:12px"></div>
+
+              <!-- Erreur step 2 -->
+              <div id="step2-error" class="form-error" style="display:none;margin-top:12px"></div>
+
+              <button class="btn btn-primary acc-continue-btn" onclick="validateAndGoToPayment()">
+                Continuer vers le paiement →
+              </button>
+            </div>
+          </div>
+
+          <!-- ── ÉTAPE 3 : Paiement ── -->
+          <div class="checkout-accordion" id="acc-3">
+            <div class="acc-header locked" id="acc-hdr-3">
+              <div class="acc-step-bubble">3</div>
+              <div class="acc-step-info">
+                <div class="acc-step-title">Paiement</div>
+                <div class="acc-step-recap" id="acc-recap-3" style="display:none"></div>
+              </div>
+            </div>
+            <div class="acc-body" id="acc-body-3" style="display:none">
+
+              <!-- Mode de paiement -->
+              <div class="form-section-label">Choisissez votre mode de paiement</div>
+              <div id="payment-methods" style="display:flex;gap:8px;margin-bottom:18px">
+                <button type="button" id="pm-card" class="payment-method-btn active" onclick="selectPaymentMethod('card')">
+                  💳 Carte bancaire
+                </button>
+                <button type="button" id="pm-paypal" class="payment-method-btn" onclick="selectPaymentMethod('paypal')">
+                  <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" style="height:18px;vertical-align:middle"> PayPal
+                </button>
+              </div>
+
+              <!-- Récap final avant paiement -->
+              <div id="final-recap-box" style="background:var(--cream-dark);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px;font-size:.85rem;line-height:1.7">
+                <!-- rempli dynamiquement -->
+              </div>
+
+              <!-- Erreur -->
+              <div id="checkout-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+
+              <!-- Stripe -->
+              <div id="stripe-section">
+                <button id="checkout-btn" class="btn btn-primary btn-block btn-lg" style="font-size:1rem;padding:16px" onclick="startCheckout()">
+                  🔒 Payer en sécurité
+                </button>
+                <div class="stripe-badge" style="margin-top:10px">
+                  <span>🔒</span><span>Paiement sécurisé par Stripe — CB, Visa, Mastercard</span>
+                </div>
+              </div>
+
+              <!-- PayPal -->
+              <div id="paypal-section" style="display:none">
+                <div id="paypal-button-container"></div>
+                <p style="font-size:.75rem;color:var(--text-light);text-align:center;margin-top:8px">🔒 Paiement sécurisé par PayPal</p>
+              </div>
+
+            </div>
+          </div>
+          <!-- /étape 3 -->
 
         </div>
-        <!-- /cart-left -->
+        <!-- /colonne gauche -->
 
-        <!-- ════ COLONNE DROITE : récapitulatif sticky ════ -->
+        <!-- ══════ COLONNE DROITE : récapitulatif sticky ══════ -->
         <div>
           <div class="cart-sidebar">
 
-            <!-- Étapes -->
-            <div class="checkout-steps">
-              <div class="checkout-step done" id="step-cart">
-                <div class="step-num">✓</div><span>Panier</span>
-              </div>
-              <div class="step-sep"></div>
-              <div class="checkout-step active" id="step-delivery">
-                <div class="step-num">2</div><span>Livraison</span>
-              </div>
-              <div class="step-sep"></div>
-              <div class="checkout-step" id="step-payment">
-                <div class="step-num">3</div><span>Paiement</span>
-              </div>
-            </div>
-
-            <!-- Barre livraison gratuite -->
+            <!-- Free shipping bar -->
             <div id="free-ship-bar-wrap"></div>
 
-            <!-- Récapitulatif articles (collapsible) -->
+            <!-- Résumé articles collapsible -->
             <h3 style="font-family:var(--font-title);margin-bottom:12px;font-size:1rem">Récapitulatif</h3>
             <div id="cart-summary"></div>
 
             <!-- Lignes de total -->
-            <div id="delivery-row" class="cart-total-row" style="display:none">
+            <div id="delivery-row" class="cart-total-row" style="display:none;color:#888">
               <span id="delivery-fee-label">Livraison</span>
               <span id="delivery-fee-amount">+0,00 €</span>
             </div>
@@ -282,8 +306,7 @@
               <span id="promo-amount">-0,00 €</span>
             </div>
             <div id="gift-row" class="cart-total-row" style="display:none">
-              <span>Emballage cadeau 🎁</span>
-              <span>+2,00 €</span>
+              <span>Emballage cadeau 🎁</span><span>+2,00 €</span>
             </div>
 
             <div class="divider"></div>
@@ -294,55 +317,24 @@
 
             <!-- Code promo -->
             <div class="sidebar-promo">
-              <input type="text" id="promo-input" class="form-input" placeholder="Code promo" style="text-transform:uppercase">
+              <input type="text" id="promo-input" class="form-input" placeholder="Code promo" style="text-transform:uppercase;font-size:.82rem">
               <button type="button" class="btn btn-secondary btn-sm" onclick="applyPromo()">OK</button>
             </div>
-            <div id="promo-result" style="font-size:.8rem;margin-top:-8px;margin-bottom:8px;display:none"></div>
-
-            <!-- Erreur -->
-            <div id="checkout-error" class="form-error" style="display:none;margin-bottom:12px"></div>
-
-            <!-- Mode de paiement -->
-            <div id="payment-methods" style="display:flex;gap:8px;margin-bottom:14px">
-              <button type="button" id="pm-card" class="payment-method-btn active" onclick="selectPaymentMethod('card')">
-                💳 Carte
-              </button>
-              <button type="button" id="pm-paypal" class="payment-method-btn" onclick="selectPaymentMethod('paypal')">
-                <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" style="height:18px;vertical-align:middle"> PayPal
-              </button>
-            </div>
-
-            <!-- Stripe -->
-            <div id="stripe-section">
-              <button id="checkout-btn" class="btn btn-primary btn-block btn-lg" onclick="startCheckout()">
-                🔒 Payer en sécurité
-              </button>
-              <div class="stripe-badge">
-                <span>🔒</span>
-                <span>Paiement sécurisé par Stripe</span>
-              </div>
-            </div>
-
-            <!-- PayPal -->
-            <div id="paypal-section" style="display:none">
-              <div id="paypal-button-container"></div>
-              <p style="font-size:.75rem;color:var(--text-light);text-align:center;margin-top:8px">🔒 Paiement sécurisé par PayPal</p>
-            </div>
+            <div id="promo-result" style="font-size:.8rem;margin-top:-6px;margin-bottom:8px;display:none"></div>
 
             <!-- Badges de confiance -->
             <div class="trust-badges">
-              <div class="trust-badge-row"><span class="tb-icon">🔒</span><span>Paiement 100% sécurisé — SSL</span></div>
+              <div class="trust-badge-row"><span class="tb-icon">🔒</span><span>Paiement 100% sécurisé SSL</span></div>
               <div class="trust-badge-row"><span class="tb-icon">🚚</span><span>Livraison France métropolitaine</span></div>
               <div class="trust-badge-row"><span class="tb-icon">↩️</span><span>Retours acceptés sous 14 jours</span></div>
-              <div class="trust-badge-row"><span class="tb-icon">🤲</span><span>Fait main avec amour — pièce unique</span></div>
+              <div class="trust-badge-row"><span class="tb-icon">🤲</span><span>Pièce unique, faite main avec amour</span></div>
             </div>
 
           </div>
         </div>
-        <!-- /cart-right -->
+        <!-- /colonne droite -->
 
       </div>
-      <!-- /cart-layout -->
     </div>
     <!-- /cart-content -->
 
@@ -360,7 +352,106 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
-// ── Livraison ────────────────────────────────────────────────
+// ════════════════════════════════════════════════
+//  ACCORDÉON — gestion des étapes
+// ════════════════════════════════════════════════
+let currentStep = 1;
+
+function goToStep(step) {
+  // On ne peut pas sauter des étapes
+  if (step > currentStep && step > 2) return; // step 3 uniquement via validateAndGoToPayment
+  currentStep = step;
+  _refreshAccordion();
+}
+
+function _refreshAccordion() {
+  [1, 2, 3].forEach(s => {
+    const hdr  = document.getElementById(`acc-hdr-${s}`);
+    const body = document.getElementById(`acc-body-${s}`);
+    const edit = document.getElementById(`acc-edit-${s}`);
+    const recap= document.getElementById(`acc-recap-${s}`);
+    if (!hdr || !body) return;
+
+    if (s === currentStep) {
+      hdr.className  = 'acc-header active';
+      body.style.display = '';
+      if (edit)  edit.style.display  = 'none';
+      if (recap) recap.style.display = 'none';
+    } else if (s < currentStep) {
+      hdr.className  = 'acc-header done';
+      body.style.display = 'none';
+      if (edit)  edit.style.display  = '';
+      if (recap) recap.style.display = '';
+    } else {
+      hdr.className  = 'acc-header locked';
+      body.style.display = 'none';
+      if (edit)  edit.style.display  = 'none';
+      if (recap) recap.style.display = 'none';
+    }
+  });
+
+  // Scroll doux vers l'étape active (mobile surtout)
+  const activeAcc = document.getElementById(`acc-${currentStep}`);
+  if (activeAcc) {
+    setTimeout(() => activeAcc.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  }
+}
+
+function validateAndGoToPayment() {
+  const fname   = document.getElementById('co-fname').value.trim();
+  const lname   = document.getElementById('co-lname').value.trim();
+  const email   = document.getElementById('co-email').value.trim();
+  const address = document.getElementById('co-address').value.trim();
+  const postal  = document.getElementById('co-postal').value.trim();
+  const city    = document.getElementById('co-city').value.trim();
+  const relay   = (document.getElementById('co-relay')?.value || '').trim();
+  const errEl   = document.getElementById('step2-error');
+
+  if (!fname || !lname || !email || !address || !postal || !city) {
+    errEl.textContent = '⚠️ Veuillez remplir tous les champs obligatoires (*)';
+    errEl.style.display = '';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = '⚠️ Adresse email invalide';
+    errEl.style.display = '';
+    return;
+  }
+  if (selectedDelivery === 'relay' && !relay) {
+    errEl.textContent = '⚠️ Veuillez indiquer votre point relais';
+    errEl.style.display = '';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  // Mettre à jour le résumé étape 2
+  const deliveryLabels = { home: '🏠 Domicile (+8,00 €)', relay: '📦 Point Relais (+4,10 €)', handover: '🤝 Main propre (Gratuit)' };
+  document.getElementById('acc-recap-2').textContent =
+    `${fname} ${lname} · ${address}, ${postal} ${city} · ${deliveryLabels[selectedDelivery] || ''}`;
+
+  // Remplir le récap final avant paiement
+  const items = Cart.get();
+  const subtotal = items.reduce((s,i) => s + i.price * i.qty, 0);
+  const fee = DELIVERY_FEES[selectedDelivery] || 0;
+  const gift = document.getElementById('co-gift-wrap')?.checked ? 2 : 0;
+  const discount = _appliedPromo ? _appliedPromo.discount_amount : 0;
+  const total = Math.max(0, subtotal + fee + gift - discount);
+  document.getElementById('final-recap-box').innerHTML = `
+    <div style="margin-bottom:6px;font-weight:700;color:var(--text)">📋 Récapitulatif de votre commande</div>
+    <div style="color:var(--text-light)">${items.length} article${items.length>1?'s':''} · Sous-total : <strong>${subtotal.toFixed(2).replace('.',',')} €</strong></div>
+    <div style="color:var(--text-light)">Livraison : <strong>${fee === 0 ? 'Gratuite' : fee.toFixed(2).replace('.',',') + ' €'}</strong></div>
+    ${gift ? `<div style="color:var(--text-light)">Emballage cadeau : <strong>+2,00 €</strong></div>` : ''}
+    ${discount ? `<div style="color:var(--sage-dark)">Réduction : <strong>-${discount.toFixed(2).replace('.',',')} €</strong></div>` : ''}
+    <div style="margin-top:8px;font-size:1rem;font-weight:700;color:var(--rose-dark)">Total à payer : ${total.toFixed(2).replace('.',',')} €</div>
+    <div style="margin-top:6px;font-size:.78rem;color:var(--text-light)">📍 Livraison à : ${fname} ${lname}, ${address}, ${postal} ${city}</div>`;
+
+  currentStep = 3;
+  _refreshAccordion();
+}
+
+// ════════════════════════════════════════════════
+//  LIVRAISON
+// ════════════════════════════════════════════════
 const DELIVERY_FEES = { home: 8.00, relay: 4.10, handover: 0.00 };
 let selectedDelivery = 'home';
 let handoverEligible = false;
@@ -370,8 +461,8 @@ function selectDelivery(type) {
   if (type === 'handover' && !handoverEligible) return;
   selectedDelivery = type;
   document.getElementById('del-' + type).checked = true;
-  ['home', 'relay', 'handover'].forEach(t => {
-    const el = document.getElementById('opt-' + t);
+  ['home','relay','handover'].forEach(t => {
+    const el = document.getElementById('opt-'+t);
     if (el) el.classList.toggle('is-selected', t === type);
   });
   document.getElementById('relay-details').style.display  = type === 'relay'    ? '' : 'none';
@@ -398,10 +489,10 @@ async function applyPromo() {
     if (r.valid) {
       _appliedPromo = r;
       resultEl.style.color = 'var(--sage-dark)';
-      resultEl.textContent = `✓ Code "${r.code}" — -${r.discount_amount.toFixed(2)} €${r.description ? ' (' + r.description + ')' : ''}`;
+      resultEl.textContent = `✓ Code "${r.code}" — -${r.discount_amount.toFixed(2)} €`;
       document.getElementById('promo-row').style.display = '';
-      document.getElementById('promo-amount').textContent = `-${r.discount_amount.toFixed(2)} €`;
-      document.getElementById('promo-label').textContent = `Code "${r.code}"`;
+      document.getElementById('promo-amount').textContent = `-${r.discount_amount.toFixed(2).replace('.',',')} €`;
+      document.getElementById('promo-label').textContent  = `Code "${r.code}"`;
     } else {
       resultEl.style.color = '#d9534f';
       resultEl.textContent = r.message || 'Code invalide';
@@ -410,16 +501,16 @@ async function applyPromo() {
     }
     resultEl.style.display = '';
     updateCartTotal();
-  } catch(e) { resultEl.style.color = '#d9534f'; resultEl.textContent = 'Erreur'; resultEl.style.display = ''; }
+  } catch { resultEl.style.color='#d9534f'; resultEl.textContent='Erreur'; resultEl.style.display=''; }
 }
 
 function updateCartTotal() {
-  const base = Cart.total() + (DELIVERY_FEES[selectedDelivery] || 0);
-  const gift = document.getElementById('co-gift-wrap')?.checked ? 2 : 0;
+  const base     = Cart.total() + (DELIVERY_FEES[selectedDelivery] || 0);
+  const gift     = document.getElementById('co-gift-wrap')?.checked ? 2 : 0;
   const discount = _appliedPromo ? _appliedPromo.discount_amount : 0;
-  const total = Math.max(0, base + gift - discount);
+  const total    = Math.max(0, base + gift - discount);
   const el = document.getElementById('cart-total-display');
-  if (el) el.textContent = total.toFixed(2).replace('.', ',') + ' €';
+  if (el) el.textContent = total.toFixed(2).replace('.',',') + ' €';
 }
 
 function updateDeliveryRow() {
@@ -427,86 +518,59 @@ function updateDeliveryRow() {
   const row    = document.getElementById('delivery-row');
   const label  = document.getElementById('delivery-fee-label');
   const amount = document.getElementById('delivery-fee-amount');
-  if (row) {
-    if (fee > 0) {
-      row.style.display  = '';
-      label.textContent  = selectedDelivery === 'home' ? 'Livraison à domicile' : 'Point Relais';
-      amount.textContent = '+' + fee.toFixed(2).replace('.', ',') + ' €';
-    } else {
-      row.style.display = 'none';
-    }
+  if (!row) return;
+  if (fee > 0) {
+    row.style.display  = '';
+    label.textContent  = selectedDelivery === 'home' ? 'Livraison à domicile' : 'Point Relais';
+    amount.textContent = '+' + fee.toFixed(2).replace('.',',') + ' €';
+  } else {
+    row.style.display = 'none';
   }
   updateCartTotal();
 }
 
-// ── Géocodage remise en main propre ──────────────────────────
+// Géolocalisation remise en main propre
 function scheduleGeoCheck() {
   clearTimeout(geoCheckTimer);
   geoCheckTimer = setTimeout(checkHandoverEligibility, 900);
 }
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+function haversineKm(lat1,lon1,lat2,lon2) {
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
-
 async function checkHandoverEligibility() {
-  const postal  = (document.getElementById('co-postal')?.value  || '').trim();
-  const city    = (document.getElementById('co-city')?.value    || '').trim();
-  const address = (document.getElementById('co-address')?.value || '').trim();
-  const optEl   = document.getElementById('opt-handover');
-  const msgEl   = document.getElementById('handover-zone-msg');
-  if (!optEl || !msgEl) return;
-  if (!postal && !city) {
-    msgEl.textContent = "Renseignez votre adresse pour vérifier l'éligibilité";
-    _setHandoverEligible(false, optEl); return;
-  }
-  if (/^750[0-2]\d$/.test(postal)) {
-    msgEl.textContent = '✅ Zone éligible — remise en main propre disponible';
-    _setHandoverEligible(true, optEl); return;
-  }
-  msgEl.textContent = '⏳ Vérification de la zone…';
+  const postal=(document.getElementById('co-postal')?.value||'').trim();
+  const city=(document.getElementById('co-city')?.value||'').trim();
+  const address=(document.getElementById('co-address')?.value||'').trim();
+  const optEl=document.getElementById('opt-handover');
+  const msgEl=document.getElementById('handover-zone-msg');
+  if (!optEl||!msgEl) return;
+  if (!postal&&!city) { msgEl.textContent="Renseignez votre adresse pour vérifier l'éligibilité"; _setHandoverEligible(false,optEl); return; }
+  if (/^750[0-2]\d$/.test(postal)) { msgEl.textContent='✅ Zone éligible — remise en main propre disponible'; _setHandoverEligible(true,optEl); return; }
+  msgEl.textContent='⏳ Vérification de la zone…';
   try {
-    const q = encodeURIComponent([address, postal, city].filter(Boolean).join(' '));
-    const resp = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${q}&limit=1`);
-    const data = await resp.json();
+    const q=encodeURIComponent([address,postal,city].filter(Boolean).join(' '));
+    const resp=await fetch(`https://api-adresse.data.gouv.fr/search/?q=${q}&limit=1`);
+    const data=await resp.json();
     if (data.features?.length) {
-      const [lng, lat] = data.features[0].geometry.coordinates;
-      const dist = haversineKm(lat, lng, 48.8534, 2.3488);
-      if (dist <= 7) {
-        msgEl.textContent = '✅ Zone éligible — remise en main propre disponible';
-        _setHandoverEligible(true, optEl);
-      } else {
-        msgEl.textContent = `⛔ Hors zone (${dist.toFixed(0)} km de Paris)`;
-        _setHandoverEligible(false, optEl);
-      }
-    } else {
-      msgEl.textContent = 'Adresse non reconnue — option non disponible';
-      _setHandoverEligible(false, optEl);
-    }
-  } catch {
-    msgEl.textContent = 'Vérification impossible';
-    _setHandoverEligible(false, optEl);
-  }
+      const [lng,lat]=data.features[0].geometry.coordinates;
+      const dist=haversineKm(lat,lng,48.8534,2.3488);
+      if (dist<=7) { msgEl.textContent='✅ Zone éligible — remise en main propre disponible'; _setHandoverEligible(true,optEl); }
+      else { msgEl.textContent=`⛔ Hors zone (${dist.toFixed(0)} km de Paris)`; _setHandoverEligible(false,optEl); }
+    } else { msgEl.textContent='Adresse non reconnue'; _setHandoverEligible(false,optEl); }
+  } catch { msgEl.textContent='Vérification impossible'; _setHandoverEligible(false,optEl); }
+}
+function _setHandoverEligible(eligible,optEl) {
+  handoverEligible=eligible;
+  const input=document.getElementById('del-handover');
+  if (eligible) { optEl.classList.remove('is-disabled'); if(input) input.disabled=false; }
+  else { optEl.classList.add('is-disabled'); if(input) input.disabled=true; if(selectedDelivery==='handover') selectDelivery('home'); }
 }
 
-function _setHandoverEligible(eligible, optEl) {
-  handoverEligible = eligible;
-  const input = document.getElementById('del-handover');
-  if (eligible) {
-    optEl.classList.remove('is-disabled');
-    if (input) input.disabled = false;
-  } else {
-    optEl.classList.add('is-disabled');
-    if (input) input.disabled = true;
-    if (selectedDelivery === 'handover') selectDelivery('home');
-  }
-}
-
-// ── Rendu panier ─────────────────────────────────────────────
+// ════════════════════════════════════════════════
+//  RENDU PANIER
+// ════════════════════════════════════════════════
 function renderCart() {
   const items = Cart.get();
   if (!items.length) {
@@ -528,58 +592,61 @@ function renderCart() {
         <a href="/produit.html?id=${item.product_id}" style="text-decoration:none;color:inherit">
           <div class="cart-item-name">${item.name}</div>
         </a>
-        <div class="cart-item-price">${item.price.toFixed(2).replace('.', ',')} €</div>
+        <div class="cart-item-price">${item.price.toFixed(2).replace('.',',')} €</div>
         <div class="qty-control">
-          <button class="qty-btn" onclick="updateQty(${item.product_id}, ${item.qty - 1})">−</button>
+          <button class="qty-btn" onclick="updateQty(${item.product_id},${item.qty-1})">−</button>
           <span class="qty-val">${item.qty}</span>
-          <button class="qty-btn" onclick="updateQty(${item.product_id}, ${item.qty + 1})">+</button>
+          <button class="qty-btn" onclick="updateQty(${item.product_id},${item.qty+1})">+</button>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-        <span style="font-weight:700;color:var(--rose-dark)">${(item.price * item.qty).toFixed(2).replace('.', ',')} €</span>
-        <button onclick="Cart.remove(${item.product_id}); renderCart();" style="border:none;background:none;color:var(--text-light);font-size:.8rem;cursor:pointer">✕</button>
+        <span style="font-weight:700;color:var(--rose-dark)">${(item.price*item.qty).toFixed(2).replace('.',',')} €</span>
+        <button onclick="Cart.remove(${item.product_id});renderCart();" style="border:none;background:none;color:var(--text-light);font-size:.8rem;cursor:pointer">✕</button>
       </div>
     </div>`).join('');
 
-  // Résumé collapsible
-  const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const itemLines = items.map(i =>
-    `<div class="cart-total-row"><span>${i.name} × ${i.qty}</span><span>${(i.price*i.qty).toFixed(2).replace('.',',')} €</span></div>`
-  ).join('');
+  // Résumé sidebar collapsible
+  const subtotal = items.reduce((s,i)=>s+i.price*i.qty,0);
+  const itemLines = items.map(i=>`<div class="cart-total-row"><span>${i.name} × ${i.qty}</span><span>${(i.price*i.qty).toFixed(2).replace('.',',')} €</span></div>`).join('');
   document.getElementById('cart-summary').innerHTML = `
     <button class="summary-toggle-btn" onclick="toggleSummaryItems(this)" aria-expanded="false">
-      <span class="sum-label">🛍️ ${items.length} article${items.length > 1 ? 's' : ''}</span>
+      <span class="sum-label">🛍️ ${items.length} article${items.length>1?'s':''}</span>
       <span class="sum-total">${subtotal.toFixed(2).replace('.',',')} €</span>
       <span class="sum-chevron">▾</span>
     </button>
     <div class="summary-items-list" style="display:none">${itemLines}</div>`;
+
+  // Résumé étape 1
+  document.getElementById('acc-recap-1').textContent =
+    `${items.length} article${items.length>1?'s':''} · ${subtotal.toFixed(2).replace('.',',')} €`;
 
   updateDeliveryRow();
 
   // Pré-remplir si connecté
   const u = Auth.getUser();
   if (u) {
-    if (!document.getElementById('co-fname').value) document.getElementById('co-fname').value = u.first_name || '';
-    if (!document.getElementById('co-lname').value) document.getElementById('co-lname').value = u.last_name  || '';
-    if (!document.getElementById('co-email').value) document.getElementById('co-email').value  = u.email     || '';
+    if (!document.getElementById('co-fname').value) document.getElementById('co-fname').value = u.first_name||'';
+    if (!document.getElementById('co-lname').value) document.getElementById('co-lname').value = u.last_name||'';
+    if (!document.getElementById('co-email').value) document.getElementById('co-email').value  = u.email||'';
   }
-
   const noticeEl = document.getElementById('guest-checkout-notice');
   if (noticeEl) noticeEl.style.display = Auth.isLoggedIn() ? 'none' : '';
 
   // Sync abandoned cart
-  const cartItems = Cart.get();
-  if (u && cartItems.length > 0) {
-    apiFetch('/cart/sync', { method: 'POST', body: { session_key: `user_${u.id}`, email: u.email, items: cartItems }}).catch(() => {});
+  if (u && items.length > 0) {
+    apiFetch('/cart/sync',{method:'POST',body:{session_key:`user_${u.id}`,email:u.email,items}}).catch(()=>{});
   }
 }
 
-function updateQty(id, qty) { Cart.updateQty(id, qty); renderCart(); }
+function updateQty(id, qty) { Cart.updateQty(id,qty); renderCart(); }
 function clearCart() {
   if (!confirm('Vider le panier ?')) return;
   Cart.clear(); renderCart();
 }
 
+// ════════════════════════════════════════════════
+//  CHECKOUT (Stripe)
+// ════════════════════════════════════════════════
 async function startCheckout() {
   const fname   = document.getElementById('co-fname').value.trim();
   const lname   = document.getElementById('co-lname').value.trim();
@@ -588,41 +655,30 @@ async function startCheckout() {
   const postal  = document.getElementById('co-postal').value.trim();
   const city    = document.getElementById('co-city').value.trim();
   const notes   = document.getElementById('co-notes').value.trim();
-  const relay   = (document.getElementById('co-relay')?.value || '').trim();
+  const relay   = (document.getElementById('co-relay')?.value||'').trim();
   const errEl   = document.getElementById('checkout-error');
   errEl.style.display = 'none';
 
-  if (!fname || !lname || !email || !address || !postal || !city) {
-    errEl.textContent = 'Veuillez remplir tous les champs obligatoires (*) dans le formulaire de livraison';
-    errEl.style.display = '';
-    document.getElementById('checkout-form-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return;
-  }
-  if (selectedDelivery === 'relay' && !relay) {
-    errEl.textContent = 'Veuillez indiquer le point relais choisi';
-    errEl.style.display = '';
-    return;
-  }
-
   const btn = document.getElementById('checkout-btn');
-  btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;margin:0 auto"></div>';
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin:0 auto"></div>';
 
   try {
     const result = await apiFetch('/orders/checkout', {
       method: 'POST',
       body: {
-        items: Cart.get().map(i => ({ product_id: i.product_id, qty: i.qty })),
-        delivery: { type: selectedDelivery, fee: DELIVERY_FEES[selectedDelivery], relay_point: relay || null },
-        customer: { user_id: Auth.getUser()?.id || null, email, first_name: fname, last_name: lname, address, city, postal_code: postal, country: 'France', notes },
-        gift_wrap: document.getElementById('co-gift-wrap')?.checked || false,
-        gift_message: document.getElementById('co-gift-message')?.value.trim() || '',
-        promo_code: _appliedPromo?.code || null,
-        promo_discount: _appliedPromo?.discount_amount || 0,
+        items: Cart.get().map(i=>({product_id:i.product_id,qty:i.qty})),
+        delivery: {type:selectedDelivery,fee:DELIVERY_FEES[selectedDelivery],relay_point:relay||null},
+        customer: {user_id:Auth.getUser()?.id||null,email,first_name:fname,last_name:lname,address,city,postal_code:postal,country:'France',notes},
+        gift_wrap: document.getElementById('co-gift-wrap')?.checked||false,
+        gift_message: document.getElementById('co-gift-message')?.value.trim()||'',
+        promo_code: _appliedPromo?.code||null,
+        promo_discount: _appliedPromo?.discount_amount||0,
       }
     });
-    if (result.checkout_url) { Cart.clear(); window.location.href = result.checkout_url; }
-    else if (result.demo)    { Cart.clear(); window.location.href = `/commande-confirmee.html?order=${result.order_id}&demo=true`; }
-  } catch (e) {
+    if (result.checkout_url) { Cart.clear(); window.location.href=result.checkout_url; }
+    else if (result.demo)    { Cart.clear(); window.location.href=`/commande-confirmee.html?order=${result.order_id}&demo=true`; }
+  } catch(e) {
     errEl.textContent = e.message;
     errEl.style.display = '';
     btn.disabled = false;
@@ -630,131 +686,118 @@ async function startCheckout() {
   }
 }
 
-// ── Mode de paiement ─────────────────────────────────────────
+// ════════════════════════════════════════════════
+//  PAIEMENT — mode (carte / PayPal)
+// ════════════════════════════════════════════════
 let paymentMethod = 'card';
 let paypalLoaded  = false;
 
 function selectPaymentMethod(mode) {
   paymentMethod = mode;
-  document.getElementById('pm-card').classList.toggle('active',   mode === 'card');
-  document.getElementById('pm-paypal').classList.toggle('active', mode === 'paypal');
-  document.getElementById('stripe-section').style.display  = mode === 'card'   ? '' : 'none';
-  document.getElementById('paypal-section').style.display  = mode === 'paypal' ? '' : 'none';
-  if (mode === 'paypal' && !paypalLoaded) initPayPal();
+  document.getElementById('pm-card').classList.toggle('active',   mode==='card');
+  document.getElementById('pm-paypal').classList.toggle('active', mode==='paypal');
+  document.getElementById('stripe-section').style.display  = mode==='card'   ? '' : 'none';
+  document.getElementById('paypal-section').style.display  = mode==='paypal' ? '' : 'none';
+  if (mode==='paypal' && !paypalLoaded) initPayPal();
 }
 
 function getCheckoutPayload() {
-  const fname   = document.getElementById('co-fname').value.trim();
-  const lname   = document.getElementById('co-lname').value.trim();
-  const email   = document.getElementById('co-email').value.trim();
-  const address = document.getElementById('co-address').value.trim();
-  const postal  = document.getElementById('co-postal').value.trim();
-  const city    = document.getElementById('co-city').value.trim();
-  const notes   = document.getElementById('co-notes').value.trim();
-  const relay   = (document.getElementById('co-relay')?.value || '').trim();
-  if (!fname || !lname || !email || !address || !postal || !city) return null;
-  if (selectedDelivery === 'relay' && !relay) return null;
+  const fname=document.getElementById('co-fname').value.trim(), lname=document.getElementById('co-lname').value.trim();
+  const email=document.getElementById('co-email').value.trim(), address=document.getElementById('co-address').value.trim();
+  const postal=document.getElementById('co-postal').value.trim(), city=document.getElementById('co-city').value.trim();
+  const notes=document.getElementById('co-notes').value.trim();
+  const relay=(document.getElementById('co-relay')?.value||'').trim();
+  if (!fname||!lname||!email||!address||!postal||!city) return null;
+  if (selectedDelivery==='relay'&&!relay) return null;
   return {
-    items: Cart.get().map(i => ({ product_id: i.product_id, qty: i.qty })),
-    delivery: { type: selectedDelivery, fee: DELIVERY_FEES[selectedDelivery], relay_point: relay || null },
-    customer: { user_id: Auth.getUser()?.id || null, email, first_name: fname, last_name: lname, address, city, postal_code: postal, country: 'France', notes },
+    items:Cart.get().map(i=>({product_id:i.product_id,qty:i.qty})),
+    delivery:{type:selectedDelivery,fee:DELIVERY_FEES[selectedDelivery],relay_point:relay||null},
+    customer:{user_id:Auth.getUser()?.id||null,email,first_name:fname,last_name:lname,address,city,postal_code:postal,country:'France',notes},
   };
 }
 
 async function initPayPal() {
   try {
     const cfg = await apiFetch('/orders/paypal/config');
-    if (!cfg.enabled) {
-      document.getElementById('paypal-section').innerHTML = '<p style="text-align:center;color:var(--text-light);font-size:.85rem;padding:12px">PayPal non configuré.</p>';
-      return;
-    }
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = `https://www.paypal.com/sdk/js?client-id=${cfg.client_id}&currency=EUR&locale=fr_FR`;
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
+    if (!cfg.enabled) { document.getElementById('paypal-section').innerHTML='<p style="text-align:center;color:var(--text-light);font-size:.85rem;padding:12px">PayPal non configuré.</p>'; return; }
+    await new Promise((resolve,reject)=>{
+      const s=document.createElement('script');
+      s.src=`https://www.paypal.com/sdk/js?client-id=${cfg.client_id}&currency=EUR&locale=fr_FR`;
+      s.onload=resolve; s.onerror=reject; document.head.appendChild(s);
     });
-    paypalLoaded = true;
-    renderPayPalButton();
-  } catch(e) { console.error('PayPal init error:', e); }
+    paypalLoaded=true; renderPayPalButton();
+  } catch(e) { console.error('PayPal init error:',e); }
 }
 
 function renderPayPalButton() {
-  const container = document.getElementById('paypal-button-container');
-  if (!container || !window.paypal) return;
-  container.innerHTML = '';
+  const container=document.getElementById('paypal-button-container');
+  if (!container||!window.paypal) return;
+  container.innerHTML='';
   paypal.Buttons({
-    style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay', height: 48 },
-    createOrder: async () => {
-      const payload = getCheckoutPayload();
-      const errEl = document.getElementById('checkout-error');
-      if (!payload) { errEl.textContent = 'Veuillez remplir tous les champs obligatoires (*)'; errEl.style.display = ''; throw new Error('Form incomplete'); }
-      errEl.style.display = 'none';
-      const result = await apiFetch('/orders/paypal/create', { method: 'POST', body: payload });
-      if (result.demo) { Cart.clear(); window.location.href = `/commande-confirmee.html?order=${result.order_id}&demo=true`; throw new Error('demo'); }
-      window._pendingOrderId = result.order_id;
+    style:{layout:'vertical',color:'gold',shape:'pill',label:'pay',height:48},
+    createOrder: async()=>{
+      const payload=getCheckoutPayload();
+      const errEl=document.getElementById('checkout-error');
+      if (!payload) { errEl.textContent='Veuillez remplir tous les champs obligatoires (*)'; errEl.style.display=''; throw new Error('Form incomplete'); }
+      errEl.style.display='none';
+      const result=await apiFetch('/orders/paypal/create',{method:'POST',body:payload});
+      if (result.demo) { Cart.clear(); window.location.href=`/commande-confirmee.html?order=${result.order_id}&demo=true`; throw new Error('demo'); }
+      window._pendingOrderId=result.order_id;
       return result.paypal_order_id;
     },
-    onApprove: async (data) => {
+    onApprove: async(data)=>{
       try {
-        const result = await apiFetch('/orders/paypal/capture', { method: 'POST', body: { paypal_order_id: data.orderID, order_id: window._pendingOrderId }});
-        if (result.success) { Cart.clear(); window.location.href = `/commande-confirmee.html?order=${result.order_id}`; }
+        const result=await apiFetch('/orders/paypal/capture',{method:'POST',body:{paypal_order_id:data.orderID,order_id:window._pendingOrderId}});
+        if (result.success) { Cart.clear(); window.location.href=`/commande-confirmee.html?order=${result.order_id}`; }
       } catch(e) {
-        const errEl = document.getElementById('checkout-error');
-        errEl.textContent = e.message || 'Erreur lors de la capture PayPal.';
-        errEl.style.display = '';
+        const errEl=document.getElementById('checkout-error');
+        errEl.textContent=e.message||'Erreur lors de la capture PayPal.'; errEl.style.display='';
       }
     },
-    onError: (err) => {
-      if (err.message === 'Form incomplete' || err.message === 'demo') return;
-      const errEl = document.getElementById('checkout-error');
-      errEl.textContent = 'Paiement PayPal annulé ou échoué. Réessayez ou choisissez une autre méthode.';
-      errEl.style.display = '';
+    onError:(err)=>{
+      if (err.message==='Form incomplete'||err.message==='demo') return;
+      const errEl=document.getElementById('checkout-error');
+      errEl.textContent='Paiement PayPal annulé. Réessayez ou choisissez une autre méthode.'; errEl.style.display='';
     }
   }).render('#paypal-button-container');
 }
 
-// ── Adresses enregistrées ────────────────────────────────────
-let _savedAddresses = [];
-
+// ════════════════════════════════════════════════
+//  ADRESSES ENREGISTRÉES
+// ════════════════════════════════════════════════
+let _savedAddresses=[];
 async function loadSavedAddresses() {
   if (!Auth.isLoggedIn()) return;
   try {
-    _savedAddresses = await apiFetch('/addresses');
+    _savedAddresses=await apiFetch('/addresses');
     if (!_savedAddresses.length) return;
-    const section = document.getElementById('saved-addr-section');
-    const container = document.getElementById('saved-addr-cards');
-    section.style.display = '';
-    container.innerHTML = _savedAddresses.map(a => `
-      <div class="saved-addr-card${a.is_primary ? ' selected' : ''}" id="addr-card-${a.id}" onclick="selectSavedAddress(${a.id})">
-        <div class="saved-addr-card-label">📍 ${a.label}${a.is_primary ? ' ★' : ''}</div>
+    document.getElementById('saved-addr-section').style.display='';
+    document.getElementById('saved-addr-cards').innerHTML=_savedAddresses.map(a=>`
+      <div class="saved-addr-card${a.is_primary?' selected':''}" id="addr-card-${a.id}" onclick="selectSavedAddress(${a.id})">
+        <div class="saved-addr-card-label">📍 ${a.label}${a.is_primary?' ★':''}</div>
         <div class="saved-addr-card-addr">${a.first_name} ${a.last_name}<br>${a.address}<br>${a.postal_code} ${a.city}</div>
       </div>`).join('');
-    const primary = _savedAddresses.find(a => a.is_primary) || _savedAddresses[0];
-    if (primary) selectSavedAddress(primary.id, true);
-  } catch(e) {}
+    const primary=_savedAddresses.find(a=>a.is_primary)||_savedAddresses[0];
+    if (primary) selectSavedAddress(primary.id,true);
+  } catch {}
 }
-
-function selectSavedAddress(id, silent) {
-  document.querySelectorAll('.saved-addr-card').forEach(c => c.classList.remove('selected'));
-  if (id === null) {
-    if (!silent) Toast.show('Saisissez votre adresse manuellement', 'info');
-    return;
-  }
-  const addr = _savedAddresses.find(a => a.id === id);
+function selectSavedAddress(id,silent) {
+  document.querySelectorAll('.saved-addr-card').forEach(c=>c.classList.remove('selected'));
+  if (id===null) { if(!silent) Toast.show('Saisissez votre adresse manuellement','info'); return; }
+  const addr=_savedAddresses.find(a=>a.id===id);
   if (!addr) return;
-  const card = document.getElementById(`addr-card-${id}`);
-  if (card) card.classList.add('selected');
+  document.getElementById(`addr-card-${id}`)?.classList.add('selected');
   document.getElementById('co-fname').value   = addr.first_name;
   document.getElementById('co-lname').value   = addr.last_name;
   document.getElementById('co-address').value = addr.address;
   document.getElementById('co-postal').value  = addr.postal_code;
   document.getElementById('co-city').value    = addr.city;
-  checkHandoverEligibility();
-  updateDeliveryRow();
+  checkHandoverEligibility(); updateDeliveryRow();
 }
 
-// ── Init ─────────────────────────────────────────────────────
+// ════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════
 renderCart();
 loadSavedAddresses();
 
@@ -766,50 +809,41 @@ renderDeliveryEstimator('delivery-estimate-cart');
 renderFreeShipBar('free-ship-bar-wrap');
 renderCartSuggestions('cart-suggestions-wrap');
 
-const origCartSave = Cart.save.bind(Cart);
-Cart.save = (items) => {
-  origCartSave(items);
-  renderFreeShipBar('free-ship-bar-wrap');
-  renderCartSuggestions('cart-suggestions-wrap');
-};
+const origSave=Cart.save.bind(Cart);
+Cart.save=(items)=>{ origSave(items); renderFreeShipBar('free-ship-bar-wrap'); renderCartSuggestions('cart-suggestions-wrap'); };
 
-// Année footer
-document.getElementById('fy-p').textContent = new Date().getFullYear();
+document.getElementById('fy-p').textContent=new Date().getFullYear();
 
-// Address autocomplete
+// Autocomplétion adresse
 let _addrTimer;
 async function autocompleteAddress(q) {
   clearTimeout(_addrTimer);
-  const box = document.getElementById('addr-suggestions');
-  if (!q || q.length < 4) { box.style.display = 'none'; return; }
-  _addrTimer = setTimeout(async () => {
+  const box=document.getElementById('addr-suggestions');
+  if (!q||q.length<4) { box.style.display='none'; return; }
+  _addrTimer=setTimeout(async()=>{
     try {
-      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=5&type=housenumber`);
-      const data = await r.json();
-      const features = data.features || [];
-      if (!features.length) { box.style.display = 'none'; return; }
-      box.innerHTML = features.map(f => {
-        const p = f.properties;
+      const r=await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=5&type=housenumber`);
+      const data=await r.json();
+      const features=data.features||[];
+      if (!features.length) { box.style.display='none'; return; }
+      box.innerHTML=features.map(f=>{
+        const p=f.properties;
         return `<div class="addr-suggestion" onclick="selectAddress('${(p.name||'').replace(/'/g,"\\'")}','${p.postcode||''}','${(p.city||'').replace(/'/g,"\\'")}')">
-          ${p.label}
-        </div>`;
+          ${p.label}</div>`;
       }).join('');
-      box.style.display = 'block';
+      box.style.display='block';
     } catch {}
-  }, 300);
+  },300);
 }
-
-function selectAddress(street, postal, city) {
-  document.getElementById('co-address').value = street;
-  document.getElementById('co-postal').value  = postal;
-  document.getElementById('co-city').value    = city;
-  closeAddrSuggestions();
-  checkHandoverEligibility?.();
+function selectAddress(street,postal,city) {
+  document.getElementById('co-address').value=street;
+  document.getElementById('co-postal').value=postal;
+  document.getElementById('co-city').value=city;
+  closeAddrSuggestions(); checkHandoverEligibility?.();
 }
-
 function closeAddrSuggestions() {
-  const box = document.getElementById('addr-suggestions');
-  if (box) box.style.display = 'none';
+  const box=document.getElementById('addr-suggestions');
+  if(box) box.style.display='none';
 }
 </script>
 </body>
