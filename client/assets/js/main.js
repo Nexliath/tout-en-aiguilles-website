@@ -1147,3 +1147,22 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeaderRating();
   initWhatsAppFloat();
 });
+
+// ─── Header scroll shadow ─────────────────────────────────────
+(function() {
+  const header = document.querySelector('.site-header');
+  if (!header) return;
+  const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+
+// ─── Summary items toggle (panier) ────────────────────────────
+function toggleSummaryItems(btn) {
+  const list = btn.nextElementSibling;
+  const expanded = btn.getAttribute('aria-expanded') === 'true';
+  btn.setAttribute('aria-expanded', String(!expanded));
+  list.style.display = expanded ? 'none' : '';
+  const chevron = btn.querySelector('.sum-chevron');
+  if (chevron) chevron.style.transform = expanded ? '' : 'rotate(180deg)';
+}
