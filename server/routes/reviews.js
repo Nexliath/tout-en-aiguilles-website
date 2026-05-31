@@ -29,6 +29,7 @@ router.get('/', (req, res) => {
 
   const reviews = db.prepare(`
     SELECT r.id, r.rating, r.comment, r.created_at,
+           COALESCE(r.verified_purchase, 0) as verified_purchase,
            u.first_name, u.last_name,
            GROUP_CONCAT(rp.photo_url) AS photos_raw
     FROM reviews r
@@ -50,7 +51,30 @@ router.get('/', (req, res) => {
     photos_raw: undefined
   }));
 
-  res.json({ reviews: parsed, stats: { count: stats.count, average: stats.average || 0 } });
+  // Vérifier si l'utilisateur connecté a acheté ce produit
+  let has_purchased = false;
+  let already_reviewed = false;
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET || 'tea_secret_2024');
+      const userId = decoded.id;
+      // Chercher dans les commandes payées/livrées de cet utilisateur
+      const userOrders = db.prepare(
+        "SELECT items FROM orders WHERE user_id = ? AND status IN ('paid','shipped','delivered')"
+      ).all(userId);
+      has_purchased = userOrders.some(order => {
+        try {
+          const items = JSON.parse(order.items || '[]');
+          return items.some(i => String(i.product_id) === String(product_id));
+        } catch { return false; }
+      });
+      already_reviewed = !!db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, userId);
+    } catch {}
+  }
+
+  res.json({ reviews: parsed, stats: { count: stats.count, average: stats.average || 0 }, has_purchased, already_reviewed });
 });
 
 // ─── POST /api/reviews ──────────────────────────────────────
@@ -67,12 +91,27 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
   const product = db.prepare('SELECT id FROM products WHERE id = ? AND is_active = 1').get(product_id);
   if (!product) return res.status(404).json({ error: 'Produit introuvable' });
 
+  // Vérifier que l'utilisateur a acheté ce produit
+  const userOrders = db.prepare(
+    "SELECT items FROM orders WHERE user_id = ? AND status IN ('paid','shipped','delivered')"
+  ).all(user_id);
+  const hasBought = userOrders.some(order => {
+    try {
+      const items = JSON.parse(order.items || '[]');
+      return items.some(i => String(i.product_id) === String(product_id));
+    } catch { return false; }
+  });
+  if (!hasBought) return res.status(403).json({ error: 'Vous devez avoir acheté ce produit pour laisser un avis.' });
+
   // Vérifier l'unicité
   const existing = db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, user_id);
   if (existing) return res.status(409).json({ error: 'Vous avez déjà laissé un avis sur ce produit.' });
 
+  // Migration: add verified_purchase column if missing
+  try { db.exec('ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0'); } catch {}
+
   const result = db.prepare(
-    'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES (?, ?, ?, ?)'
+    'INSERT INTO reviews (product_id, user_id, rating, comment, verified_purchase) VALUES (?, ?, ?, ?, 1)')
   ).run(product_id, user_id, r, comment?.trim() || null);
 
   const reviewId = result.lastInsertRowid;
@@ -106,6 +145,7 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
 router.get('/admin', requireAdmin, (req, res) => {
   const reviews = db.prepare(`
     SELECT r.id, r.rating, r.comment, r.is_approved, r.created_at,
+           COALESCE(r.verified_purchase, 0) as verified_purchase,
            u.first_name, u.last_name, u.email,
            p.name AS product_name, p.id AS product_id,
            GROUP_CONCAT(rp.photo_url) AS photos_raw
