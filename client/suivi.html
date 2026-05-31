@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suivi de commande — Tout en Aiguilles</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .timeline { position: relative; padding: 8px 0; }
+    .timeline::before { content: ''; position: absolute; left: 20px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .tl-step { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 24px; position: relative; }
+    .tl-dot { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; z-index: 1; border: 2px solid white; }
+    .tl-dot.done    { background: var(--sage); }
+    .tl-dot.active  { background: var(--rose-dark); box-shadow: 0 0 0 4px var(--rose-pale); }
+    .tl-dot.pending { background: var(--cream-dark); }
+    .tl-content { padding-top: 8px; }
+    .tl-label { font-weight: 700; font-size: .9rem; margin-bottom: 2px; }
+    .tl-date  { font-size: .78rem; color: var(--text-light); }
+    .tl-desc  { font-size: .82rem; color: var(--text-light); margin-top: 4px; }
+    .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: .82rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
+    <nav class="nav"><a href="/">Accueil</a><a href="/boutique.html">Boutique</a></nav>
+    <div class="header-search-wrap">
+      <input type="text" class="header-search-input" placeholder="Rechercher…" autocomplete="off">
+      <span class="header-search-icon">🔍</span>
+      <div class="header-search-dropdown"></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="user-btn">👤</button>
+      <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
+      <button class="hamburger icon-btn" onclick="openMobileNav()" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav-overlay" id="mobile-nav" onclick="closeMobileNav()">
+  <div class="mobile-nav-panel" onclick="event.stopPropagation()">
+    <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
+    <nav class="mobile-nav-links"><a href="/">🏠 Accueil</a><a href="/boutique.html">🛍️ Boutique</a></nav>
+  </div>
+</div>
+
+<main class="section" style="min-height:60vh">
+  <div class="container" style="max-width:600px">
+
+    <div class="breadcrumb" style="margin-bottom:24px">
+      <a href="/">Accueil</a><span class="breadcrumb-sep">›</span>
+      <span>Suivi de commande</span>
+    </div>
+
+    <!-- Search form if no order ID -->
+    <div id="search-form">
+      <h1 style="margin-bottom:8px">Suivi de commande</h1>
+      <p style="color:var(--text-light);margin-bottom:28px">Entrez votre numéro de commande et votre email pour suivre votre colis.</p>
+      <div class="admin-panel">
+        <div class="form-group">
+          <label class="form-label">Numéro de commande *</label>
+          <input type="text" id="track-id" class="form-input" placeholder="Ex : 42">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email de commande *</label>
+          <input type="email" id="track-email" class="form-input" placeholder="marie@email.fr">
+        </div>
+        <div id="track-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+        <button class="btn btn-primary" onclick="trackOrder()">Suivre ma commande →</button>
+      </div>
+    </div>
+
+    <!-- Order details -->
+    <div id="order-details" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px">
+        <div>
+          <h1 style="margin-bottom:4px" id="track-order-title">Commande</h1>
+          <div style="font-size:.82rem;color:var(--text-light)" id="track-order-date"></div>
+        </div>
+        <div id="track-status-pill"></div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="admin-panel" style="margin-bottom:20px">
+        <div class="admin-panel-title" style="margin-bottom:20px">📍 Progression</div>
+        <div class="timeline" id="track-timeline"></div>
+      </div>
+
+      <!-- Articles -->
+      <div class="admin-panel" style="margin-bottom:20px">
+        <div class="admin-panel-title" style="margin-bottom:16px">🧶 Articles commandés</div>
+        <div id="track-items"></div>
+        <div style="display:flex;justify-content:space-between;font-weight:700;padding-top:12px;border-top:1px solid var(--border);margin-top:8px">
+          <span>Total</span><span id="track-total" style="color:var(--rose-dark)"></span>
+        </div>
+      </div>
+
+      <!-- Tracking number -->
+      <div id="track-number-block" style="display:none" class="admin-panel" style="margin-bottom:20px">
+        <div class="admin-panel-title" style="margin-bottom:8px">🔎 Numéro de suivi Mondial Relay</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <code id="track-number" style="background:var(--cream-dark);padding:8px 14px;border-radius:var(--radius);font-size:1rem;font-weight:700"></code>
+          <a href="https://www.mondialrelay.fr/suivi-de-colis/" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Suivre sur Mondial Relay →</a>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:8px">
+        <button class="btn btn-ghost" onclick="document.getElementById('order-details').style.display='none';document.getElementById('search-form').style.display=''">← Autre commande</button>
+        <a href="/boutique.html" class="btn btn-primary">Retour à la boutique</a>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
+      <span>© <span id="fy"></span> Tout en Aiguilles</span>
+      <a href="/boutique.html" style="color:rgba(255,255,255,.6)">← Boutique</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/main.js"></script>
+<script>
+document.getElementById('fy').textContent = new Date().getFullYear();
+initHeaderSearch();
+
+const STATUS_CONFIG = {
+  pending:   { label: 'En attente',  color: '#856404', bg: '#faeeda', icon: '⏳', step: 0 },
+  paid:      { label: 'Confirmée',   color: '#0f5132', bg: '#d1e7dd', icon: '✅', step: 1 },
+  shipped:   { label: 'Expédiée',    color: '#084298', bg: '#cfe2ff', icon: '📦', step: 2 },
+  delivered: { label: 'Livrée',      color: '#0f5132', bg: '#d1e7dd', icon: '🎉', step: 3 },
+  cancelled: { label: 'Annulée',     color: '#842029', bg: '#f8d7da', icon: '❌', step: -1 },
+};
+
+const STEPS = [
+  { key: 'pending',   icon: '🛍️', label: 'Commande reçue',    desc: 'Votre commande a été enregistrée et le paiement confirmé.' },
+  { key: 'paid',      icon: '🤲', label: 'En préparation',    desc: 'Victorine prépare votre création avec soin dans l\'atelier.' },
+  { key: 'shipped',   icon: '📦', label: 'Expédiée',          desc: 'Votre colis est en route !' },
+  { key: 'delivered', icon: '🎉', label: 'Livrée',            desc: 'Votre commande a été livrée. Profitez-en !' },
+];
+
+async function trackOrder() {
+  const id    = document.getElementById('track-id').value.trim();
+  const email = document.getElementById('track-email').value.trim().toLowerCase();
+  const errEl = document.getElementById('track-error');
+  errEl.style.display = 'none';
+  if (!id || !email) { errEl.textContent = 'Veuillez remplir les deux champs.'; errEl.style.display = ''; return; }
+
+  try {
+    const order = await apiFetch(`/orders/track?id=${encodeURIComponent(id)}&email=${encodeURIComponent(email)}`);
+    renderOrderTracking(order);
+  } catch(e) {
+    errEl.textContent = 'Commande introuvable. Vérifiez votre numéro et email.';
+    errEl.style.display = '';
+  }
+}
+
+function renderOrderTracking(o) {
+  document.getElementById('search-form').style.display   = 'none';
+  document.getElementById('order-details').style.display = '';
+
+  const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
+  document.getElementById('track-order-title').textContent = `Commande #${o.id}`;
+  document.getElementById('track-order-date').textContent  = `Passée le ${new Date(o.created_at).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' })}`;
+  document.getElementById('track-status-pill').innerHTML   = `<span class="status-pill" style="background:${cfg.bg};color:${cfg.color}">${cfg.icon} ${cfg.label}</span>`;
+
+  // Timeline
+  const currentStep = cfg.step;
+  document.getElementById('track-timeline').innerHTML = STEPS.map((s, i) => {
+    const done   = i < currentStep;
+    const active = i === currentStep;
+    const cls    = done ? 'done' : active ? 'active' : 'pending';
+    return `<div class="tl-step">
+      <div class="tl-dot ${cls}">${s.icon}</div>
+      <div class="tl-content">
+        <div class="tl-label" style="color:${active ? 'var(--rose-dark)' : done ? 'var(--sage-dark)' : 'var(--text-light)'}">${s.label}</div>
+        ${active || done ? `<div class="tl-desc">${s.desc}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Items
+  const items = typeof o.items === 'string' ? JSON.parse(o.items || '[]') : (o.items || []);
+  document.getElementById('track-items').innerHTML = items.map(i => `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+      ${i.image ? `<img src="${i.image}" style="width:44px;height:44px;border-radius:8px;object-fit:cover" alt="${i.name}">` : '<div style="width:44px;height:44px;border-radius:8px;background:var(--cream-dark);display:flex;align-items:center;justify-content:center">🧶</div>'}
+      <div style="flex:1"><div style="font-weight:700;font-size:.88rem">${i.name}</div><div style="font-size:.78rem;color:var(--text-light)">× ${i.qty}</div></div>
+      <div style="font-weight:700;color:var(--rose-dark)">${(Number(i.price) * i.qty).toFixed(2)} €</div>
+    </div>`).join('');
+  document.getElementById('track-total').textContent = `${Number(o.total).toFixed(2)} €`;
+
+  // Tracking number
+  if (o.tracking_number) {
+    document.getElementById('track-number').textContent    = o.tracking_number;
+    document.getElementById('track-number-block').style.display = '';
+  }
+
+  // Update URL
+  const url = `/suivi?id=${o.id}&email=${encodeURIComponent(o.email)}`;
+  window.history.replaceState(null, '', url);
+}
+
+// Auto-load from URL params
+const params = new URLSearchParams(location.search);
+if (params.get('id') && params.get('email')) {
+  document.getElementById('track-id').value    = params.get('id');
+  document.getElementById('track-email').value = params.get('email');
+  trackOrder();
+}
+</script>
+</body>
+</html>

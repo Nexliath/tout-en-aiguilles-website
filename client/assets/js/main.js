@@ -1044,3 +1044,106 @@ const NewsletterPopup = {
 
 // Init newsletter popup on load
 document.addEventListener('DOMContentLoaded', () => { NewsletterPopup.init(); });
+
+// ─── Note globale dans le header ─────────────────────────────
+async function initHeaderRating() {
+  try {
+    const data = await apiFetch('/reviews/global-stats');
+    if (!data || data.count < 3) return;
+    const actions = document.querySelector('.header-actions');
+    if (!actions || document.querySelector('.header-rating')) return;
+    const badge = document.createElement('a');
+    badge.href = '/boutique.html';
+    badge.className = 'header-rating';
+    badge.title = `${data.count} avis clients`;
+    badge.innerHTML = `<span class="hr-star">★</span><span class="hr-score">${Number(data.average).toFixed(1)}</span><span style="color:var(--text-light)">(${data.count})</span>`;
+    const hamburger = actions.querySelector('.hamburger');
+    if (hamburger) actions.insertBefore(badge, hamburger);
+    else actions.appendChild(badge);
+  } catch {}
+}
+
+// ─── WhatsApp flottant ───────────────────────────────────────
+function initWhatsAppFloat() {
+  if (document.querySelector('.whatsapp-float')) return;
+  const btn = document.createElement('a');
+  btn.className = 'whatsapp-float';
+  btn.href = 'https://wa.me/message/tout-en-aiguilles'; // remplacer par ton numéro: https://wa.me/33XXXXXXXXX
+  btn.target = '_blank';
+  btn.rel = 'noopener';
+  btn.title = 'Contactez-nous sur WhatsApp';
+  btn.setAttribute('aria-label', 'Contacter sur WhatsApp');
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.558 4.122 1.533 5.857L0 24l6.335-1.51A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.6a9.573 9.573 0 01-4.948-1.375l-.355-.211-3.666.874.934-3.562-.232-.366A9.557 9.557 0 012.4 12C2.4 6.698 6.698 2.4 12 2.4S21.6 6.698 21.6 12 17.302 21.6 12 21.6z"/></svg>`;
+  document.body.appendChild(btn);
+}
+
+// ─── "X personnes regardent ce produit" ──────────────────────
+function initWatchingBadge(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  // Nombre simulé réaliste selon l'heure
+  const base = new Date().getHours() >= 10 && new Date().getHours() <= 22 ? 3 : 1;
+  const count = base + Math.floor(Math.random() * 4);
+  el.innerHTML = `<div class="watching-badge"><span class="watching-dot"></span>${count} personne${count > 1 ? 's' : ''} regarde${count > 1 ? 'nt' : ''} ce produit en ce moment</div>`;
+}
+
+// ─── Retour haptique ─────────────────────────────────────────
+function haptic(ms = 50) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
+}
+
+// ─── Vus récemment sur la homepage ───────────────────────────
+function renderRecentlyViewedHome(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const items = RecentlyViewed.get();
+  if (!items.length) { el.closest?.('.rv-home-section')?.style && (el.closest('.rv-home-section').style.display = 'none'); return; }
+  el.innerHTML = items.slice(0, 4).map(p => `
+    <a href="/produit.html?id=${p.id}" class="rv-card">
+      ${p.image ? `<img src="${p.image}" alt="${p.name}" loading="lazy">` : '<div style="aspect-ratio:1;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:2rem">🧶</div>'}
+      <div class="rv-card-name">${p.name}</div>
+      <div class="rv-card-price">${Number(p.price).toFixed(2)} €</div>
+    </a>`).join('');
+}
+
+// ─── Suggestions produits dans le panier ─────────────────────
+async function renderCartSuggestions(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const cartItems = Cart.get();
+  if (!cartItems.length) return;
+  try {
+    const all = await apiFetch('/products?limit=100');
+    const cartIds = new Set(cartItems.map(i => i.product_id));
+    const suggestions = all
+      .filter(p => !cartIds.has(p.id) && p.stock > 0)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
+    if (!suggestions.length) return;
+    el.innerHTML = `
+      <div class="cart-suggestions">
+        <div class="cart-suggestions-title">Vous pourriez aussi aimer</div>
+        <div class="cart-sugg-grid">
+          ${suggestions.map(p => `
+            <div class="cart-sugg-item">
+              <a href="/produit.html?id=${p.id}">
+                ${p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy">` : '<div style="aspect-ratio:1;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.5rem">🧶</div>'}
+              </a>
+              <div class="cart-sugg-item-info">
+                <div class="cart-sugg-item-name">${p.name}</div>
+                <div class="cart-sugg-item-price">${Number(p.price).toFixed(2)} €</div>
+              </div>
+              <button class="cart-sugg-item-btn" onclick="Cart.add(${JSON.stringify(p).replace(/"/g,'&quot;')});haptic();this.textContent='✓ Ajouté!'">
+                + Ajouter
+              </button>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  } catch {}
+}
+
+// Init global features
+document.addEventListener('DOMContentLoaded', () => {
+  initHeaderRating();
+  initWhatsAppFloat();
+});

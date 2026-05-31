@@ -1634,3 +1634,72 @@ p  { color: var(--text-light); }
   z-index: 2; line-height: 1;
 }
 .nl-popup-close:hover { background: rgba(0,0,0,.4); }
+
+/* ── Header rating ── */
+.header-rating {
+  display: flex; align-items: center; gap: 4px;
+  font-size: .72rem; color: var(--text-light); white-space: nowrap;
+  padding: 4px 8px; border-radius: 20px; background: var(--cream-dark);
+  border: 1px solid var(--border); cursor: pointer; text-decoration: none;
+}
+.header-rating .hr-star { color: #f4b942; font-size: .8rem; }
+.header-rating .hr-score { font-weight: 700; color: var(--text); }
+@media (max-width: 900px) { .header-rating { display: none; } }
+
+/* ── Gallery mobile arrows ── */
+.gallery-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(255,255,255,.9); border: 1px solid var(--border);
+  display: none; align-items: center; justify-content: center;
+  font-size: .9rem; cursor: pointer; z-index: 5;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.gallery-arrow-prev { left: 8px; }
+.gallery-arrow-next { right: 8px; }
+@media (max-width: 768px) { .gallery-arrow { display: flex; } }
+
+/* ── WhatsApp floating button ── */
+.whatsapp-float {
+  position: fixed; bottom: 72px; right: 16px; z-index: 190;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: #25D366; color: white;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(37,211,102,.4);
+  cursor: pointer; border: none; transition: transform .2s, box-shadow .2s;
+  text-decoration: none;
+}
+.whatsapp-float:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(37,211,102,.5); }
+.whatsapp-float svg { width: 28px; height: 28px; }
+@media (min-width: 769px) { .whatsapp-float { bottom: 24px; } }
+
+/* ── "X personnes regardent" badge ── */
+.watching-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff8e1; border: 1px solid #ffe082; border-radius: 20px;
+  padding: 4px 10px; font-size: .76rem; font-weight: 600; color: #8d6e00;
+  margin-bottom: 10px;
+}
+.watching-dot { width: 7px; height: 7px; border-radius: 50%; background: #f4b942; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── Panier suggestions ── */
+.cart-suggestions { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.cart-suggestions-title { font-size: .82rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+.cart-sugg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cart-sugg-item {
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  overflow: hidden; cursor: pointer; transition: border-color .15s;
+  text-decoration: none; color: var(--text);
+}
+.cart-sugg-item:hover { border-color: var(--rose); }
+.cart-sugg-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.cart-sugg-item-info { padding: 6px 8px; }
+.cart-sugg-item-name { font-size: .72rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cart-sugg-item-price { font-size: .7rem; color: var(--rose-dark); font-weight: 700; }
+.cart-sugg-item-btn { width: 100%; padding: 5px; border: none; background: var(--rose-pale); color: var(--rose-dark); font-size: .7rem; font-weight: 700; cursor: pointer; }
+.cart-sugg-item-btn:hover { background: var(--rose); color: white; }
+
+/* ── Product image dimensions fix (CLS) ── */
+.product-card-img img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.gallery-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }

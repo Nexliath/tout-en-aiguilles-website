@@ -170,6 +170,13 @@
           </select>
         </div>
 
+        <!-- Stock filter -->
+        <div class="filter-group">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;font-weight:700">
+            <input type="checkbox" id="filter-in-stock" onchange="state.page=0;renderProducts();updateFilterBadge()" style="accent-color:var(--rose-dark);width:16px;height:16px">
+            En stock seulement
+          </label>
+        </div>
         <button id="reset-filters-btn" class="btn btn-ghost btn-block btn-sm" style="margin-top:8px">Réinitialiser les filtres</button>
       </aside>
 
@@ -285,6 +292,8 @@ function renderProducts() {
 
   // Filtre prix
   var filtered = _allProducts.filter(function(p) {
+    const inStockOnly = document.getElementById('filter-in-stock')?.checked;
+    if (inStockOnly && p.stock === 0) return false;
     return (!pMin || p.price >= pMin) && (pMax === Infinity || p.price <= pMax);
   });
 

@@ -195,6 +195,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
 });
 
 // GET /api/orders/my — mes commandes
+// GET /api/orders/track — suivi public par id + email
+router.get('/track', (req, res) => {
+  const { id, email } = req.query;
+  if (!id || !email) return res.status(400).json({ error: 'id et email requis' });
+  const order = db.prepare(
+    "SELECT id, status, created_at, total, items, delivery_type, delivery_fee, tracking_number, email FROM orders WHERE id = ? AND LOWER(email) = LOWER(?)"
+  ).get(id, email.trim());
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+  // Don't expose sensitive fields
+  res.json({ ...order, items: JSON.parse(order.items || '[]') });
+});
+
 router.get('/my', requireAuth, (req, res) => {
   const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
     .map(o => ({ ...o, items: JSON.parse(o.items || '[]') }));

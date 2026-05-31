@@ -792,9 +792,11 @@ document.getElementById('co-city').addEventListener('input',   scheduleGeoCheck)
 initHeaderSearch();
 renderDeliveryEstimator('delivery-estimate-cart');
 renderFreeShipBar('free-ship-bar-wrap');
+renderCartSuggestions('cart-suggestions-wrap');
 // Update free ship bar when cart changes
 const origCartSave = Cart.save.bind(Cart);
-Cart.save = (items) => { origCartSave(items); renderFreeShipBar('free-ship-bar-wrap'); };
+Cart.save = (items) => { origCartSave(items); renderFreeShipBar('free-ship-bar-wrap');
+renderCartSuggestions('cart-suggestions-wrap'); };
 
 // Address autocomplete — API adresse.data.gouv.fr (gratuit, officiel)
 let _addrTimer;

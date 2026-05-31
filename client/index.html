@@ -332,6 +332,17 @@
 </section>
 
 <!-- ════ FOOTER ════ -->
+<!-- Vus récemment (visiteurs récurrents) -->
+<section class="rv-home-section" id="rv-home-section" style="display:none;background:white;padding:32px 0;border-top:1px solid var(--border)">
+  <div class="container">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-family:var(--font-title);font-size:1.1rem">Reprendre où vous étiez 👁</h3>
+      <a href="/boutique.html" style="font-size:.82rem;color:var(--rose-dark)">Voir tout →</a>
+    </div>
+    <div class="recently-viewed-grid" id="rv-home-grid"></div>
+  </div>
+</section>
+
 <footer class="site-footer">
   <div class="container">
     <div class="footer-grid">
@@ -507,6 +518,13 @@ async function sendContact() {
 // Année dynamique
 const fyEl = document.getElementById('footer-year');
 if (fyEl) fyEl.textContent = new Date().getFullYear();
+
+// Vus récemment
+const rvItems = RecentlyViewed.get();
+if (rvItems.length > 0) {
+  document.getElementById('rv-home-section').style.display = '';
+  renderRecentlyViewedHome('rv-home-grid');
+}
 
 loadFeaturedProducts();
 loadNews();

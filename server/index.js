@@ -244,6 +244,10 @@ app.get('/api/health', (req, res) => {
 
 // ─── SPA fallback ───────────────────────────────────────────
 app.get('/404', (req, res) => res.sendFile(require('path').join(__dirname, '../client/404.html')));
+app.get('/suivi', (req, res) => res.sendFile(require('path').join(__dirname, '../client/suivi.html')));
+
+// URL propres produits : /produit/:slug → produit.html (slug résolu côté client)
+app.get('/produit/:slug', (req, res) => res.sendFile(require('path').join(__dirname, '../client/produit.html')));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/index.html'));
