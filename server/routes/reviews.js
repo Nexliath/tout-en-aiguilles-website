@@ -111,7 +111,7 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
   try { db.exec('ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0'); } catch {}
 
   const result = db.prepare(
-    'INSERT INTO reviews (product_id, user_id, rating, comment, verified_purchase) VALUES (?, ?, ?, ?, 1)')
+    'INSERT INTO reviews (product_id, user_id, rating, comment, verified_purchase) VALUES (?, ?, ?, ?, 1)'
   ).run(product_id, user_id, r, comment?.trim() || null);
 
   const reviewId = result.lastInsertRowid;
