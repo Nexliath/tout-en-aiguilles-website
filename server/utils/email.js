@@ -418,7 +418,7 @@ async function sendOrderStatusEmail(order) {
     delivered: isHandover
       ? `Votre commande vous a été remise 🎉<br>Nous espérons qu'elle vous plaît ! N'hésitez pas à laisser un avis.`
       : `Votre commande a été livrée 🎉<br>Nous espérons qu'elle vous plaît ! N'hésitez pas à laisser un avis.`,
-    cancelled: `Votre commande a été annulée.<br>Si vous avez été débité(e), un remboursement sera effectué sous 5 à 10 jours ouvrés.`,
+    cancelled: `Votre commande a été annulée.<br>Si un paiement a été effectué, nous vous contacterons directement pour trouver une solution.`,
     pending: `Votre commande est enregistrée et en attente de paiement.<br>Complétez votre paiement pour la valider.`,
   };
 

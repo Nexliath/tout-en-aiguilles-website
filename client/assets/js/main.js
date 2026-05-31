@@ -954,3 +954,93 @@ function preloadImages(urls) {
 }
 
 
+
+
+// ─── Barre "Livraison gratuite dès X€" ───────────────────────
+const FREE_SHIP_THRESHOLD = 60; // € — modifier selon ta politique
+function renderFreeShipBar(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const total = Cart.total();
+  const remaining = Math.max(0, FREE_SHIP_THRESHOLD - total);
+  if (remaining === 0) {
+    el.innerHTML = `<div class="free-ship-bar"><div class="fsb-label">🎉 Livraison offerte débloquée !</div><div class="fsb-track"><div class="fsb-fill" style="width:100%"></div></div></div>`;
+  } else {
+    const pct = Math.min(100, Math.round(total / FREE_SHIP_THRESHOLD * 100));
+    el.innerHTML = `<div class="free-ship-bar"><div class="fsb-label">🚚 Plus que <strong>${remaining.toFixed(2)} €</strong> pour la livraison offerte !</div><div class="fsb-track"><div class="fsb-fill" style="width:${pct}%"></div></div></div>`;
+  }
+}
+
+// ─── Newsletter popup avec incentive ─────────────────────────
+const NewsletterPopup = {
+  shown: false,
+  init() {
+    if (localStorage.getItem('nl_popup_seen')) return;
+    if (location.pathname.includes('panier') || location.pathname.includes('commande')) return;
+
+    let triggered = false;
+    const show = () => {
+      if (triggered) return;
+      triggered = true;
+      this.show();
+    };
+
+    // Trigger: 30s après arrivée OU 45% scroll
+    setTimeout(show, 30000);
+    const onScroll = () => {
+      const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+      if (pct > 0.45) { show(); window.removeEventListener('scroll', onScroll, { passive: true }); }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+  },
+  show() {
+    if (this.shown) return;
+    this.shown = true;
+    const overlay = document.createElement('div');
+    overlay.id = 'nl-popup-overlay';
+    overlay.className = 'nl-popup-overlay';
+    overlay.innerHTML = `
+      <div class="nl-popup">
+        <div class="nl-popup-img">
+          <img src="/assets/images/victorine-marche.jpg" alt="Tout en Aiguilles" loading="lazy">
+          <button class="nl-popup-close" onclick="NewsletterPopup.close()" aria-label="Fermer">✕</button>
+        </div>
+        <div class="nl-popup-body">
+          <div style="font-size:1.5rem;margin-bottom:8px">🧶</div>
+          <h2 style="font-family:var(--font-title);font-size:1.4rem;margin-bottom:8px;color:var(--rose-dark)">-5€ sur votre première commande</h2>
+          <p style="font-size:.875rem;color:var(--text-light);margin-bottom:20px;line-height:1.6">Rejoignez la communauté Tout en Aiguilles et recevez un code de réduction exclusif + les nouveautés en avant-première.</p>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="email" id="nl-popup-email" class="form-input" placeholder="votre@email.fr" style="flex:1">
+            <button class="btn btn-primary" onclick="NewsletterPopup.submit()">J'en profite →</button>
+          </div>
+          <div id="nl-popup-msg" style="font-size:.8rem;min-height:18px;color:var(--sage-dark)"></div>
+          <button onclick="NewsletterPopup.close()" style="background:none;border:none;color:var(--text-light);font-size:.75rem;cursor:pointer;margin-top:10px;text-decoration:underline">Non merci, je préfère payer plein tarif</button>
+        </div>
+      </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) this.close(); });
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('open'));
+  },
+  async submit() {
+    const email = document.getElementById('nl-popup-email')?.value.trim();
+    const msg   = document.getElementById('nl-popup-msg');
+    if (!email || !email.includes('@')) { if(msg) msg.textContent = 'Adresse email invalide.'; return; }
+    if(msg) msg.textContent = 'Inscription en cours…';
+    try {
+      await apiFetch('/newsletter/subscribe', { method: 'POST', body: { email } });
+      if(msg) msg.textContent = '✓ Parfait ! Votre code -5€ vous a été envoyé par email.';
+      localStorage.setItem('nl_popup_seen', '1');
+      setTimeout(() => this.close(), 3000);
+    } catch(e) {
+      if(msg) msg.textContent = e.message || 'Erreur, réessayez.';
+    }
+  },
+  close() {
+    const el = document.getElementById('nl-popup-overlay');
+    if (el) { el.classList.remove('open'); setTimeout(() => el.remove(), 300); }
+    localStorage.setItem('nl_popup_seen', '1');
+  },
+};
+
+// Init newsletter popup on load
+document.addEventListener('DOMContentLoaded', () => { NewsletterPopup.init(); });
