@@ -64,12 +64,18 @@ router.get('/', (req, res) => {
       const userOrders = db.prepare(
         "SELECT items FROM orders WHERE user_id = ? AND status IN ('paid','shipped','delivered')"
       ).all(userId);
-      has_purchased = userOrders.some(order => {
-        try {
-          const items = JSON.parse(order.items || '[]');
-          return items.some(i => String(i.product_id) === String(product_id));
-        } catch { return false; }
-      });
+      // Admin = always considered as having purchased
+      const isAdminUser = db.prepare("SELECT role FROM users WHERE id = ?").get(decoded.id);
+      if (isAdminUser?.role === 'admin') {
+        has_purchased = true;
+      } else {
+        has_purchased = userOrders.some(order => {
+          try {
+            const items = JSON.parse(order.items || '[]');
+            return items.some(i => String(i.product_id) === String(product_id));
+          } catch { return false; }
+        });
+      }
       already_reviewed = !!db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, userId);
     } catch {}
   }
@@ -91,17 +97,22 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
   const product = db.prepare('SELECT id FROM products WHERE id = ? AND is_active = 1').get(product_id);
   if (!product) return res.status(404).json({ error: 'Produit introuvable' });
 
-  // Vérifier que l'utilisateur a acheté ce produit
-  const userOrders = db.prepare(
-    "SELECT items FROM orders WHERE user_id = ? AND status IN ('paid','shipped','delivered')"
-  ).all(user_id);
-  const hasBought = userOrders.some(order => {
-    try {
-      const items = JSON.parse(order.items || '[]');
-      return items.some(i => String(i.product_id) === String(product_id));
-    } catch { return false; }
-  });
-  if (!hasBought) return res.status(403).json({ error: 'Vous devez avoir acheté ce produit pour laisser un avis.' });
+  // Les admins peuvent commenter sans avoir acheté
+  const isAdmin = req.user.role === 'admin';
+  
+  if (!isAdmin) {
+    // Vérifier que l'utilisateur a acheté ce produit
+    const userOrders = db.prepare(
+      "SELECT items FROM orders WHERE user_id = ? AND status IN ('paid','shipped','delivered')"
+    ).all(user_id);
+    const hasBought = userOrders.some(order => {
+      try {
+        const items = JSON.parse(order.items || '[]');
+        return items.some(i => String(i.product_id) === String(product_id));
+      } catch { return false; }
+    });
+    if (!hasBought) return res.status(403).json({ error: 'Vous devez avoir acheté ce produit pour laisser un avis.' });
+  }
 
   // Vérifier l'unicité
   const existing = db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, user_id);
