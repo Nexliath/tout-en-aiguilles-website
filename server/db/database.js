@@ -124,6 +124,28 @@ const migrations = [
     key TEXT PRIMARY KEY,
     seeded_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`,
+  // ── Unicité des noms de produits ─────────────────────────────
+  // Étape 1 : supprimer les doublons (garder le plus ancien — id le plus bas)
+  `DELETE FROM favorites WHERE product_id IN (
+     SELECT id FROM products WHERE id NOT IN (
+       SELECT MIN(id) FROM products GROUP BY name
+     )
+   )`,
+  `DELETE FROM reviews WHERE product_id IN (
+     SELECT id FROM products WHERE id NOT IN (
+       SELECT MIN(id) FROM products GROUP BY name
+     )
+   )`,
+  `DELETE FROM stock_alerts WHERE product_id IN (
+     SELECT id FROM products WHERE id NOT IN (
+       SELECT MIN(id) FROM products GROUP BY name
+     )
+   )`,
+  `DELETE FROM products WHERE id NOT IN (
+     SELECT MIN(id) FROM products GROUP BY name
+   )`,
+  // Étape 2 : créer l'index UNIQUE pour bloquer les futurs doublons
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_products_name_unique ON products (name)`,
   // verified_purchase sur avis existants
   "ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0",
   // Onboarder les utilisateurs vérifiés existants comme subscribers (source 'user')

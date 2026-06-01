@@ -128,6 +128,9 @@ router.post('/', requireAdmin, upload.array('images', 5), async (req, res) => {
   try {
     const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label } = req.body;
     if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
+    // Vérification doublon par nom
+    const nameExists = db.prepare('SELECT id FROM products WHERE name = ?').get(name.trim());
+    if (nameExists) return res.status(409).json({ error: `Un produit avec ce nom existe déjà (id: ${nameExists.id}). Choisissez un nom différent.` });
     const slug = slugify(name) + '-' + Date.now();
     const localDir = path.join(__dirname, '../../client/assets/images/products');
     const images = await Promise.all(
@@ -152,6 +155,11 @@ router.put('/:id', requireAdmin, upload.array('images', 5), async (req, res) => 
     const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label } = req.body;
     const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
+    // Vérification doublon par nom (sauf si c'est le même produit)
+    if (name && name.trim() !== existing.name) {
+      const nameConflict = db.prepare('SELECT id FROM products WHERE name = ? AND id != ?').get(name.trim(), req.params.id);
+      if (nameConflict) return res.status(409).json({ error: `Un produit avec ce nom existe déjà (id: ${nameConflict.id}).` });
+    }
 
     let images = JSON.parse(keep_images || existing.images || '[]');
     if (req.files && req.files.length > 0) {
