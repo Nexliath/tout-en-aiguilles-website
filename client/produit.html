@@ -867,6 +867,7 @@ function updateStarSelector(n) {
 
 function renderReviewForm(hasPurchased, alreadyReviewed) {
   const user = Auth.getUser();
+  const isAdmin = user?.role === 'admin';
   const area = document.getElementById('review-form-area');
   if (!area) return;
 
@@ -890,8 +891,8 @@ function renderReviewForm(hasPurchased, alreadyReviewed) {
     return;
   }
 
-  // Not purchased
-  if (!hasPurchased) {
+  // Not purchased — admins can always leave a review
+  if (!hasPurchased && !isAdmin) {
     area.innerHTML = `
       <div class="review-form-wrap" style="background:var(--cream);border:1.5px dashed var(--border);text-align:center">
         <div style="font-size:1.5rem;margin-bottom:8px">🛒</div>

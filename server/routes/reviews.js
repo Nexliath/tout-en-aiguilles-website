@@ -58,7 +58,7 @@ router.get('/', (req, res) => {
   if (authHeader) {
     try {
       const jwt = require('jsonwebtoken');
-      const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET || 'tea_secret_2024');
+      const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024');
       const userId = decoded.id;
       // Chercher dans les commandes payées/livrées de cet utilisateur
       const userOrders = db.prepare(
