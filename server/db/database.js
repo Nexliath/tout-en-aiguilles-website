@@ -120,6 +120,10 @@ const migrations = [
   "ALTER TABLE products ADD COLUMN variant_label TEXT DEFAULT NULL",
   // Préférence newsletter des utilisateurs
   "ALTER TABLE users ADD COLUMN newsletter_opt_out INTEGER DEFAULT 0",
+  `CREATE TABLE IF NOT EXISTS seeded_keys (
+    key TEXT PRIMARY KEY,
+    seeded_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`,
   // verified_purchase sur avis existants
   "ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0",
   // Onboarder les utilisateurs vérifiés existants comme subscribers (source 'user')
