@@ -584,7 +584,7 @@ function renderProduct(p) {
   const descEl = document.getElementById('prod-desc');
   const fullDesc = p.description || '';
   descEl.textContent = fullDesc;
-  descEl.style.cssText = 'color:var(--text);font-size:.9rem;line-height:1.65;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden';
+  descEl.style.cssText = 'color:var(--text);font-size:.9rem;line-height:1.65;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden';
   if (fullDesc.length > 300) {
     const readMore = document.createElement('button');
     readMore.style.cssText = 'display:block;margin-top:6px;background:none;border:none;color:var(--rose-dark);font-size:.82rem;font-weight:700;cursor:pointer;padding:0';

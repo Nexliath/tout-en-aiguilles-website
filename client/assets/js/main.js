@@ -925,7 +925,7 @@ const QuickView = {
             <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;color:var(--sage-dark);margin-bottom:6px">${p.category_name || ''}</div>
             <h2 style="font-size:1.3rem;margin-bottom:10px">${p.name}</h2>
             <div style="font-size:1.6rem;font-weight:700;color:var(--rose-dark);margin-bottom:14px">${Number(p.price).toFixed(2)} €</div>
-            <p style="font-size:.85rem;color:var(--text);line-height:1.6;margin-bottom:16px">${(p.description || '').slice(0, 200)}${p.description?.length > 200 ? '…' : ''}</p>
+            <p style="font-size:.85rem;color:var(--text);line-height:1.6;margin-bottom:16px;white-space:pre-line">${(p.description || '').slice(0, 200)}${p.description?.length > 200 ? '…' : ''}</p>
             ${p.stock > 0
               ? `<div style="display:flex;gap:10px;align-items:center">
                   <button class="btn btn-primary" style="flex:1" onclick="Cart.add(${JSON.stringify(p).replace(/"/g,'&quot;')});QuickView.close()">🛒 Ajouter au panier</button>
