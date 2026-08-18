@@ -670,8 +670,11 @@ function renderProduct(p) {
     tagsEl.appendChild(more);
   }
 
-  // Gallery
-  const images = p.images || [];
+  // Gallery — inclut aussi les photos des variations (dédupliquées)
+  const variationImages = (p.variations || []).map(v => v.image_url).filter(Boolean);
+  const images = [...(p.images || [])];
+  for (const vImg of variationImages) { if (!images.includes(vImg)) images.push(vImg); }
+  p.images = images; // pour que applyOption() retrouve l'index de l'image sélectionnée
   const thumbsEl = document.getElementById('thumbs');
   const mainEl = document.getElementById('main-img');
 
