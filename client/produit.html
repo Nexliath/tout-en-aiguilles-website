@@ -32,11 +32,19 @@
 
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
-    .product-gallery { display: grid; grid-template-columns: 80px 1fr; gap: 12px; }
-    .gallery-thumbs { display: flex; flex-direction: column; gap: 8px; }
+    .product-gallery { display: grid; grid-template-columns: 80px 1fr; gap: 12px; align-items: start; }
+    .gallery-thumbs {
+      display: flex; flex-direction: column; gap: 8px;
+      max-height: 600px; overflow-y: auto; overflow-x: hidden;
+      scrollbar-width: thin; scrollbar-color: var(--rose) transparent;
+      padding-right: 2px;
+    }
+    .gallery-thumbs::-webkit-scrollbar { width: 5px; }
+    .gallery-thumbs::-webkit-scrollbar-thumb { background: var(--rose); border-radius: 4px; }
+    .gallery-thumbs::-webkit-scrollbar-track { background: transparent; }
     .gallery-thumb {
       width: 72px; height: 72px; border-radius: 8px; overflow: hidden; cursor: pointer;
-      border: 2px solid var(--border); background: var(--cream-dark);
+      border: 2px solid var(--border); background: var(--cream-dark); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
       transition: border-color var(--transition);
     }
@@ -699,6 +707,7 @@ function renderProduct(p) {
     mainEl.innerHTML = `<div class="gallery-carousel" id="gallery-carousel">${slides}</div>${dots}`;
     initGalleryCarousel();
     initImageZoom(document.getElementById('main-img'));
+    syncThumbsHeight();
   } else {
     thumbsEl.innerHTML = `<div class="gallery-thumb active">🧶</div>`;
     mainEl.innerHTML = '<span>🧶</span>';
@@ -854,6 +863,19 @@ function setMainImg(src, thumb) {
   const idx = thumbs.indexOf(thumb);
   goToSlide(idx >= 0 ? idx : 0);
 }
+
+// Aligne la hauteur défilable des vignettes sur celle de la photo principale (desktop uniquement)
+function syncThumbsHeight() {
+  const thumbsEl = document.getElementById('thumbs');
+  const mainEl = document.getElementById('main-img');
+  if (!thumbsEl || !mainEl) return;
+  if (window.innerWidth <= 768) { thumbsEl.style.maxHeight = ''; return; }
+  requestAnimationFrame(() => {
+    const h = mainEl.offsetHeight;
+    if (h > 0) thumbsEl.style.maxHeight = h + 'px';
+  });
+}
+window.addEventListener('resize', () => { if (document.getElementById('main-img')) syncThumbsHeight(); });
 
 function changeQty(delta) {
   const maxStock = selectedOption ? selectedOption.stock : (currentProduct?.stock || 99);
