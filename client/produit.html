@@ -45,7 +45,7 @@
 
     /* Main image + carousel */
     .gallery-main {
-      position: relative; aspect-ratio: 1; border-radius: var(--radius-xl); overflow: hidden;
+      position: relative; aspect-ratio: 3 / 4; border-radius: var(--radius-xl); overflow: hidden;
       background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 6rem;
     }
     .gallery-carousel {
@@ -92,12 +92,11 @@
       .gallery-thumbs::-webkit-scrollbar { display: none; }
       .gallery-thumb { width: 56px !important; height: 56px !important; flex-shrink: 0; border-radius: 6px !important; }
 
-      /* Image compacte — 65vw max comme Etsy/Vinted */
+      /* Image compacte, même ratio 3:4 que les photos produit */
       .gallery-main {
-        aspect-ratio: 1 / 1;
+        aspect-ratio: 3 / 4;
         border-radius: var(--radius-lg) !important;
         margin-bottom: 0;
-        max-height: 65vw;
       }
 
       /* Carousel swipeable sur mobile — prefixes cross-browser */
