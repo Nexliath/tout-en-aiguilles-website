@@ -8,6 +8,9 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 
 const app = express();
+// Railway place l'app derrière un reverse proxy unique qui ajoute X-Forwarded-For.
+// Sans ça, express-rate-limit plante sa détection d'IP sur les routes protégées.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024';
 
