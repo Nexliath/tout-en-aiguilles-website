@@ -181,3 +181,26 @@ INSERT OR IGNORE INTO news (title, slug, excerpt, content, published) VALUES
 <p>Chaque création est unique et faite à la main en France. N''hésitez pas à nous contacter pour des commandes personnalisées !</p>
 <p>Avec tout mon amour, Victorine 🌸</p>',
    1);
+
+-- Article marché de Noël de la Mailleray-sur-Seine (14 décembre)
+INSERT OR IGNORE INTO news (title, slug, excerpt, content, cover_image, published, created_at, updated_at) VALUES
+  ('Marché de Noël de la Mailleray-sur-Seine 🎄',
+   'marche-noel-mailleray-sur-seine',
+   'Une journée chaleureuse (et un peu stressante !) pour lancer nos nouveautés de Noël.',
+   '<p>Dimanche 14 décembre, toute la journée, on tenait notre stand Tout en Aiguilles au marché de Noël de la Mailleray-sur-Seine !</p>
+<figure><img src="/assets/images/news/mailleray-noel-cover.jpg" alt="Stand Tout en Aiguilles au marché de Noël de la Mailleray-sur-Seine"><figcaption>Notre étal, prêt à accueillir les visiteurs</figcaption></figure>
+<p>Pour l''occasion, on présentait pour la première fois quelques nouvelles pièces pensées spécialement pour Noël, en plus de nos bananes en velours côtelé, nos lingettes lavables et nos peluches au crochet habituelles. Forcément, un peu de stress avant l''ouverture : est-ce que les nouveautés allaient plaire ? Est-ce qu''on en avait fait assez ? 😅</p>
+<h2>Une ambiance chaleureuse malgré le froid</h2>
+<p>Et comme (presque) toujours, on a vite été rassurées. Les gens qui s''arrêtent à notre stand sont toujours aussi bienveillants : ils prennent le temps de poser des questions sur le crochet, sur la couture, sur d''où viennent nos idées…</p>
+<figure><img src="/assets/images/news/mailleray-noel-2.jpg" alt="Petites créations en crochet et cartes de visite Tout en Aiguilles"><figcaption>Nos petites nouveautés en crochet, posées à côté de nos cartes de visite</figcaption></figure>
+<p>Ça fait toujours un bien fou de voir que le travail fait à la maison, pièce par pièce, trouve son public.</p>
+<figure><img src="/assets/images/news/mailleray-noel-4.jpg" alt="Fleurs et cactus au crochet, porte-clés sur le stand"><figcaption>Fleurs, cactus et petits porte-clés, toujours parmi les coups de cœur</figcaption></figure>
+<h2>Merci, et à l''année prochaine !</h2>
+<p>Merci à toutes les personnes venues nous voir, discuter, et reparties avec une petite création faite main. On garde ça précieusement, ça nous donne l''énergie de continuer. 🌿</p>
+<figure><img src="/assets/images/news/mailleray-noel-3.jpg" alt="Victorine derrière son stand au marché de Noël de la Mailleray-sur-Seine"><figcaption>Un peu fatiguée, beaucoup contente</figcaption></figure>
+<p>On reviendra l''année prochaine avec plein de nouvelles idées, promis !</p>
+<p>À bientôt, Victorine 🌸</p>',
+   '/assets/images/news/mailleray-noel-cover.jpg',
+   1,
+   '2026-12-17 10:00:00',
+   '2026-12-17 10:00:00');
