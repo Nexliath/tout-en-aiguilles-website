@@ -630,15 +630,17 @@ function renderProduct(p) {
 
   // Stock badge
   const stockEl = document.getElementById('prod-stock');
-  if (p.stock > 0) {
+  if (p.is_custom_order) {
+    stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✂️ Sur commande</span>`;
+  } else if (p.stock > 0) {
     stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${p.stock} dispo.)</span>`;
   } else {
     stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
     document.getElementById('add-cart-btn').disabled = true;
   }
-  // Alerte retour en stock
+  // Alerte retour en stock (n'a pas de sens pour un produit sur devis)
   const alertSection = document.getElementById('stock-alert-section');
-  if (alertSection) alertSection.style.display = p.stock === 0 ? '' : 'none';
+  if (alertSection) alertSection.style.display = (!p.is_custom_order && p.stock === 0) ? '' : 'none';
   window._currentProductId = p.id;
 
   // Tags — max 3 visibles + badge "+N"

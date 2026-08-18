@@ -89,9 +89,10 @@
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group">
+        <div class="form-group" id="stock-field-group">
           <label class="form-label">Stock</label>
           <input type="number" id="f-stock" class="form-input" min="0" value="0">
+          <p class="form-hint" id="stock-custom-hint" style="display:none">Pas besoin pour un produit sur devis — chaque commande est faite à la demande.</p>
         </div>
         <div class="form-group">
           <label class="form-label">Catégorie</label>
@@ -116,7 +117,7 @@
       </div>
       <div style="display:flex;gap:16px;margin-bottom:20px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="f-custom-order"> <span class="form-label" style="margin:0">✉️ Produit personnalisé (sur devis — pas d'ajout au panier direct)</span>
+          <input type="checkbox" id="f-custom-order" onchange="toggleStockField()"> <span class="form-label" style="margin:0">✉️ Produit personnalisé (sur devis — pas d'ajout au panier direct)</span>
         </label>
       </div>
       <!-- Options / variations (libellé libre + photo + prix + stock) -->
@@ -336,6 +337,15 @@ function resetFilters() {
     `${allProducts.length} produit${allProducts.length > 1 ? 's' : ''}`;
 }
 
+function toggleStockField() {
+  const isCustom = document.getElementById('f-custom-order').checked;
+  const stockInput = document.getElementById('f-stock');
+  document.getElementById('stock-custom-hint').style.display = isCustom ? '' : 'none';
+  stockInput.disabled = isCustom;
+  stockInput.style.opacity = isCustom ? '.5' : '1';
+  if (isCustom) stockInput.value = '0';
+}
+
 function showForm(title = 'Ajouter un produit') {
   document.getElementById('form-title').textContent = title;
   document.getElementById('product-form-panel').style.display = '';
@@ -363,6 +373,7 @@ function hideForm() {
   document.getElementById('variations-table-wrap').style.display = 'none';
   document.getElementById('variations-tbody').innerHTML = '';
   document.getElementById('form-error').style.display = 'none';
+  toggleStockField();
 }
 
 function editProduct(id) {
@@ -381,6 +392,7 @@ function editProduct(id) {
   document.getElementById('f-featured').checked = !!p.is_featured;
   document.getElementById('f-active').checked = !!p.is_active;
   document.getElementById('f-custom-order').checked = !!p.is_custom_order;
+  toggleStockField();
 
   // Show current images with delete buttons
   window._currentProductImages = [...(p.images || [])];

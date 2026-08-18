@@ -465,7 +465,7 @@ function renderProductCard(p) {
     : '';
   const placeholder = `<div class="product-card-placeholder" ${img ? 'style="display:none"' : ''}>🧶</div>`;
   const isFav = Favorites.has(p.id);
-  const inStock = p.stock > 0;
+  const inStock = p.is_custom_order || p.stock > 0;
   const tags = Array.isArray(p.tags) && p.tags.length > 0
     ? p.tags.slice(0, 3).map(t => `<span class="product-card-tag">${t}</span>`).join('')
     : '';
@@ -473,7 +473,7 @@ function renderProductCard(p) {
   // Badge "Nouveau" si créé il y a moins de 30 jours
   const isNew = p.created_at && (Date.now() - new Date(p.created_at).getTime()) < 30 * 24 * 60 * 60 * 1000;
   // Urgence stock (≤ 3 en stock)
-  const isLowStock = inStock && p.stock <= 3;
+  const isLowStock = !p.is_custom_order && inStock && p.stock <= 3;
   // Note moyenne
   const avgRating = p.avg_rating ? Number(p.avg_rating) : 0;
   const reviewCount = Number(p.review_count || 0);
@@ -1127,7 +1127,7 @@ async function renderCartSuggestions(containerId) {
     const all = await apiFetch('/products?limit=100');
     const cartIds = new Set(cartItems.map(i => i.product_id));
     const suggestions = all
-      .filter(p => !cartIds.has(p.id) && p.stock > 0)
+      .filter(p => !cartIds.has(p.id) && (p.is_custom_order || p.stock > 0))
       .sort(() => Math.random() - 0.5)
       .slice(0, 3);
     if (!suggestions.length) return;
