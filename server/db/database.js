@@ -151,6 +151,10 @@ const migrations = [
   // Onboarder les utilisateurs vérifiés existants comme subscribers (source 'user')
   `INSERT OR IGNORE INTO newsletter_subscribers (email, first_name, source)
    SELECT email, first_name, 'user' FROM users WHERE email_verified = 1`,
+  // Changer la couverture de l'article marché de Noël Mailleray (déjà en base, INSERT OR IGNORE ne la met plus à jour)
+  `UPDATE news SET cover_image = '/assets/images/news/mailleray-noel-2.jpg' WHERE slug = 'marche-noel-mailleray-sur-seine'`,
+  `UPDATE news SET content = REPLACE(content, '<figure><img src="/assets/images/news/mailleray-noel-2.jpg" alt="Petites créations en crochet et cartes de visite Tout en Aiguilles"><figcaption>Nos petites nouveautés en crochet, posées à côté de nos cartes de visite</figcaption></figure>
+', '') WHERE slug = 'marche-noel-mailleray-sur-seine'`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }

@@ -526,8 +526,12 @@ if (rvItems.length > 0) {
   renderRecentlyViewedHome('rv-home-grid');
 }
 
-loadFeaturedProducts();
-loadNews();
+Promise.all([loadFeaturedProducts(), loadNews()]).then(() => {
+  if (location.hash) {
+    const target = document.querySelector(location.hash);
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: 'auto', block: 'start' }));
+  }
+});
 initHeaderSearch();
 </script>
 </body>
