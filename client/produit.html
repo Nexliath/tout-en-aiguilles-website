@@ -450,6 +450,7 @@ function initStickyATC(product) {
   const btn = document.getElementById('add-cart-btn');
   const sticky = document.getElementById('sticky-atc');
   if (!sticky || !btn) return;
+  if (product.is_custom_order) { sticky.style.display = 'none'; return; }
   document.getElementById('sticky-atc-name').textContent = product.name;
   document.getElementById('sticky-atc-price').textContent = product.price.toFixed(2) + ' €';
   if (product.stock === 0) document.getElementById('sticky-atc-btn').disabled = true;
@@ -733,14 +734,17 @@ function renderOptions(p) {
   const maxPrice = Math.max(...prices);
   const pricesDiffer = minPrice !== maxPrice;
 
-  list.innerHTML = currentOptions.map((o) => `
-    <button type="button" class="variant-btn${o.stock === 0 ? ' out' : ''}"
-      onclick="selectOption(${o.id})" title="${o.label}${o.stock === 0 ? ' — Rupture de stock' : ''}">
+  list.innerHTML = currentOptions.map((o) => {
+    const oos = !p.is_custom_order && o.stock === 0;
+    return `
+    <button type="button" class="variant-btn${oos ? ' out' : ''}"
+      onclick="selectOption(${o.id})" title="${o.label}${oos ? ' — Rupture de stock' : ''}">
       ${o.image_url ? `<img src="${o.image_url}" alt="${o.label}" loading="lazy">` : `<span>${o.label.charAt(0)}</span>`}
       <span class="variant-label">${o.label}</span>
       ${o.price !== null && o.price !== undefined ? `<span class="variant-label" style="opacity:.7">${Number(o.price).toFixed(2)} €</span>` : ''}
-      ${o.stock === 0 ? '<span class="variant-oos">✗</span>' : ''}
-    </button>`).join('');
+      ${oos ? '<span class="variant-oos">✗</span>' : ''}
+    </button>`;
+  }).join('');
 
   if (pricesDiffer) {
     // Prix "à partir de" tant qu'aucune option n'est choisie
@@ -775,21 +779,24 @@ function selectOption(id) {
 function applyOption(opt) {
   if (!opt || !currentProduct) return;
   const price = (opt.price !== null && opt.price !== undefined) ? opt.price : currentProduct.price;
-  const stock = opt.stock;
   document.getElementById('prod-price').textContent = Number(price).toFixed(2) + ' €';
-  const stockEl = document.getElementById('prod-stock');
-  const addBtn = document.getElementById('add-cart-btn');
   const stickyPrice = document.getElementById('sticky-atc-price');
-  const stickyBtn = document.getElementById('sticky-atc-btn');
   if (stickyPrice) stickyPrice.textContent = Number(price).toFixed(2) + ' €';
-  if (stock > 0) {
-    stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${stock} dispo.)</span>`;
-    if (addBtn) addBtn.disabled = false;
-    if (stickyBtn) stickyBtn.disabled = false;
-  } else {
-    stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
-    if (addBtn) addBtn.disabled = true;
-    if (stickyBtn) stickyBtn.disabled = true;
+
+  if (!currentProduct.is_custom_order) {
+    const stock = opt.stock;
+    const stockEl = document.getElementById('prod-stock');
+    const addBtn = document.getElementById('add-cart-btn');
+    const stickyBtn = document.getElementById('sticky-atc-btn');
+    if (stock > 0) {
+      stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${stock} dispo.)</span>`;
+      if (addBtn) addBtn.disabled = false;
+      if (stickyBtn) stickyBtn.disabled = false;
+    } else {
+      stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
+      if (addBtn) addBtn.disabled = true;
+      if (stickyBtn) stickyBtn.disabled = true;
+    }
   }
   if (opt.image_url) {
     const thumbs = document.querySelectorAll('.gallery-thumb');
