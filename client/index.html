@@ -526,6 +526,16 @@ if (rvItems.length > 0) {
   renderRecentlyViewedHome('rv-home-grid');
 }
 
+// Pré-remplissage du formulaire de contact (venant d'une demande produit personnalisé)
+try {
+  const prefill = sessionStorage.getItem('tea_prefill_contact');
+  if (prefill) {
+    const msgEl = document.getElementById('contact-msg');
+    if (msgEl) msgEl.value = prefill;
+    sessionStorage.removeItem('tea_prefill_contact');
+  }
+} catch {}
+
 Promise.all([loadFeaturedProducts(), loadNews()]).then(() => {
   if (location.hash) {
     const target = document.querySelector(location.hash);

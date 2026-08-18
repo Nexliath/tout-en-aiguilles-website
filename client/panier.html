@@ -594,14 +594,14 @@ function renderCart() {
         </a>
         <div class="cart-item-price">${item.price.toFixed(2).replace('.',',')} €</div>
         <div class="qty-control">
-          <button class="qty-btn" onclick="updateQty(${item.product_id},${item.qty-1})">−</button>
+          <button class="qty-btn" onclick="updateQty(${item.product_id},${item.qty-1},${item.variation_id ?? 'null'})">−</button>
           <span class="qty-val">${item.qty}</span>
-          <button class="qty-btn" onclick="updateQty(${item.product_id},${item.qty+1})">+</button>
+          <button class="qty-btn" onclick="updateQty(${item.product_id},${item.qty+1},${item.variation_id ?? 'null'})">+</button>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
         <span style="font-weight:700;color:var(--rose-dark)">${(item.price*item.qty).toFixed(2).replace('.',',')} €</span>
-        <button onclick="Cart.remove(${item.product_id});renderCart();" style="border:none;background:none;color:var(--text-light);font-size:.8rem;cursor:pointer">✕</button>
+        <button onclick="Cart.remove(${item.product_id},${item.variation_id ?? 'null'});renderCart();" style="border:none;background:none;color:var(--text-light);font-size:.8rem;cursor:pointer">✕</button>
       </div>
     </div>`).join('');
 
@@ -638,7 +638,7 @@ function renderCart() {
   }
 }
 
-function updateQty(id, qty) { Cart.updateQty(id,qty); renderCart(); }
+function updateQty(id, qty, variationId = null) { Cart.updateQty(id, qty, variationId); renderCart(); }
 function clearCart() {
   if (!confirm('Vider le panier ?')) return;
   Cart.clear(); renderCart();
@@ -667,7 +667,7 @@ async function startCheckout() {
     const result = await apiFetch('/orders/checkout', {
       method: 'POST',
       body: {
-        items: Cart.get().map(i=>({product_id:i.product_id,qty:i.qty})),
+        items: Cart.get().map(i=>({product_id:i.product_id,variation_id:i.variation_id||null,qty:i.qty})),
         delivery: {type:selectedDelivery,fee:DELIVERY_FEES[selectedDelivery],relay_point:relay||null},
         customer: {user_id:Auth.getUser()?.id||null,email,first_name:fname,last_name:lname,address,city,postal_code:postal,country:'France',notes},
         gift_wrap: document.getElementById('co-gift-wrap')?.checked||false,
@@ -710,7 +710,7 @@ function getCheckoutPayload() {
   if (!fname||!lname||!email||!address||!postal||!city) return null;
   if (selectedDelivery==='relay'&&!relay) return null;
   return {
-    items:Cart.get().map(i=>({product_id:i.product_id,qty:i.qty})),
+    items:Cart.get().map(i=>({product_id:i.product_id,variation_id:i.variation_id||null,qty:i.qty})),
     delivery:{type:selectedDelivery,fee:DELIVERY_FEES[selectedDelivery],relay_point:relay||null},
     customer:{user_id:Auth.getUser()?.id||null,email,first_name:fname,last_name:lname,address,city,postal_code:postal,country:'France',notes},
   };

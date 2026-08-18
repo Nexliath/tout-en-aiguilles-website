@@ -155,6 +155,20 @@ const migrations = [
   `UPDATE news SET cover_image = '/assets/images/news/mailleray-noel-2.jpg' WHERE slug = 'marche-noel-mailleray-sur-seine'`,
   `UPDATE news SET content = REPLACE(content, '<figure><img src="/assets/images/news/mailleray-noel-2.jpg" alt="Petites créations en crochet et cartes de visite Tout en Aiguilles"><figcaption>Nos petites nouveautés en crochet, posées à côté de nos cartes de visite</figcaption></figure>
 ', '') WHERE slug = 'marche-noel-mailleray-sur-seine'`,
+  // Produits personnalisés (sur devis, sans ajout direct au panier)
+  "ALTER TABLE products ADD COLUMN is_custom_order INTEGER NOT NULL DEFAULT 0",
+  // Options / variations libres par produit (libellé, photo, prix, stock, visibilité)
+  `CREATE TABLE IF NOT EXISTS product_variations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    image_url TEXT,
+    price REAL,
+    stock INTEGER NOT NULL DEFAULT 0,
+    visible INTEGER NOT NULL DEFAULT 1,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }

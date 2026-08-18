@@ -63,18 +63,29 @@ async function apiFetchForm(path, formData, method = 'POST') {
 const Cart = {
   get: () => { try { return JSON.parse(localStorage.getItem('tea_cart') || '[]'); } catch { return []; } },
   save: (items) => { localStorage.setItem('tea_cart', JSON.stringify(items)); Cart.updateBadge(); },
-  add: (product, qty = 1) => {
+  add: (product, qty = 1, variation = null) => {
     const items = Cart.get();
-    const idx = items.findIndex(i => i.product_id === product.id);
+    const variationId = variation ? variation.id : null;
+    const idx = items.findIndex(i => i.product_id === product.id && (i.variation_id || null) === variationId);
     if (idx >= 0) items[idx].qty += qty;
-    else items.push({ product_id: product.id, name: product.name, price: product.price, qty, image: (product.images || [])[0] || '' });
+    else items.push({
+      product_id: product.id,
+      variation_id: variationId,
+      name: variation ? `${product.name} (${variation.label})` : product.name,
+      price: (variation && variation.price !== null && variation.price !== undefined) ? variation.price : product.price,
+      qty,
+      image: (variation && variation.image_url) || (product.images || [])[0] || ''
+    });
     Cart.save(items);
-    Toast.show(`${product.name} ajouté au panier 🛒`, 'success');
+    Toast.show(`${variation ? `${product.name} (${variation.label})` : product.name} ajouté au panier 🛒`, 'success');
   },
-  remove: (product_id) => { Cart.save(Cart.get().filter(i => i.product_id !== product_id)); },
-  updateQty: (product_id, qty) => {
-    if (qty <= 0) return Cart.remove(product_id);
-    const items = Cart.get(); const idx = items.findIndex(i => i.product_id === product_id);
+  remove: (product_id, variation_id = null) => {
+    Cart.save(Cart.get().filter(i => !(i.product_id === product_id && (i.variation_id || null) === (variation_id || null))));
+  },
+  updateQty: (product_id, qty, variation_id = null) => {
+    if (qty <= 0) return Cart.remove(product_id, variation_id);
+    const items = Cart.get();
+    const idx = items.findIndex(i => i.product_id === product_id && (i.variation_id || null) === (variation_id || null));
     if (idx >= 0) { items[idx].qty = qty; Cart.save(items); }
   },
   count: () => Cart.get().reduce((s, i) => s + i.qty, 0),
@@ -926,13 +937,15 @@ const QuickView = {
             <h2 style="font-size:1.3rem;margin-bottom:10px">${p.name}</h2>
             <div style="font-size:1.6rem;font-weight:700;color:var(--rose-dark);margin-bottom:14px">${Number(p.price).toFixed(2)} €</div>
             <p style="font-size:.85rem;color:var(--text);line-height:1.6;margin-bottom:16px;white-space:pre-line">${(p.description || '').slice(0, 200)}${p.description?.length > 200 ? '…' : ''}</p>
-            ${p.stock > 0
-              ? `<div style="display:flex;gap:10px;align-items:center">
-                  <button class="btn btn-primary" style="flex:1" onclick="Cart.add(${JSON.stringify(p).replace(/"/g,'&quot;')});QuickView.close()">🛒 Ajouter au panier</button>
-                  <a href="/produit.html?id=${p.id}" class="btn btn-secondary btn-sm">Voir détails →</a>
-                </div>`
-              : `<div style="color:#d9534f;font-weight:700;margin-bottom:10px">Rupture de stock</div>
-                 <a href="/produit.html?id=${p.id}" class="btn btn-secondary">Voir la fiche produit</a>`}
+            ${p.is_custom_order
+              ? `<a href="/produit.html?id=${p.id}" class="btn btn-primary btn-block">✉️ Faire une demande personnalisée</a>`
+              : p.stock > 0
+                ? `<div style="display:flex;gap:10px;align-items:center">
+                    <button class="btn btn-primary" style="flex:1" onclick="Cart.add(${JSON.stringify(p).replace(/"/g,'&quot;')});QuickView.close()">🛒 Ajouter au panier</button>
+                    <a href="/produit.html?id=${p.id}" class="btn btn-secondary btn-sm">Voir détails →</a>
+                  </div>`
+                : `<div style="color:#d9534f;font-weight:700;margin-bottom:10px">Rupture de stock</div>
+                   <a href="/produit.html?id=${p.id}" class="btn btn-secondary">Voir la fiche produit</a>`}
           </div>
         </div>`;
     } catch { document.getElementById('qv-content').innerHTML = '<p style="text-align:center;padding:24px;color:var(--text-light)">Impossible de charger ce produit.</p>'; }

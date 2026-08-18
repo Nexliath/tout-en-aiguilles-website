@@ -52,7 +52,7 @@
       <h1>Gestion des produits</h1>
       <div style="display:flex;gap:8px">
         <button class="btn btn-secondary btn-sm" onclick="showImport()">📥 Importer Excel</button>
-        <button class="btn btn-primary btn-sm" onclick="showForm()">+ Ajouter un produit</button>
+        <button class="btn btn-primary btn-sm" onclick="hideForm();showForm()">+ Ajouter un produit</button>
       </div>
     </div>
 
@@ -111,8 +111,32 @@
       <div class="form-group">
         <label class="form-label">Photos du produit</label>
         <input type="file" id="f-images" multiple accept="image/*" class="form-input">
-        <p class="form-hint">Max 5 photos — JPG, PNG, WebP (5 Mo max chacune)</p>
+        <p class="form-hint">Max 20 photos — JPG, PNG, WebP (5 Mo max chacune)</p>
         <div id="current-images" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:20px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="f-custom-order"> <span class="form-label" style="margin:0">✉️ Produit personnalisé (sur devis — pas d'ajout au panier direct)</span>
+        </label>
+      </div>
+      <!-- Options / variations (libellé libre + photo + prix + stock) -->
+      <div id="variations-panel" style="background:var(--cream-dark);border-radius:var(--radius-lg);padding:16px;margin-bottom:20px">
+        <div style="font-size:.82rem;font-weight:700;margin-bottom:4px;color:var(--text)">📋 Options de l'article</div>
+        <p style="font-size:.75rem;color:var(--text-light);margin-bottom:12px">Ex : "Velours avec côtés", "Jean sans fond"… chaque option peut avoir sa propre photo, son prix et son stock.</p>
+        <div id="variations-need-save" style="font-size:.8rem;color:var(--text-light);font-style:italic;display:none">Enregistrez d'abord le produit pour pouvoir ajouter des options.</div>
+        <div id="variations-table-wrap" style="display:none">
+          <table class="admin-table" style="margin-bottom:12px">
+            <thead><tr><th>Photo</th><th>Libellé</th><th>Prix (€)</th><th>Stock</th><th>Visible</th><th>Actions</th></tr></thead>
+            <tbody id="variations-tbody"></tbody>
+          </table>
+          <div id="variation-add-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:white;border:1px dashed var(--border);border-radius:8px;padding:10px">
+            <input type="file" id="var-new-image" accept="image/*" style="max-width:140px;font-size:.78rem">
+            <input type="text" id="var-new-label" class="form-input" placeholder="Libellé (ex: Velours avec côtés)" style="flex:1;min-width:160px;font-size:.85rem">
+            <input type="number" id="var-new-price" class="form-input" placeholder="Prix €" step="0.01" style="width:90px;font-size:.85rem">
+            <input type="number" id="var-new-stock" class="form-input" placeholder="Stock" style="width:80px;font-size:.85rem">
+            <button class="btn btn-secondary btn-sm" onclick="addVariation()">+ Ajouter</button>
+          </div>
+        </div>
       </div>
       <!-- Variantes -->
       <div style="background:var(--cream-dark);border-radius:var(--radius-lg);padding:16px;margin-bottom:20px">
@@ -331,9 +355,13 @@ function hideForm() {
   document.getElementById('f-variant-label').value = '';
   document.getElementById('f-featured').checked = false;
   document.getElementById('f-active').checked = true;
+  document.getElementById('f-custom-order').checked = false;
   document.getElementById('f-images').value = '';
   document.getElementById('current-images').innerHTML = '';
   window._currentProductImages = [];
+  document.getElementById('variations-need-save').style.display = '';
+  document.getElementById('variations-table-wrap').style.display = 'none';
+  document.getElementById('variations-tbody').innerHTML = '';
   document.getElementById('form-error').style.display = 'none';
 }
 
@@ -352,10 +380,17 @@ function editProduct(id) {
   document.getElementById('f-variant-label').value = p.variant_label || '';
   document.getElementById('f-featured').checked = !!p.is_featured;
   document.getElementById('f-active').checked = !!p.is_active;
+  document.getElementById('f-custom-order').checked = !!p.is_custom_order;
 
   // Show current images with delete buttons
   window._currentProductImages = [...(p.images || [])];
   renderCurrentImages();
+
+  // Options / variations
+  document.getElementById('variations-need-save').style.display = 'none';
+  document.getElementById('variations-table-wrap').style.display = '';
+  window._currentVariationsProductId = id;
+  loadVariations(id);
 }
 
 function renderCurrentImages() {
@@ -393,6 +428,7 @@ async function saveProduct() {
   formData.append('tags',        JSON.stringify(document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean)));
   formData.append('is_featured',     document.getElementById('f-featured').checked ? '1' : '0');
   formData.append('is_active',       document.getElementById('f-active').checked ? '1' : '0');
+  formData.append('is_custom_order', document.getElementById('f-custom-order').checked ? '1' : '0');
   formData.append('variant_group_id', document.getElementById('f-variant-group').value.trim().toLowerCase().replace(/\s+/g, '-') || '');
   formData.append('variant_label',    document.getElementById('f-variant-label').value.trim() || '');
   const files = document.getElementById('f-images').files;
@@ -406,12 +442,17 @@ async function saveProduct() {
     if (id) {
       await apiFetchForm(`/products/${id}`, formData, 'PUT');
       Toast.show('Produit mis à jour ✓', 'success');
+      hideForm();
+      loadProducts();
     } else {
       await apiFetchForm('/products', formData, 'POST');
       Toast.show('Produit créé ✓', 'success');
+      await loadProducts();
+      // Rouvrir en édition pour permettre l'ajout d'options tout de suite
+      const created = allProducts.find(x => x.name === name);
+      if (created) { editProduct(created.id); }
+      else { hideForm(); }
     }
-    hideForm();
-    loadProducts();
   } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
 }
 
@@ -421,6 +462,94 @@ async function deleteProduct(id, name) {
     await apiFetch(`/products/${id}`, { method: 'DELETE' });
     Toast.show('Produit supprimé ✓', 'success');
     loadProducts();
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+// ─── Options / variations ──────────────────────────────────────
+async function loadVariations(productId) {
+  try {
+    const variations = await apiFetch(`/products/${productId}/variations`);
+    renderVariationsTable(variations);
+  } catch (e) {
+    document.getElementById('variations-tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+  }
+}
+
+function renderVariationsTable(variations) {
+  const tbody = document.getElementById('variations-tbody');
+  if (!variations.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-light);padding:12px">Aucune option pour l\'instant</td></tr>';
+    return;
+  }
+  tbody.innerHTML = variations.map(v => `
+    <tr>
+      <td>
+        <label style="cursor:pointer" title="Changer la photo">
+          ${v.image_url
+            ? `<img src="${v.image_url}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;display:block">`
+            : '<div style="width:44px;height:44px;border-radius:6px;background:var(--rose-pale);display:flex;align-items:center;justify-content:center">🧶</div>'}
+          <input type="file" accept="image/*" style="display:none" onchange="uploadVariationImage(${v.id}, this)">
+        </label>
+      </td>
+      <td><input type="text" class="form-input" style="font-size:.85rem" value="${v.label.replace(/"/g, '&quot;')}" onchange="updateVariationField(${v.id}, 'label', this.value)"></td>
+      <td><input type="number" class="form-input" style="font-size:.85rem;width:90px" step="0.01" value="${v.price ?? ''}" placeholder="—" onchange="updateVariationField(${v.id}, 'price', this.value)"></td>
+      <td><input type="number" class="form-input" style="font-size:.85rem;width:80px" value="${v.stock}" onchange="updateVariationField(${v.id}, 'stock', this.value)"></td>
+      <td>
+        <label style="display:flex;align-items:center;cursor:pointer">
+          <input type="checkbox" ${v.visible ? 'checked' : ''} onchange="updateVariationField(${v.id}, 'visible', this.checked ? '1' : '0')">
+        </label>
+      </td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deleteVariation(${v.id})" title="Supprimer">🗑️</button></td>
+    </tr>`).join('');
+}
+
+async function addVariation() {
+  const productId = window._currentVariationsProductId;
+  if (!productId) return;
+  const label = document.getElementById('var-new-label').value.trim();
+  if (!label) { Toast.show('Le libellé est requis', 'error'); return; }
+  const formData = new FormData();
+  formData.append('label', label);
+  formData.append('price', document.getElementById('var-new-price').value || '');
+  formData.append('stock', document.getElementById('var-new-stock').value || '0');
+  const file = document.getElementById('var-new-image').files[0];
+  if (file) formData.append('image', file);
+  try {
+    await apiFetchForm(`/products/${productId}/variations`, formData, 'POST');
+    document.getElementById('var-new-label').value = '';
+    document.getElementById('var-new-price').value = '';
+    document.getElementById('var-new-stock').value = '';
+    document.getElementById('var-new-image').value = '';
+    Toast.show('Option ajoutée ✓', 'success');
+    loadVariations(productId);
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+async function updateVariationField(variationId, field, value) {
+  const formData = new FormData();
+  formData.append(field, value);
+  try {
+    await apiFetchForm(`/products/variations/${variationId}`, formData, 'PUT');
+  } catch (e) { Toast.show(e.message, 'error'); loadVariations(window._currentVariationsProductId); }
+}
+
+async function uploadVariationImage(variationId, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('image', file);
+  try {
+    await apiFetchForm(`/products/variations/${variationId}`, formData, 'PUT');
+    Toast.show('Photo mise à jour ✓', 'success');
+    loadVariations(window._currentVariationsProductId);
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+async function deleteVariation(variationId) {
+  if (!confirm('Supprimer cette option ?')) return;
+  try {
+    await apiFetch(`/products/variations/${variationId}`, { method: 'DELETE' });
+    loadVariations(window._currentVariationsProductId);
   } catch (e) { Toast.show(e.message, 'error'); }
 }
 

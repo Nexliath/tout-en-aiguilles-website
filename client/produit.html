@@ -279,11 +279,17 @@
             <div id="variants-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
           </div>
 
+          <!-- Sélecteur d'options (libellés libres avec photo/prix/stock propres) -->
+          <div id="options-section" style="display:none;margin-bottom:14px">
+            <div style="font-size:.82rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Choisir une option</div>
+            <div id="options-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+
           <!-- Tags -->
           <div id="prod-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px"></div>
 
           <!-- Quantity + Add to cart -->
-          <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
+          <div id="atc-normal" style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
             <div class="qty-control">
               <button class="qty-btn" onclick="changeQty(-1)">−</button>
               <span class="qty-val" id="qty-display">1</span>
@@ -293,6 +299,13 @@
               🛒 Ajouter au panier
             </button>
             <button id="fav-btn" class="favorite-btn" onclick="toggleFavFromPage()" title="Ajouter aux favoris">🤍</button>
+          </div>
+          <!-- Produit personnalisé : demande via formulaire de contact -->
+          <div id="atc-custom-order" style="display:none;margin-bottom:16px">
+            <div style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px;font-size:.85rem;color:var(--text)">
+              ✂️ Ce produit est réalisé sur mesure. Dites-nous ce que vous souhaitez (dimensions, options, tissu…) et on échange ensemble avant de valider votre commande.
+            </div>
+            <button class="btn btn-primary btn-block" onclick="requestCustomOrder()">✉️ Faire une demande personnalisée</button>
           </div>
           <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="window.location='/panier.html'">Voir mon panier →</button>
 
@@ -462,6 +475,10 @@ async function loadProduct() {
     } catch {}
 
     if (!product) { showNotFound(); return; }
+    try {
+      const full = await apiFetch(`/products/${encodeURIComponent(product.slug)}`);
+      product = { ...product, ...full };
+    } catch {}
     currentProduct = product;
     renderProduct(product);
     loadVariants(product);
@@ -685,6 +702,71 @@ function renderProduct(p) {
   // Favorites
   const favBtn = document.getElementById('fav-btn');
   if (Favorites.has(p.id)) favBtn.classList.add('active'), favBtn.textContent = '❤️';
+
+  // Produit personnalisé : bouton "faire une demande" à la place du panier
+  if (p.is_custom_order) {
+    document.getElementById('atc-normal').style.display = 'none';
+    document.getElementById('atc-custom-order').style.display = '';
+  } else {
+    document.getElementById('atc-normal').style.display = '';
+    document.getElementById('atc-custom-order').style.display = 'none';
+  }
+
+  renderOptions(p);
+}
+
+// ─── Options (libellés libres avec photo/prix/stock propres) ──
+let currentOptions = [];
+let selectedOption = null;
+
+function renderOptions(p) {
+  currentOptions = p.variations || [];
+  const section = document.getElementById('options-section');
+  const list = document.getElementById('options-list');
+  if (!currentOptions.length) { section.style.display = 'none'; selectedOption = null; return; }
+  section.style.display = '';
+  selectedOption = currentOptions[0];
+  list.innerHTML = currentOptions.map((o, i) => `
+    <button type="button" class="variant-btn${i === 0 ? ' active' : ''}${o.stock === 0 ? ' out' : ''}"
+      onclick="selectOption(${o.id})" title="${o.label}${o.stock === 0 ? ' — Rupture de stock' : ''}">
+      ${o.image_url ? `<img src="${o.image_url}" alt="${o.label}" loading="lazy">` : `<span>${o.label.charAt(0)}</span>`}
+      <span class="variant-label">${o.label}</span>
+      ${o.price !== null && o.price !== undefined ? `<span class="variant-label" style="opacity:.7">${Number(o.price).toFixed(2)} €</span>` : ''}
+      ${o.stock === 0 ? '<span class="variant-oos">✗</span>' : ''}
+    </button>`).join('');
+  applyOption(selectedOption);
+}
+
+function selectOption(id) {
+  const opt = currentOptions.find(o => o.id === id);
+  if (!opt) return;
+  selectedOption = opt;
+  document.querySelectorAll('#options-list .variant-btn').forEach((btn, i) => btn.classList.toggle('active', currentOptions[i].id === id));
+  applyOption(opt);
+}
+
+function applyOption(opt) {
+  if (!opt || !currentProduct) return;
+  const price = (opt.price !== null && opt.price !== undefined) ? opt.price : currentProduct.price;
+  const stock = opt.stock;
+  document.getElementById('prod-price').textContent = Number(price).toFixed(2) + ' €';
+  const stockEl = document.getElementById('prod-stock');
+  const addBtn = document.getElementById('add-cart-btn');
+  if (stock > 0) {
+    stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${stock} dispo.)</span>`;
+    if (addBtn) addBtn.disabled = false;
+  } else {
+    stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
+    if (addBtn) addBtn.disabled = true;
+  }
+  if (opt.image_url) {
+    const thumbs = document.querySelectorAll('.gallery-thumb');
+    const matchIdx = (currentProduct.images || []).indexOf(opt.image_url);
+    if (matchIdx >= 0) { goToSlide(matchIdx); }
+  }
+  currentQty = 1;
+  const qtyDisplay = document.getElementById('qty-display');
+  if (qtyDisplay) qtyDisplay.textContent = 1;
 }
 
 // ── Gallery carousel ─────────────────────────────────────────
@@ -733,14 +815,23 @@ function setMainImg(src, thumb) {
 }
 
 function changeQty(delta) {
-  currentQty = Math.max(1, Math.min(currentProduct?.stock || 99, currentQty + delta));
+  const maxStock = selectedOption ? selectedOption.stock : (currentProduct?.stock || 99);
+  currentQty = Math.max(1, Math.min(maxStock || 99, currentQty + delta));
   document.getElementById('qty-display').textContent = currentQty;
 }
 
 function addToCartFromPage() {
   if (!currentProduct) return;
   haptic();
-  Cart.add(currentProduct, currentQty);
+  Cart.add(currentProduct, currentQty, selectedOption);
+}
+
+function requestCustomOrder() {
+  if (!currentProduct) return;
+  const label = selectedOption ? ` (${selectedOption.label})` : '';
+  const message = `Bonjour, je souhaite faire une demande personnalisée pour : ${currentProduct.name}${label}.\n\nMerci de préciser vos souhaits (dimensions, options, tissu intérieur…) :\n`;
+  try { sessionStorage.setItem('tea_prefill_contact', message); } catch {}
+  window.location.href = '/#contact';
 }
 
 function toggleFavFromPage() {

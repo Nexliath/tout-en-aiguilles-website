@@ -64,6 +64,79 @@ router.get('/variants/:groupId', (req, res) => {
   res.json(variants);
 });
 
+// ─── Options / variations libres (libellé + photo + prix + stock) ─────
+// GET /api/products/:productId/variations — admin uniquement (toutes, y compris masquées)
+router.get('/:productId/variations', requireAdmin, (req, res) => {
+  const variations = db.prepare(
+    'SELECT * FROM product_variations WHERE product_id = ? ORDER BY position ASC, id ASC'
+  ).all(req.params.productId);
+  res.json(variations);
+});
+
+// POST /api/products/:productId/variations — créer une variation
+router.post('/:productId/variations', requireAdmin, upload.single('image'), async (req, res) => {
+  try {
+    const { label, price, stock, visible, position } = req.body;
+    if (!label?.trim()) return res.status(400).json({ error: 'Libellé requis' });
+    const product = db.prepare('SELECT id FROM products WHERE id = ?').get(req.params.productId);
+    if (!product) return res.status(404).json({ error: 'Produit introuvable' });
+    let image_url = null;
+    if (req.file) {
+      const localDir = path.join(__dirname, '../../client/assets/images/products');
+      image_url = await uploadImage(req.file.buffer, req.file.originalname, 'products', localDir);
+    }
+    db.prepare(`
+      INSERT INTO product_variations (product_id, label, image_url, price, stock, visible, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      req.params.productId, label.trim(), image_url,
+      price !== undefined && price !== '' ? Number(price) : null,
+      Number(stock) || 0,
+      visible === undefined || visible === '1' || visible === 'true' || visible === true ? 1 : 0,
+      Number(position) || 0
+    );
+    res.status(201).json({ success: true });
+  } catch (e) {
+    console.error('[POST variations]', e);
+    res.status(500).json({ error: 'Erreur lors de la création : ' + e.message });
+  }
+});
+
+// PUT /api/products/variations/:variationId — modifier une variation
+router.put('/variations/:variationId', requireAdmin, upload.single('image'), async (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM product_variations WHERE id = ?').get(req.params.variationId);
+    if (!existing) return res.status(404).json({ error: 'Variation introuvable' });
+    const { label, price, stock, visible, position } = req.body;
+    let image_url = existing.image_url;
+    if (req.file) {
+      const localDir = path.join(__dirname, '../../client/assets/images/products');
+      image_url = await uploadImage(req.file.buffer, req.file.originalname, 'products', localDir);
+    }
+    db.prepare(`
+      UPDATE product_variations SET label=?, image_url=?, price=?, stock=?, visible=?, position=? WHERE id=?
+    `).run(
+      label?.trim() || existing.label,
+      image_url,
+      price !== undefined && price !== '' ? Number(price) : (price === '' ? null : existing.price),
+      stock !== undefined ? Number(stock) : existing.stock,
+      visible !== undefined ? (visible === '1' || visible === 'true' || visible === true ? 1 : 0) : existing.visible,
+      position !== undefined ? Number(position) : existing.position,
+      req.params.variationId
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[PUT variations]', e);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour : ' + e.message });
+  }
+});
+
+// DELETE /api/products/variations/:variationId — supprimer une variation
+router.delete('/variations/:variationId', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM product_variations WHERE id = ?').run(req.params.variationId);
+  res.json({ success: true });
+});
+
 // GET /api/products/categories — toutes les catégories
 router.get('/categories', (req, res) => {
   const cats = db.prepare('SELECT * FROM categories ORDER BY type, name').all();
@@ -104,7 +177,10 @@ router.get('/:slug', (req, res) => {
     WHERE p.slug = ? AND p.is_active = 1
   `).get(req.params.slug);
   if (!p) return res.status(404).json({ error: 'Produit introuvable' });
-  res.json({ ...p, images: JSON.parse(p.images || '[]'), tags: JSON.parse(p.tags || '[]') });
+  const variations = db.prepare(
+    'SELECT * FROM product_variations WHERE product_id = ? AND visible = 1 ORDER BY position ASC, id ASC'
+  ).all(p.id);
+  res.json({ ...p, images: JSON.parse(p.images || '[]'), tags: JSON.parse(p.tags || '[]'), variations });
 });
 
 // POST /api/products/:id/favorite
@@ -124,9 +200,9 @@ router.delete('/:id/favorite', requireAuth, (req, res) => {
 // ─── Admin ──────────────────────────────────────────────────
 
 // POST /api/products — créer un produit
-router.post('/', requireAdmin, upload.array('images', 5), async (req, res) => {
+router.post('/', requireAdmin, upload.array('images', 20), async (req, res) => {
   try {
-    const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label } = req.body;
+    const { name, description, price, stock, category_id, tags, is_featured, is_custom_order, variant_group_id, variant_label } = req.body;
     if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
     // Vérification doublon par nom
     const nameExists = db.prepare('SELECT id FROM products WHERE name = ?').get(name.trim());
@@ -137,10 +213,11 @@ router.post('/', requireAdmin, upload.array('images', 5), async (req, res) => {
       (req.files || []).map(f => uploadImage(f.buffer, f.originalname, 'products', localDir))
     );
     db.prepare(`
-      INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, is_custom_order, variant_group_id, variant_label)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(name, slug, description || '', Number(price), Number(stock) || 0,
            category_id || null, JSON.stringify(images), tags || '[]', is_featured ? 1 : 0,
+           (is_custom_order === '1' || is_custom_order === 'true' || is_custom_order === true) ? 1 : 0,
            variant_group_id?.trim() || null, variant_label?.trim() || null);
     res.status(201).json({ success: true });
   } catch(e) {
@@ -150,9 +227,9 @@ router.post('/', requireAdmin, upload.array('images', 5), async (req, res) => {
 });
 
 // PUT /api/products/:id — modifier un produit
-router.put('/:id', requireAdmin, upload.array('images', 5), async (req, res) => {
+router.put('/:id', requireAdmin, upload.array('images', 20), async (req, res) => {
   try {
-    const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label } = req.body;
+    const { name, description, price, stock, category_id, tags, is_featured, is_active, is_custom_order, keep_images, variant_group_id, variant_label } = req.body;
     const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
     // Vérification doublon par nom (sauf si c'est le même produit)
@@ -172,13 +249,14 @@ router.put('/:id', requireAdmin, upload.array('images', 5), async (req, res) => 
 
     db.prepare(`
       UPDATE products SET name=?, description=?, price=?, stock=?, category_id=?,
-      images=?, tags=?, is_featured=?, is_active=?, variant_group_id=?, variant_label=?, updated_at=CURRENT_TIMESTAMP
+      images=?, tags=?, is_featured=?, is_active=?, is_custom_order=?, variant_group_id=?, variant_label=?, updated_at=CURRENT_TIMESTAMP
       WHERE id=?
     `).run(name || existing.name, description ?? existing.description, Number(price) || existing.price,
            Number(stock) ?? existing.stock, category_id || existing.category_id,
            JSON.stringify(images), tags || existing.tags,
            is_featured !== undefined ? (is_featured === '1' || is_featured === 1 || is_featured === true ? 1 : 0) : existing.is_featured,
            is_active !== undefined   ? (is_active   === '1' || is_active   === 1 || is_active   === true ? 1 : 0) : existing.is_active,
+           is_custom_order !== undefined ? (is_custom_order === '1' || is_custom_order === 1 || is_custom_order === true ? 1 : 0) : existing.is_custom_order,
            variant_group_id?.trim() || existing.variant_group_id || null,
            variant_label?.trim() || existing.variant_label || null,
            req.params.id);
