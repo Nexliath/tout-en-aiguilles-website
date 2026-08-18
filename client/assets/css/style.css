@@ -1659,19 +1659,19 @@ p  { color: var(--text-light); }
 .gallery-arrow-next { right: 8px; }
 @media (max-width: 768px) { .gallery-arrow { display: flex; } }
 
-/* ── WhatsApp floating button ── */
-.whatsapp-float {
+/* ── Bouton contact flottant ── */
+.contact-float {
   position: fixed; bottom: 72px; right: 16px; z-index: 190;
   width: 52px; height: 52px; border-radius: 50%;
-  background: #25D366; color: white;
+  background: var(--rose-dark); color: white;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 16px rgba(37,211,102,.4);
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
   cursor: pointer; border: none; transition: transform .2s, box-shadow .2s;
   text-decoration: none;
 }
-.whatsapp-float:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(37,211,102,.5); }
-.whatsapp-float svg { width: 28px; height: 28px; }
-@media (min-width: 769px) { .whatsapp-float { bottom: 24px; } }
+.contact-float:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.contact-float svg { width: 24px; height: 24px; }
+@media (min-width: 769px) { .contact-float { bottom: 24px; } }
 
 /* ── "X personnes regardent" badge ── */
 .watching-badge {

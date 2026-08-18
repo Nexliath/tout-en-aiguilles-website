@@ -1063,17 +1063,15 @@ async function initHeaderRating() {
   } catch {}
 }
 
-// ─── WhatsApp flottant ───────────────────────────────────────
-function initWhatsAppFloat() {
-  if (document.querySelector('.whatsapp-float')) return;
+// ─── Bouton contact flottant ───────────────────────────────────
+function initContactFloat() {
+  if (document.querySelector('.contact-float')) return;
   const btn = document.createElement('a');
-  btn.className = 'whatsapp-float';
-  btn.href = 'https://wa.me/message/tout-en-aiguilles'; // remplacer par ton numéro: https://wa.me/33XXXXXXXXX
-  btn.target = '_blank';
-  btn.rel = 'noopener';
-  btn.title = 'Contactez-nous sur WhatsApp';
-  btn.setAttribute('aria-label', 'Contacter sur WhatsApp');
-  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.558 4.122 1.533 5.857L0 24l6.335-1.51A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.6a9.573 9.573 0 01-4.948-1.375l-.355-.211-3.666.874.934-3.562-.232-.366A9.557 9.557 0 012.4 12C2.4 6.698 6.698 2.4 12 2.4S21.6 6.698 21.6 12 17.302 21.6 12 21.6z"/></svg>`;
+  btn.className = 'contact-float';
+  btn.href = '/#contact';
+  btn.title = 'Envoyer un message';
+  btn.setAttribute('aria-label', 'Envoyer un message');
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>`;
   document.body.appendChild(btn);
 }
 
@@ -1145,7 +1143,7 @@ async function renderCartSuggestions(containerId) {
 // Init global features
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderRating();
-  initWhatsAppFloat();
+  initContactFloat();
 });
 
 // ─── Header scroll shadow ─────────────────────────────────────
