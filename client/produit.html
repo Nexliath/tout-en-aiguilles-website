@@ -727,16 +727,41 @@ function renderOptions(p) {
   const list = document.getElementById('options-list');
   if (!currentOptions.length) { section.style.display = 'none'; selectedOption = null; return; }
   section.style.display = '';
-  selectedOption = currentOptions[0];
-  list.innerHTML = currentOptions.map((o, i) => `
-    <button type="button" class="variant-btn${i === 0 ? ' active' : ''}${o.stock === 0 ? ' out' : ''}"
+
+  const prices = currentOptions.map(o => (o.price !== null && o.price !== undefined) ? o.price : p.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const pricesDiffer = minPrice !== maxPrice;
+
+  list.innerHTML = currentOptions.map((o) => `
+    <button type="button" class="variant-btn${o.stock === 0 ? ' out' : ''}"
       onclick="selectOption(${o.id})" title="${o.label}${o.stock === 0 ? ' — Rupture de stock' : ''}">
       ${o.image_url ? `<img src="${o.image_url}" alt="${o.label}" loading="lazy">` : `<span>${o.label.charAt(0)}</span>`}
       <span class="variant-label">${o.label}</span>
       ${o.price !== null && o.price !== undefined ? `<span class="variant-label" style="opacity:.7">${Number(o.price).toFixed(2)} €</span>` : ''}
       ${o.stock === 0 ? '<span class="variant-oos">✗</span>' : ''}
     </button>`).join('');
-  applyOption(selectedOption);
+
+  if (pricesDiffer) {
+    // Prix "à partir de" tant qu'aucune option n'est choisie
+    selectedOption = null;
+    document.getElementById('prod-price').textContent = minPrice.toFixed(2) + ' €+';
+    if (!p.is_custom_order) {
+      const stockEl = document.getElementById('prod-stock');
+      stockEl.innerHTML = `<span style="background:var(--cream-dark);color:var(--text-light);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Choisissez une option</span>`;
+      const addBtn = document.getElementById('add-cart-btn');
+      if (addBtn) addBtn.disabled = true;
+      const stickyPrice = document.getElementById('sticky-atc-price');
+      const stickyBtn = document.getElementById('sticky-atc-btn');
+      if (stickyPrice) stickyPrice.textContent = minPrice.toFixed(2) + ' €+';
+      if (stickyBtn) stickyBtn.disabled = true;
+    }
+  } else {
+    // Même prix pour toutes les options : pas d'ambiguïté, on présélectionne la première
+    selectedOption = currentOptions[0];
+    document.querySelectorAll('#options-list .variant-btn')[0]?.classList.add('active');
+    applyOption(selectedOption);
+  }
 }
 
 function selectOption(id) {
@@ -754,12 +779,17 @@ function applyOption(opt) {
   document.getElementById('prod-price').textContent = Number(price).toFixed(2) + ' €';
   const stockEl = document.getElementById('prod-stock');
   const addBtn = document.getElementById('add-cart-btn');
+  const stickyPrice = document.getElementById('sticky-atc-price');
+  const stickyBtn = document.getElementById('sticky-atc-btn');
+  if (stickyPrice) stickyPrice.textContent = Number(price).toFixed(2) + ' €';
   if (stock > 0) {
     stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${stock} dispo.)</span>`;
     if (addBtn) addBtn.disabled = false;
+    if (stickyBtn) stickyBtn.disabled = false;
   } else {
     stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
     if (addBtn) addBtn.disabled = true;
+    if (stickyBtn) stickyBtn.disabled = true;
   }
   if (opt.image_url) {
     const thumbs = document.querySelectorAll('.gallery-thumb');
@@ -824,6 +854,10 @@ function changeQty(delta) {
 
 function addToCartFromPage() {
   if (!currentProduct) return;
+  if (currentOptions.length > 0 && !selectedOption) {
+    Toast.show('Merci de choisir une option avant d\'ajouter au panier', 'error');
+    return;
+  }
   haptic();
   Cart.add(currentProduct, currentQty, selectedOption);
 }
