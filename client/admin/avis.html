@@ -134,7 +134,7 @@ async function loadReviews() {
     applyFilter();
   } catch (e) {
     document.getElementById('reviews-body').innerHTML =
-      `<tr><td colspan="8" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
+      `<tr><td colspan="9" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
   }
 }
 
@@ -226,7 +226,22 @@ async function deleteReply(id) {
   } catch (e) { Toast.show(e.message, 'error'); }
 }
 
+// loadReviews() reconstruit tout le tableau (renderReviews) — si une zone
+// de réponse est ouverte avec du texte non publié, un rechargement complet
+// la ferait disparaître silencieusement. On vérifie avant de recharger.
+function hasUnsavedReplyEdits() {
+  const textareas = document.querySelectorAll('[id^="reply-text-"]');
+  for (const ta of textareas) {
+    const id = Number(ta.id.replace('reply-text-', ''));
+    const review = allReviews.find(r => r.id === id);
+    const original = review?.admin_reply || '';
+    if (ta.value.trim() !== original.trim()) return true;
+  }
+  return false;
+}
+
 async function approveReview(id) {
+  if (hasUnsavedReplyEdits() && !confirm('Une réponse non publiée est en cours de rédaction — elle sera perdue si vous continuez. Continuer quand même ?')) return;
   try {
     await apiFetch(`/reviews/${id}/approve`, { method: 'PUT' });
     Toast.show('✅ Avis approuvé et publié !', 'success');
@@ -237,6 +252,7 @@ async function approveReview(id) {
 }
 
 async function rejectReview(id) {
+  if (hasUnsavedReplyEdits() && !confirm('Une réponse non publiée est en cours de rédaction — elle sera perdue si vous continuez. Continuer quand même ?')) return;
   try {
     await apiFetch(`/reviews/${id}/reject`, { method: 'PUT' });
     Toast.show('↩ Avis repassé en attente', 'success');
@@ -258,6 +274,7 @@ function closeDeleteModal() {
 
 document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
   if (!deleteTarget) return;
+  if (hasUnsavedReplyEdits() && !confirm('Une réponse non publiée est en cours de rédaction — elle sera perdue si vous continuez. Continuer quand même ?')) return;
   try {
     await apiFetch(`/reviews/${deleteTarget}`, { method: 'DELETE' });
     closeDeleteModal();
