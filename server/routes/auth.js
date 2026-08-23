@@ -11,6 +11,7 @@ const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
 const { asyncRoute } = require('../middleware/asyncRoute');
 const { sendVerificationEmail, sendEmailChangeConfirmation, sendPasswordResetEmail } = require('../utils/email');
+const { processImageToBuffer } = require('../utils/imageProcess');
 
 // ─── Config upload avatar — stockage mémoire → base64 en DB ──
 // (évite la perte des fichiers à chaque redéploiement Railway)
@@ -655,17 +656,27 @@ router.get('/confirm-email-change', (req, res) => {
 
 // ─── POST /api/auth/avatar ──────────────────────────────────
 // Stockage en base64 dans la DB — persiste entre les redéploiements Railway
-router.post('/avatar', requireAuth, uploadAvatar.single('avatar'), (req, res) => {
+router.post('/avatar', requireAuth, uploadAvatar.single('avatar'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Fichier image requis' });
 
-  // Convertir en base64 data URL et stocker en DB (pas de fichier sur disque)
-  const mime = req.file.mimetype || 'image/jpeg';
-  const b64 = req.file.buffer.toString('base64');
-  const dataUrl = `data:${mime};base64,${b64}`;
+  // Le fileFilter de multer (plus haut) ne vérifie que le Content-Type
+  // annoncé par le client — falsifiable. On fait donc décoder le fichier par
+  // sharp comme tous les autres uploads d'image du site (produits, articles,
+  // avis) : un fichier qui n'est pas réellement une image (ou un format
+  // dangereux) est rejeté ici, au lieu d'être stocké tel quel en base64 en
+  // base. Recompresse aussi la photo (souvent plusieurs Mo côté téléphone)
+  // avant stockage en base64 en DB.
+  let processed;
+  try {
+    processed = await processImageToBuffer(req.file.buffer, { maxWidth: 512, maxHeight: 512 });
+  } catch (e) {
+    return res.status(400).json({ error: 'Ce fichier n\'est pas une image valide.' });
+  }
 
+  const dataUrl = `data:image/jpeg;base64,${processed.toString('base64')}`;
   db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(dataUrl, req.user.id);
   res.json({ avatar_url: dataUrl, message: 'Photo de profil mise à jour !' });
-});
+}));
 
 // ─── PUT /api/auth/password ─────────────────────────────────
 router.put('/password', requireAuth, (req, res) => {
