@@ -9,6 +9,7 @@ const { authenticator } = require('otplib');
 const qrcode = require('qrcode');
 const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
+const { asyncRoute } = require('../middleware/asyncRoute');
 const { sendVerificationEmail, sendEmailChangeConfirmation, sendPasswordResetEmail } = require('../utils/email');
 
 // ─── Config upload avatar — stockage mémoire → base64 en DB ──
@@ -62,6 +63,37 @@ function verifyPurposeToken(token, expectedPurpose) {
     if (payload.purpose !== expectedPurpose) return null;
     return payload;
   } catch {
+    return null;
+  }
+}
+// ─── Chiffrement au repos du secret TOTP ────────────────────────
+// Le secret MFA (mfa_secret) permet à quiconque le lit de générer des codes
+// valides — un accès en lecture seule à la base (dump, backup mal protégé)
+// suffirait sinon à contourner totalement le second facteur. Chiffré en
+// AES-256-GCM avec une clé dérivée de JWT_SECRET (pas de nouvelle variable
+// d'env à gérer). Format stocké : "enc:v1:<iv_hex>:<tag_hex>:<ciphertext_hex>".
+// decryptSecret() retombe sur la valeur brute si elle ne porte pas ce préfixe,
+// pour rester compatible avec les secrets déjà en clair en base (pas de
+// migration de données requise, chiffrement transparent à la prochaine écriture).
+const MFA_ENC_PREFIX = 'enc:v1:';
+const mfaEncKey = crypto.createHash('sha256').update(JWT_SECRET).digest();
+function encryptSecret(plain) {
+  if (!plain) return plain;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', mfaEncKey, iv);
+  const ciphertext = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return MFA_ENC_PREFIX + iv.toString('hex') + ':' + tag.toString('hex') + ':' + ciphertext.toString('hex');
+}
+function decryptSecret(stored) {
+  if (!stored || !stored.startsWith(MFA_ENC_PREFIX)) return stored; // legacy en clair
+  try {
+    const [ivHex, tagHex, dataHex] = stored.slice(MFA_ENC_PREFIX.length).split(':');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', mfaEncKey, Buffer.from(ivHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+    return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8');
+  } catch (e) {
+    console.error('Erreur déchiffrement secret MFA:', e.message);
     return null;
   }
 }
@@ -179,13 +211,18 @@ router.post('/resend-verification', (req, res) => {
 });
 
 // ─── POST /api/auth/login ───────────────────────────────────
+// Hash factice utilisé quand l'email n'existe pas, pour que bcrypt.compareSync
+// s'exécute dans les deux cas (email inconnu / mot de passe incorrect) — sans
+// ça, le temps de réponse laisse deviner si un email est enregistré ou non.
+const DUMMY_HASH = bcrypt.hashSync('dummy_password_constant_time', 10);
 router.post('/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)
     return res.status(400).json({ error: 'Email et mot de passe requis' });
 
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user || !bcrypt.compareSync(password, user.password_hash))
+  const passwordOk = bcrypt.compareSync(password, user ? user.password_hash : DUMMY_HASH);
+  if (!user || !passwordOk)
     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
 
   if (!user.email_verified) {
@@ -220,35 +257,84 @@ router.post('/login', (req, res) => {
 // Résout l'utilisateur ciblé par une requête MFA : soit via un token de
 // finalité limitée (setup en cours / défi de connexion), soit via un
 // Authorization Bearer classique (auto-activation volontaire depuis "Mon
-// compte" pour un utilisateur déjà connecté).
+// compte" pour un utilisateur déjà connecté). `via` indique la méthode de
+// résolution — utilisé pour décider si une ré-authentification (mot de
+// passe + code actuel) est exigée avant de régénérer un secret déjà actif.
 function resolveMfaUser(req, expectedPurpose) {
   const { setup_token, mfa_token } = req.body;
   const purposeToken = expectedPurpose === 'mfa_setup' ? setup_token : mfa_token;
   if (purposeToken) {
     const payload = verifyPurposeToken(purposeToken, expectedPurpose);
     if (!payload) return null;
-    return db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+    return user ? { user, via: 'token' } : null;
   }
   const auth = req.headers.authorization;
   if (auth && auth.startsWith('Bearer ')) {
     try {
       const payload = jwt.verify(auth.slice(7), JWT_SECRET);
       if (payload.purpose) return null; // pas un vrai token de session
-      return db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+      return user ? { user, via: 'bearer' } : null;
     } catch { return null; }
   }
   return null;
 }
 
+// ── Anti-bruteforce MFA (par compte, en plus du rate-limit IP global) ──
+// Map user_id → [timestamps des échecs]. Verrouille temporairement un
+// compte après plusieurs codes invalides, pour empêcher un bruteforce
+// distribué (plusieurs IP) sur un code TOTP à 6 chiffres.
+const mfaFailedAttempts = new Map();
+const MFA_MAX_ATTEMPTS = 6;
+const MFA_LOCK_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+function isMfaLocked(userId) {
+  const attempts = (mfaFailedAttempts.get(userId) || []).filter(t => Date.now() - t < MFA_LOCK_WINDOW_MS);
+  mfaFailedAttempts.set(userId, attempts);
+  return attempts.length >= MFA_MAX_ATTEMPTS;
+}
+function recordMfaFailure(userId) {
+  const attempts = (mfaFailedAttempts.get(userId) || []).filter(t => Date.now() - t < MFA_LOCK_WINDOW_MS);
+  attempts.push(Date.now());
+  mfaFailedAttempts.set(userId, attempts);
+}
+function clearMfaAttempts(userId) {
+  mfaFailedAttempts.delete(userId);
+}
+const MFA_LOCK_MSG = 'Trop de tentatives échouées. Réessayez dans quelques minutes.';
+
 // POST /api/auth/mfa/setup/init — génère (ou régénère) un secret TOTP en
 // attente de confirmation. Accessible via setup_token (activation forcée
-// admin) ou via un token de session classique (auto-activation volontaire).
-router.post('/mfa/setup/init', async (req, res) => {
-  const user = resolveMfaUser(req, 'mfa_setup');
-  if (!user) return res.status(401).json({ error: 'Session invalide ou expirée, reconnectez-vous.' });
+// admin, uniquement avant la première activation) ou via un token de
+// session classique (auto-activation volontaire, ou reconfiguration d'un
+// MFA déjà actif — dans ce cas mot de passe + code actuel sont exigés pour
+// empêcher qu'un token de session volé suffise à prendre le contrôle du
+// second facteur).
+router.post('/mfa/setup/init', asyncRoute(async (req, res) => {
+  const resolved = resolveMfaUser(req, 'mfa_setup');
+  if (!resolved) return res.status(401).json({ error: 'Session invalide ou expirée, reconnectez-vous.' });
+  const { user, via } = resolved;
+
+  if (user.mfa_enabled) {
+    if (via === 'token') {
+      // Un setup_token n'est valide que pour une PREMIÈRE activation ; un
+      // compte déjà protégé doit repasser par la reconfiguration volontaire
+      // (Bearer + réauthentification) depuis Mon compte.
+      return res.status(400).json({ error: 'Le MFA est déjà actif sur ce compte. Reconfigurez-le depuis "Mon compte".' });
+    }
+    if (isMfaLocked(user.id)) return res.status(429).json({ error: MFA_LOCK_MSG });
+    const { password, code } = req.body;
+    const passwordOk = password && bcrypt.compareSync(password, user.password_hash);
+    const codeOk = code && authenticator.check(String(code).trim(), decryptSecret(user.mfa_secret));
+    if (!passwordOk || !codeOk) {
+      recordMfaFailure(user.id);
+      return res.status(401).json({ error: 'Mot de passe et code de vérification actuel requis pour reconfigurer le MFA.' });
+    }
+    clearMfaAttempts(user.id);
+  }
 
   const secret = authenticator.generateSecret();
-  db.prepare('UPDATE users SET mfa_secret = ? WHERE id = ?').run(secret, user.id);
+  db.prepare('UPDATE users SET mfa_secret = ? WHERE id = ?').run(encryptSecret(secret), user.id);
 
   const uri = authenticator.keyuri(user.email, 'Tout en Aiguilles', secret);
   try {
@@ -258,20 +344,25 @@ router.post('/mfa/setup/init', async (req, res) => {
     console.error('Erreur génération QR MFA:', e.message);
     res.status(500).json({ error: 'Erreur lors de la génération du QR code' });
   }
-});
+}));
 
 // POST /api/auth/mfa/setup/confirm — vérifie le premier code et active le
 // MFA. Renvoie le token de session final + les codes de récupération
 // (affichés une seule fois, à noter par l'utilisateur).
-router.post('/mfa/setup/confirm', (req, res) => {
-  const user = resolveMfaUser(req, 'mfa_setup');
-  if (!user) return res.status(401).json({ error: 'Session invalide ou expirée, reconnectez-vous.' });
+router.post('/mfa/setup/confirm', asyncRoute(async (req, res) => {
+  const resolved = resolveMfaUser(req, 'mfa_setup');
+  if (!resolved) return res.status(401).json({ error: 'Session invalide ou expirée, reconnectez-vous.' });
+  const { user } = resolved;
+  if (isMfaLocked(user.id)) return res.status(429).json({ error: MFA_LOCK_MSG });
 
   const { code } = req.body;
-  if (!user.mfa_secret) return res.status(400).json({ error: "Aucune activation en cours — relancez la configuration." });
-  if (!code || !authenticator.check(String(code).trim(), user.mfa_secret)) {
+  const currentSecret = decryptSecret(user.mfa_secret);
+  if (!currentSecret) return res.status(400).json({ error: "Aucune activation en cours — relancez la configuration." });
+  if (!code || !authenticator.check(String(code).trim(), currentSecret)) {
+    recordMfaFailure(user.id);
     return res.status(400).json({ error: 'Code invalide. Vérifiez l\'heure de votre téléphone et réessayez.' });
   }
+  clearMfaAttempts(user.id);
 
   const { plain, hashed } = generateRecoveryCodes();
   db.prepare('UPDATE users SET mfa_enabled = 1, mfa_recovery_codes = ? WHERE id = ?').run(JSON.stringify(hashed), user.id);
@@ -279,55 +370,86 @@ router.post('/mfa/setup/confirm', (req, res) => {
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
   const { token, user: safe } = issueSession(updated, res);
   res.json({ token, user: safe, recovery_codes: plain });
-});
+}));
 
 // POST /api/auth/mfa/verify — défi de connexion pour un compte ayant déjà
 // le MFA actif. Accepte un code TOTP à 6 chiffres OU un code de récupération.
-router.post('/mfa/verify', (req, res) => {
+router.post('/mfa/verify', asyncRoute(async (req, res) => {
   const { mfa_token, code, recovery_code } = req.body;
   const payload = verifyPurposeToken(mfa_token, 'mfa_challenge');
   if (!payload) return res.status(401).json({ error: 'Session de connexion expirée, reconnectez-vous.' });
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
   if (!user || !user.mfa_enabled) return res.status(401).json({ error: 'Session invalide.' });
+  if (isMfaLocked(user.id)) return res.status(429).json({ error: MFA_LOCK_MSG });
 
   if (code) {
-    if (!authenticator.check(String(code).trim(), user.mfa_secret)) {
+    if (!authenticator.check(String(code).trim(), decryptSecret(user.mfa_secret))) {
+      recordMfaFailure(user.id);
       return res.status(400).json({ error: 'Code invalide.' });
     }
   } else if (recovery_code) {
     const hashed = JSON.parse(user.mfa_recovery_codes || '[]');
     const idx = hashed.findIndex(h => bcrypt.compareSync(String(recovery_code).trim(), h));
-    if (idx === -1) return res.status(400).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
+    if (idx === -1) {
+      recordMfaFailure(user.id);
+      return res.status(400).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
+    }
     hashed.splice(idx, 1); // usage unique
     db.prepare('UPDATE users SET mfa_recovery_codes = ? WHERE id = ?').run(JSON.stringify(hashed), user.id);
   } else {
     return res.status(400).json({ error: 'Code requis.' });
   }
+  clearMfaAttempts(user.id);
 
   const { token, user: safe } = issueSession(user, res);
   res.json({ token, user: safe });
-});
+}));
 
 // POST /api/auth/mfa/disable — désactivation volontaire (mot de passe +
-// code requis). Pour un compte admin, le MFA sera simplement redemandé à
-// la prochaine connexion (voir /login) — pas de contournement possible.
-router.post('/mfa/disable', requireAuth, (req, res) => {
+// code TOTP OU code de récupération). Pour un compte admin, le MFA sera
+// simplement redemandé à la prochaine connexion (voir /login) — pas de
+// contournement possible.
+router.post('/mfa/disable', requireAuth, asyncRoute(async (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
   if (!user.mfa_enabled) return res.status(400).json({ error: 'Le MFA n\'est pas activé sur ce compte.' });
+  if (isMfaLocked(user.id)) return res.status(429).json({ error: MFA_LOCK_MSG });
 
-  const { password, code } = req.body;
+  const { password, code, recovery_code } = req.body;
   if (!password || !bcrypt.compareSync(password, user.password_hash)) {
+    recordMfaFailure(user.id);
     return res.status(401).json({ error: 'Mot de passe incorrect.' });
   }
-  if (!code || !authenticator.check(String(code).trim(), user.mfa_secret)) {
+
+  let verified = false;
+  let remainingRecoveryCodes = null;
+  if (code) {
+    verified = authenticator.check(String(code).trim(), decryptSecret(user.mfa_secret));
+  } else if (recovery_code) {
+    const hashed = JSON.parse(user.mfa_recovery_codes || '[]');
+    const idx = hashed.findIndex(h => bcrypt.compareSync(String(recovery_code).trim(), h));
+    if (idx !== -1) {
+      verified = true;
+      hashed.splice(idx, 1);
+      remainingRecoveryCodes = hashed;
+    }
+  }
+  if (!verified) {
+    recordMfaFailure(user.id);
     return res.status(400).json({ error: 'Code de vérification invalide.' });
   }
+  clearMfaAttempts(user.id);
 
+  // Si désactivé via un code de récupération, on persiste quand même la
+  // consommation avant de tout effacer — cohérence si jamais une autre
+  // requête concurrente lisait encore l'ancienne liste (fenêtre très courte).
+  if (remainingRecoveryCodes !== null) {
+    db.prepare('UPDATE users SET mfa_recovery_codes = ? WHERE id = ?').run(JSON.stringify(remainingRecoveryCodes), user.id);
+  }
   db.prepare('UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_recovery_codes = NULL WHERE id = ?').run(user.id);
   res.json({ message: 'Double authentification désactivée.' });
-});
+}));
 
 // ─── POST /api/auth/forgot-password ─────────────────────────
 // Toujours une réponse générique (que l'email existe ou non) pour ne pas
