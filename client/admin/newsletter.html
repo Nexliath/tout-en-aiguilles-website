@@ -79,9 +79,9 @@
         <div class="admin-panel-title">👥 Subscribers récents</div>
         <div class="admin-table-wrap" style="max-height:420px;overflow-y:auto">
           <table class="admin-table">
-            <thead><tr><th>Email</th><th>Prénom</th><th>Date</th></tr></thead>
+            <thead><tr><th>Email</th><th>Prénom</th><th>Confirmé</th><th>Date</th></tr></thead>
             <tbody id="subs-tbody">
-              <tr><td colspan="3" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+              <tr><td colspan="4" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -125,17 +125,18 @@ async function loadSubscribers() {
     const tbody = document.getElementById('subs-tbody');
     tbody.innerHTML = allSubs.slice(0,50).map(s => `
       <tr>
-        <td style="font-size:.85rem">${s.email}</td>
-        <td style="font-size:.85rem">${s.first_name || '—'}</td>
+        <td style="font-size:.85rem">${escapeHtml(s.email)}</td>
+        <td style="font-size:.85rem">${escapeHtml(s.first_name) || '—'}</td>
+        <td style="font-size:.78rem">${s.confirmed ? '✅' : '⏳ en attente'}</td>
         <td style="font-size:.78rem;color:var(--text-light)">${new Date(s.subscribed_at).toLocaleDateString('fr-FR')}</td>
-      </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-light)">Aucun subscriber</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-light)">Aucun subscriber</td></tr>';
   } catch(e) {
     // Avant cette correction, une erreur ici laissait le tableau bloqué sur
     // son spinner indéfiniment (contrairement à loadCampaigns() plus bas,
     // qui affiche bien un message dans son tableau en cas d'échec).
     Toast.show(e.message, 'error');
     const tbody = document.getElementById('subs-tbody');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#d9534f;padding:24px">Erreur de chargement — ${e.message}</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#d9534f;padding:24px">Erreur de chargement — ${e.message}</td></tr>`;
   }
 }
 
@@ -258,10 +259,11 @@ function exportSubscribers() {
   const rows = allSubs.map(s => ({
     'Email': s.email, 'Prénom': s.first_name || '',
     'Source': s.source || 'website', 'Actif': s.is_active ? 'Oui' : 'Non',
+    'Confirmé': s.confirmed ? 'Oui' : 'Non',
     'Date inscription': new Date(s.subscribed_at).toLocaleDateString('fr-FR'),
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{wch:30},{wch:16},{wch:12},{wch:8},{wch:18}];
+  ws['!cols'] = [{wch:30},{wch:16},{wch:12},{wch:8},{wch:10},{wch:18}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Subscribers');
   XLSX.writeFile(wb, `newsletter_subscribers_${new Date().toISOString().split('T')[0]}.xlsx`);
