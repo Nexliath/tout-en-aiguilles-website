@@ -2,7 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail } = require('../utils/email');
+const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail, sendOversellAlert } = require('../utils/email');
 const { logActivity } = require('../utils/activityLog');
 const { asyncRoute } = require('../middleware/asyncRoute');
 
@@ -76,16 +76,40 @@ function resolveOrderItems(items) {
   return { resolved, productsTotal };
 }
 
-// Décrémente le stock du produit ou, si l'article porte une variante,
-// le stock de cette variante spécifiquement.
+// Décrémente le stock du produit ou, si l'article porte une variante, le
+// stock de cette variante — via une seule requête UPDATE atomique avec garde
+// WHERE stock >= ?. Le stock disponible n'est vérifié qu'à la création de la
+// commande (resolveOrderItems, plus haut), pas au moment de cette
+// décrémentation qui n'arrive qu'après confirmation du paiement (webhook
+// Stripe, capture PayPal) — un délai pendant lequel une autre commande a pu
+// épuiser le stock restant. En passant par une garde SQL plutôt qu'un
+// SELECT-puis-UPDATE, cette fonction ne peut jamais faire passer le stock
+// sous zéro, même si deux commandes se finalisent presque simultanément
+// pour le dernier exemplaire. Comme la commande est déjà payée à ce stade,
+// on ne peut pas simplement la refuser : le stock est ramené à 0 et les
+// articles concernés sont retournés pour que l'appelant alerte la boutique.
 function decrementStockForItems(items) {
+  const oversold = [];
   for (const item of items) {
+    let result;
     if (item.variant_id) {
-      db.prepare('UPDATE product_variants SET stock = stock - ? WHERE id = ?').run(item.qty, item.variant_id);
+      result = db.prepare('UPDATE product_variants SET stock = stock - ? WHERE id = ? AND stock >= ?').run(item.qty, item.variant_id, item.qty);
+      if (result.changes === 0) db.prepare('UPDATE product_variants SET stock = 0 WHERE id = ?').run(item.variant_id);
     } else {
-      db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
+      result = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?').run(item.qty, item.product_id, item.qty);
+      if (result.changes === 0) db.prepare('UPDATE products SET stock = 0 WHERE id = ?').run(item.product_id);
     }
+    if (result.changes === 0) oversold.push(item);
   }
+  return oversold;
+}
+
+// Envoie l'alerte de survente à la boutique sans jamais faire échouer le
+// flux de paiement qui vient d'aboutir (le client a déjà été débité).
+function alertIfOversold(order, oversoldItems) {
+  if (!oversoldItems || !oversoldItems.length) return;
+  console.error(`⚠️ Survente commande #${order.id} :`, oversoldItems.map(i => `${i.name} x${i.qty}`).join(', '));
+  sendOversellAlert(order, oversoldItems).catch(err => console.error('Erreur envoi alerte survente:', err.message));
 }
 
 // Frais fixe d'emballage cadeau (miroir de la valeur codée en dur côté client dans panier.html)
@@ -262,12 +286,13 @@ router.post('/checkout', asyncRoute(async (req, res) => {
   // Mode démo (sans Stripe)
   if (!stripe) {
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
-    decrementStockForItems(orderItems);
+    const oversold = decrementStockForItems(orderItems);
     incrementPromoUsage(promoResult.promo?.code);
     const demoOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
     if (demoOrder) {
       sendNewOrderNotification({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
       sendOrderStatusEmail({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
+      alertIfOversold(demoOrder, oversold);
     }
     return res.json({ demo: true, order_id: orderId, message: 'Commande enregistrée (mode démo)' });
   }
@@ -322,15 +347,21 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
     const session = event.data.object;
     const orderId = session.metadata?.order_id;
     if (orderId) {
-      db.prepare('UPDATE orders SET status = ?, stripe_payment_intent = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run('paid', session.payment_intent, orderId);
       const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
-      if (order) {
+      // Idempotence : Stripe rejoue un webhook tant qu'il ne reçoit pas de
+      // réponse 2xx rapide (timeout, coupure réseau...), et peut aussi
+      // livrer un même événement en double. Sans cette vérification, un
+      // rejeu décrémenterait le stock une seconde fois pour une commande
+      // déjà marquée payée (contrairement à /paypal/capture, déjà protégé).
+      if (order && !['paid', 'shipped', 'delivered'].includes(order.status)) {
+        db.prepare('UPDATE orders SET status = ?, stripe_payment_intent = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run('paid', session.payment_intent, orderId);
         const parsedItems = JSON.parse(order.items || '[]');
-        decrementStockForItems(parsedItems);
+        const oversoldItems = decrementStockForItems(parsedItems);
         incrementPromoUsage(order.promo_code);
         // Email client : paiement confirmé + facture
-        sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
+        sendOrderStatusEmail({ ...order, status: 'paid', items: parsedItems }).catch(console.error);
+        alertIfOversold(order, oversoldItems);
       }
     }
   }
@@ -554,8 +585,9 @@ router.post('/paypal/create', asyncRoute(async (req, res) => {
   if (!token) {
     // Mode démo sans PayPal
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
-    decrementStockForItems(orderItems);
+    const oversoldDemo = decrementStockForItems(orderItems);
     incrementPromoUsage(promoResult.promo?.code);
+    alertIfOversold(newOrder, oversoldDemo);
     return res.json({ demo: true, order_id: orderId });
   }
 
@@ -618,9 +650,10 @@ router.post('/paypal/capture', asyncRoute(async (req, res) => {
 
   db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('paid', order_id);
   const parsedItems = JSON.parse(order.items || '[]');
-  decrementStockForItems(parsedItems);
+  const oversoldItems = decrementStockForItems(parsedItems);
   incrementPromoUsage(order.promo_code);
   sendOrderStatusEmail({ ...order, status: 'paid', items: parsedItems }).catch(console.error);
+  alertIfOversold(order, oversoldItems);
   res.json({ success: true, order_id });
 }));
 
