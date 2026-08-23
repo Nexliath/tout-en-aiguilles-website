@@ -97,6 +97,20 @@ function decryptSecret(stored) {
     return null;
   }
 }
+// Vérifie un code TOTP en distinguant trois cas : vrai, faux, ou secret
+// illisible (déchiffrement impossible — typiquement parce que JWT_SECRET a
+// changé depuis l'activation du MFA, puisque la clé de chiffrement en
+// dérive). Ce 3e cas n'est PAS un code invalide : réessayer un autre code ne
+// changera rien, alors qu'un vrai "code invalide" peut se corriger au
+// prochain essai. Les deux ne doivent donc pas produire le même message.
+function checkTotp(code, encryptedSecret) {
+  if (!encryptedSecret) return false;
+  const secret = decryptSecret(encryptedSecret);
+  if (!secret) return null; // déchiffrement impossible
+  return authenticator.check(String(code).trim(), secret);
+}
+const MFA_SECRET_UNREADABLE_MSG = 'Erreur de configuration serveur : le secret de double authentification de ce compte est illisible. Utilisez un code de secours si vous en avez, sinon contactez le support.';
+
 function generateRecoveryCodes() {
   const plain = [];
   const hashed = [];
@@ -325,8 +339,9 @@ router.post('/mfa/setup/init', asyncRoute(async (req, res) => {
     if (isMfaLocked(user.id)) return res.status(429).json({ error: MFA_LOCK_MSG });
     const { password, code } = req.body;
     const passwordOk = password && bcrypt.compareSync(password, user.password_hash);
-    const codeOk = code && authenticator.check(String(code).trim(), decryptSecret(user.mfa_secret));
-    if (!passwordOk || !codeOk) {
+    const totpResult = code ? checkTotp(code, user.mfa_secret) : false;
+    if (totpResult === null) return res.status(500).json({ error: MFA_SECRET_UNREADABLE_MSG });
+    if (!passwordOk || !totpResult) {
       recordMfaFailure(user.id);
       return res.status(401).json({ error: 'Mot de passe et code de vérification actuel requis pour reconfigurer le MFA.' });
     }
@@ -356,9 +371,10 @@ router.post('/mfa/setup/confirm', asyncRoute(async (req, res) => {
   if (isMfaLocked(user.id)) return res.status(429).json({ error: MFA_LOCK_MSG });
 
   const { code } = req.body;
-  const currentSecret = decryptSecret(user.mfa_secret);
-  if (!currentSecret) return res.status(400).json({ error: "Aucune activation en cours — relancez la configuration." });
-  if (!code || !authenticator.check(String(code).trim(), currentSecret)) {
+  if (!user.mfa_secret) return res.status(400).json({ error: "Aucune activation en cours — relancez la configuration." });
+  const totpResult = code ? checkTotp(code, user.mfa_secret) : false;
+  if (totpResult === null) return res.status(500).json({ error: MFA_SECRET_UNREADABLE_MSG });
+  if (!totpResult) {
     recordMfaFailure(user.id);
     return res.status(400).json({ error: 'Code invalide. Vérifiez l\'heure de votre téléphone et réessayez.' });
   }
@@ -384,7 +400,9 @@ router.post('/mfa/verify', asyncRoute(async (req, res) => {
   if (isMfaLocked(user.id)) return res.status(429).json({ error: MFA_LOCK_MSG });
 
   if (code) {
-    if (!authenticator.check(String(code).trim(), decryptSecret(user.mfa_secret))) {
+    const totpResult = checkTotp(code, user.mfa_secret);
+    if (totpResult === null) return res.status(500).json({ error: MFA_SECRET_UNREADABLE_MSG });
+    if (!totpResult) {
       recordMfaFailure(user.id);
       return res.status(400).json({ error: 'Code invalide.' });
     }
@@ -425,7 +443,13 @@ router.post('/mfa/disable', requireAuth, asyncRoute(async (req, res) => {
   let verified = false;
   let remainingRecoveryCodes = null;
   if (code) {
-    verified = authenticator.check(String(code).trim(), decryptSecret(user.mfa_secret));
+    const totpResult = checkTotp(code, user.mfa_secret);
+    // Le code de récupération reste une voie de sortie indépendante du
+    // secret TOTP — mais ici le client a choisi la voie "code" (pas
+    // recovery_code), donc un secret illisible doit être signalé
+    // explicitement plutôt que traité comme un simple code invalide.
+    if (totpResult === null) return res.status(500).json({ error: MFA_SECRET_UNREADABLE_MSG });
+    verified = totpResult === true;
   } else if (recovery_code) {
     const hashed = JSON.parse(user.mfa_recovery_codes || '[]');
     const idx = hashed.findIndex(h => bcrypt.compareSync(String(recovery_code).trim(), h));
