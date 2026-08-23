@@ -856,32 +856,13 @@ function initBackToTop() {
   }, { passive: true });
 }
 
-// ─── Cookie consent banner ────────────────────────────────────
-function initCookieBanner() {
-  if (localStorage.getItem('cookie_consent')) return; // déjà répondu
-  const banner = document.createElement('div');
-  banner.id = 'cookie-banner';
-  banner.innerHTML = `
-    <div class="cookie-text">
-      🍪 Ce site utilise des cookies analytiques (Google Tag Manager) pour améliorer votre expérience.
-      <a href="/mentions-legales.html" style="color:var(--rose-dark)">En savoir plus</a>
-    </div>
-    <div class="cookie-actions">
-      <button class="cookie-btn cookie-refuse" onclick="setCookieConsent('refused')">Refuser</button>
-      <button class="cookie-btn cookie-accept" onclick="setCookieConsent('accepted')">Accepter</button>
-    </div>`;
-  document.body.appendChild(banner);
-}
-
-function setCookieConsent(choice) {
-  localStorage.setItem('cookie_consent', choice);
-  const banner = document.getElementById('cookie-banner');
-  if (banner) banner.remove();
-  if (choice === 'accepted') {
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({ event: 'cookie_consent_granted' });
-  }
-}
+// Note : le bandeau cookies RGPD est géré plus haut dans ce fichier
+// (initCookieConsent / showCookieBanner / setCookieConsent, clé
+// tea_cookie_consent). Il existait ici un second système entièrement
+// dupliqué (même nom de fonction setCookieConsent, clé localStorage
+// différente 'cookie_consent') qui écrasait silencieusement le premier par
+// hoisting JS et ne chargeait jamais réellement GTM (pas d'appel à
+// loadGTM()) — supprimé pour ne garder qu'une seule implémentation.
 
 // ─── Init on load ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -889,5 +870,4 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeader();
   Favorites.loadFromServer();
   initBackToTop();
-  initCookieBanner();
 });
