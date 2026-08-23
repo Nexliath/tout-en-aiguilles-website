@@ -3,7 +3,27 @@
    Palette : Rose poudré · Vert sauge · Crème
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Lato:wght@300;400;700&display=swap');
+/* Polices auto-hébergées (perf + RGPD : plus de requête vers Google au chargement) */
+@font-face {
+  font-family: 'Lato'; font-style: normal; font-weight: 300; font-display: swap;
+  src: url('/assets/fonts/lato-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lato'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/assets/fonts/lato-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lato'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/assets/fonts/lato-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Playfair Display'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url('/assets/fonts/playfair-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Playfair Display'; font-style: italic; font-weight: 400 500; font-display: swap;
+  src: url('/assets/fonts/playfair-italic.woff2') format('woff2');
+}
 
 /* ─── Variables ─────────────────────────────────────────────── */
 :root {
@@ -68,6 +88,7 @@ p  { color: var(--text-light); }
 .grid-2      { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
 .grid-3      { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 .grid-4      { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+.recently-viewed-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
 
 /* ─── Header / Navigation ───────────────────────────────────── */
 .site-header {
@@ -1069,6 +1090,7 @@ p  { color: var(--text-light); }
 @media (max-width: 1024px) {
   .header-search-wrap { display: none; }
   .grid-4    { grid-template-columns: repeat(3, 1fr); }
+  .recently-viewed-grid { grid-template-columns: repeat(3, 1fr); }
   .news-grid { grid-template-columns: repeat(2, 1fr); }
   /* Tablette : réduire les photos */
   .hero-container { gap: 24px; }
@@ -1102,6 +1124,7 @@ p  { color: var(--text-light); }
   /* Grids */
   .grid-2 { grid-template-columns: 1fr 1fr; }
   .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .recently-viewed-grid { grid-template-columns: repeat(2, 1fr); }
   .news-grid { grid-template-columns: 1fr; }
   .shop-layout, .cart-layout, .account-layout { grid-template-columns: 1fr; }
   .filters-panel  { position: static; }
@@ -1274,6 +1297,7 @@ p  { color: var(--text-light); }
 @media (max-width: 480px) {
   .grid-2 { grid-template-columns: 1fr; }
   .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+  .recently-viewed-grid { grid-template-columns: 1fr 1fr; }
   .hero-actions { flex-direction: column; }
   .btn-lg { padding: 14px 28px; width: 100%; justify-content: center; }
   .modal { padding: 20px 16px; border-radius: var(--radius-lg); }
