@@ -1,8 +1,4 @@
 const express = require('express');
-let _loyaltyAward = null;
-function awardLoyalty(userId, action, pts, ref) {
-  try { if (!_loyaltyAward) _loyaltyAward = require('./loyalty').awardPoints; _loyaltyAward(userId, action, pts, ref); } catch {}
-}
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -11,10 +7,20 @@ const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 // ─── Config upload photos d'avis ────────────────────────────
-const { uploadImage } = require('../utils/imageUpload');
+const reviewStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../../client/assets/images/reviews');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `review_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+  }
+});
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: reviewStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB par photo (le client compresse déjà)
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
     cb(null, true);
@@ -28,12 +34,12 @@ router.get('/', (req, res) => {
   if (!product_id) return res.status(400).json({ error: 'product_id requis' });
 
   const reviews = db.prepare(`
-    SELECT r.id, r.rating, r.comment, r.created_at,
-           COALESCE(r.verified_purchase, 0) as verified_purchase,
-           u.first_name, u.last_name,
+    SELECT r.id, r.rating, r.comment, r.created_at, r.admin_reply, r.admin_reply_at,
+           COALESCE(u.first_name, 'Client') AS first_name,
+           COALESCE(u.last_name, 'Tout en Aiguilles') AS last_name,
            GROUP_CONCAT(rp.photo_url) AS photos_raw
     FROM reviews r
-    JOIN users u ON u.id = r.user_id
+    LEFT JOIN users u ON u.id = r.user_id
     LEFT JOIN review_photos rp ON rp.review_id = r.id
     WHERE r.product_id = ? AND r.is_approved = 1
     GROUP BY r.id
@@ -51,41 +57,12 @@ router.get('/', (req, res) => {
     photos_raw: undefined
   }));
 
-  // Vérifier si l'utilisateur connecté a acheté ce produit
-  let has_purchased = false;
-  let already_reviewed = false;
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    try {
-      const jwt = require('jsonwebtoken');
-      const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024');
-      const userId = decoded.id;
-      // Chercher dans les commandes payées/livrées de cet utilisateur
-      const userOrders = db.prepare(
-        "SELECT items FROM orders WHERE user_id = ? AND status IN ('paid','shipped','delivered')"
-      ).all(userId);
-      // Admin = always considered as having purchased
-      const isAdminUser = db.prepare("SELECT role FROM users WHERE id = ?").get(decoded.id);
-      if (isAdminUser?.role === 'admin') {
-        has_purchased = true;
-      } else {
-        has_purchased = userOrders.some(order => {
-          try {
-            const items = JSON.parse(order.items || '[]');
-            return items.some(i => String(i.product_id) === String(product_id));
-          } catch { return false; }
-        });
-      }
-      already_reviewed = !!db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, userId);
-    } catch {}
-  }
-
-  res.json({ reviews: parsed, stats: { count: stats.count, average: stats.average || 0 }, has_purchased, already_reviewed });
+  res.json({ reviews: parsed, stats: { count: stats.count, average: stats.average || 0 } });
 });
 
 // ─── POST /api/reviews ──────────────────────────────────────
 // Authentifié : poster un avis avec jusqu'à 3 photos
-router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
+router.post('/', requireAuth, upload.array('photos', 3), (req, res) => {
   const { product_id, rating, comment } = req.body;
   const user_id = req.user.id;
 
@@ -97,56 +74,27 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
   const product = db.prepare('SELECT id FROM products WHERE id = ? AND is_active = 1').get(product_id);
   if (!product) return res.status(404).json({ error: 'Produit introuvable' });
 
-  // Les admins peuvent commenter sans avoir acheté
-  const isAdmin = req.user.role === 'admin';
-  
-  if (!isAdmin) {
-    // Vérifier que l'utilisateur a acheté ce produit
-    const userOrders = db.prepare(
-      "SELECT items FROM orders WHERE user_id = ? AND status IN ('paid','shipped','delivered')"
-    ).all(user_id);
-    const hasBought = userOrders.some(order => {
-      try {
-        const items = JSON.parse(order.items || '[]');
-        return items.some(i => String(i.product_id) === String(product_id));
-      } catch { return false; }
-    });
-    if (!hasBought) return res.status(403).json({ error: 'Vous devez avoir acheté ce produit pour laisser un avis.' });
-  }
-
   // Vérifier l'unicité
   const existing = db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, user_id);
   if (existing) return res.status(409).json({ error: 'Vous avez déjà laissé un avis sur ce produit.' });
 
-  // Migration: add verified_purchase column if missing
-  try { db.exec('ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0'); } catch {}
-
   const result = db.prepare(
-    'INSERT INTO reviews (product_id, user_id, rating, comment, verified_purchase) VALUES (?, ?, ?, ?, 1)'
+    'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES (?, ?, ?, ?)'
   ).run(product_id, user_id, r, comment?.trim() || null);
 
   const reviewId = result.lastInsertRowid;
 
   // Enregistrer les photos si présentes
   if (req.files && req.files.length > 0) {
-    const localDir = path.join(__dirname, '../../client/assets/images/reviews');
     const insertPhoto = db.prepare('INSERT INTO review_photos (review_id, photo_url) VALUES (?, ?)');
     for (const file of req.files) {
-      try {
-        const url = await uploadImage(file.buffer, file.originalname, 'reviews', localDir);
-        insertPhoto.run(reviewId, url);
-      } catch(imgErr) {
-        console.error('[review photo upload]', imgErr.message);
-      }
+      insertPhoto.run(reviewId, `/assets/images/reviews/${file.filename}`);
     }
   }
 
-  // +10 points fidélité pour l'avis
-  awardLoyalty(req.user.id, 'review', 10, String(product_id));
-
   res.status(201).json({
     id: reviewId,
-    message: 'Avis enregistré ! Il sera visible après validation. +10 points fidélité 🌸',
+    message: 'Avis enregistré ! Il sera visible après validation.',
     pending: true
   });
 });
@@ -154,35 +102,28 @@ router.post('/', requireAuth, upload.array('photos', 3), async (req, res) => {
 // ─── GET /api/reviews/admin ─────────────────────────────────
 // Admin : tous les avis avec photos
 router.get('/admin', requireAdmin, (req, res) => {
-  try {
-    // Migration défensive : s'assurer que verified_purchase existe
-    try { db.exec('ALTER TABLE reviews ADD COLUMN verified_purchase INTEGER DEFAULT 0'); } catch {}
+  const reviews = db.prepare(`
+    SELECT r.id, r.rating, r.comment, r.is_approved, r.created_at, r.admin_reply, r.admin_reply_at,
+           COALESCE(u.first_name, 'Client') AS first_name,
+           COALESCE(u.last_name, 'supprimé') AS last_name,
+           u.email,
+           COALESCE(p.name, '(produit supprimé)') AS product_name, p.id AS product_id,
+           GROUP_CONCAT(rp.photo_url) AS photos_raw
+    FROM reviews r
+    LEFT JOIN users u ON u.id = r.user_id
+    LEFT JOIN products p ON p.id = r.product_id
+    LEFT JOIN review_photos rp ON rp.review_id = r.id
+    GROUP BY r.id
+    ORDER BY r.is_approved ASC, r.created_at DESC
+  `).all();
 
-    const reviews = db.prepare(`
-      SELECT r.id, r.rating, r.comment, r.is_approved, r.created_at,
-             COALESCE(r.verified_purchase, 0) as verified_purchase,
-             u.first_name, u.last_name, u.email,
-             p.name AS product_name, p.id AS product_id,
-             GROUP_CONCAT(rp.photo_url) AS photos_raw
-      FROM reviews r
-      JOIN users u ON u.id = r.user_id
-      JOIN products p ON p.id = r.product_id
-      LEFT JOIN review_photos rp ON rp.review_id = r.id
-      GROUP BY r.id
-      ORDER BY r.is_approved ASC, r.created_at DESC
-    `).all();
+  const parsed = reviews.map(r => ({
+    ...r,
+    photos: r.photos_raw ? r.photos_raw.split(',') : [],
+    photos_raw: undefined
+  }));
 
-    const parsed = reviews.map(r => ({
-      ...r,
-      photos: r.photos_raw ? r.photos_raw.split(',') : [],
-      photos_raw: undefined
-    }));
-
-    res.json(parsed);
-  } catch (e) {
-    console.error('[GET /reviews/admin]', e.message);
-    res.status(500).json({ error: 'Erreur lors du chargement des avis : ' + e.message });
-  }
+  res.json(parsed);
 });
 
 // ─── PUT /api/reviews/:id/approve ──────────────────────────
@@ -201,6 +142,20 @@ router.put('/:id/reject', requireAdmin, (req, res) => {
   res.json({ message: 'Avis rejeté' });
 });
 
+// ─── PUT /api/reviews/:id/reply ────────────────────────────
+// Admin : ajouter/modifier/supprimer une réponse publique à un avis
+router.put('/:id/reply', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { reply } = req.body;
+  const review = db.prepare('SELECT id FROM reviews WHERE id = ?').get(id);
+  if (!review) return res.status(404).json({ error: 'Avis introuvable' });
+
+  const text = (reply || '').trim();
+  db.prepare('UPDATE reviews SET admin_reply = ?, admin_reply_at = ? WHERE id = ?')
+    .run(text || null, text ? new Date().toISOString() : null, id);
+  res.json({ message: text ? 'Réponse publiée' : 'Réponse supprimée' });
+});
+
 // ─── DELETE /api/reviews/:id ────────────────────────────────
 router.delete('/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
@@ -216,21 +171,6 @@ router.delete('/:id', requireAdmin, (req, res) => {
 
   db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
   res.json({ message: 'Avis supprimé' });
-});
-
-
-// ─── GET /api/reviews/global-stats ──────────────────────────
-// Statistiques globales pour le header (étoiles du site)
-router.get('/global-stats', (req, res) => {
-  try {
-    const stats = db.prepare(`
-      SELECT COUNT(*) as count, ROUND(AVG(rating * 1.0), 1) as average
-      FROM reviews WHERE is_approved = 1
-    `).get();
-    res.json({ count: stats.count || 0, average: stats.average || 0 });
-  } catch (e) {
-    res.json({ count: 0, average: 0 });
-  }
 });
 
 module.exports = router;
