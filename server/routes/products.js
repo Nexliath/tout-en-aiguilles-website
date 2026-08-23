@@ -49,7 +49,8 @@ router.get('/', (req, res) => {
   query += ' GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
   params.push(Number(limit), Number(offset));
 
-  const products = db.prepare(query).all(...params).map(p => ({
+  // cost_price (prix de revient) sert au calcul de marge admin — jamais exposé publiquement
+  const products = db.prepare(query).all(...params).map(({ cost_price, ...p }) => ({
     ...p,
     images: JSON.parse(p.images || '[]'),
     tags: JSON.parse(p.tags || '[]')
@@ -109,7 +110,7 @@ router.get('/favorites/list', requireAuth, (req, res) => {
     LEFT JOIN categories c ON p.category_id = c.id
     WHERE f.user_id = ? AND p.is_active = 1
     ORDER BY f.created_at DESC
-  `).all(req.user.id).map(p => ({ ...p, images: JSON.parse(p.images || '[]') }));
+  `).all(req.user.id).map(({ cost_price, ...p }) => ({ ...p, images: JSON.parse(p.images || '[]') }));
   res.json(favs);
 });
 
@@ -155,6 +156,8 @@ router.get('/:id/variants', (req, res) => {
 router.post('/:id/variants', requireAdmin, upload.single('image'), asyncRoute(async (req, res) => {
   const { label, price, stock, is_active, sort_order } = req.body;
   if (!label) return res.status(400).json({ error: 'Libellé requis' });
+  if (price !== undefined && price !== '' && Number(price) <= 0) return res.status(400).json({ error: 'Le prix doit être supérieur à 0' });
+  if (stock !== undefined && Number(stock) < 0) return res.status(400).json({ error: 'Le stock ne peut pas être négatif' });
   const images = req.file ? [await saveProductImage(req.file, 'variant')] : [];
   const result = db.prepare(`
     INSERT INTO product_variants (product_id, label, price, stock, images, is_active, sort_order)
@@ -202,7 +205,9 @@ router.get('/:slug', (req, res) => {
   if (!p) return res.status(404).json({ error: 'Produit introuvable' });
   const variants = db.prepare('SELECT * FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC').all(p.id)
     .map(v => ({ ...v, images: JSON.parse(v.images || '[]') }));
-  res.json({ ...p, images: JSON.parse(p.images || '[]'), tags: JSON.parse(p.tags || '[]'), variants });
+  // cost_price (prix de revient) sert au calcul de marge admin — jamais exposé publiquement
+  const { cost_price, ...publicProduct } = p;
+  res.json({ ...publicProduct, images: JSON.parse(p.images || '[]'), tags: JSON.parse(p.tags || '[]'), variants });
 });
 
 // POST /api/products/:id/favorite
@@ -225,6 +230,9 @@ router.delete('/:id/favorite', requireAuth, (req, res) => {
 router.post('/', requireAdmin, upload.array('images', 5), asyncRoute(async (req, res) => {
   const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label, cost_price, meta_title, meta_description } = req.body;
   if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
+  if (Number(price) <= 0) return res.status(400).json({ error: 'Le prix doit être supérieur à 0' });
+  if (stock !== undefined && Number(stock) < 0) return res.status(400).json({ error: 'Le stock ne peut pas être négatif' });
+  if (cost_price !== undefined && cost_price !== '' && Number(cost_price) < 0) return res.status(400).json({ error: 'Le coût de revient ne peut pas être négatif' });
   const slug = slugify(name) + '-' + Date.now();
   const images = await Promise.all((req.files || []).map(f => saveProductImage(f)));
   const result = db.prepare(`
@@ -244,6 +252,9 @@ router.put('/:id', requireAdmin, upload.array('images', 5), asyncRoute(async (re
   const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label, cost_price, meta_title, meta_description } = req.body;
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
+  if (price !== undefined && Number(price) <= 0) return res.status(400).json({ error: 'Le prix doit être supérieur à 0' });
+  if (stock !== undefined && Number(stock) < 0) return res.status(400).json({ error: 'Le stock ne peut pas être négatif' });
+  if (cost_price !== undefined && cost_price !== '' && Number(cost_price) < 0) return res.status(400).json({ error: 'Le coût de revient ne peut pas être négatif' });
 
   let images = JSON.parse(keep_images || existing.images || '[]');
   if (req.files && req.files.length > 0) {
