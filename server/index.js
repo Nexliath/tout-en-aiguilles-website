@@ -76,14 +76,6 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const reviewLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 heure
-  max: 10,                   // max 10 avis par heure par IP
-  message: { error: 'Trop d\'avis soumis. Réessayez dans une heure.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 const checkoutLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
@@ -128,7 +120,7 @@ app.use('/api/newsletter', require('./routes/newsletter'));
 app.use('/api/cart',       require('./routes/cart'));
 app.use('/api/news',            require('./routes/news'));
 app.use('/api/admin',           require('./routes/admin'));
-app.use('/api/reviews',         reviewLimiter, require('./routes/reviews'));
+app.use('/api/reviews',         require('./routes/reviews'));
 
 // ─── Formulaire de contact ───────────────────────────────────
 app.post('/api/contact', contactLimiter, async (req, res) => {
