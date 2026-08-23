@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 const router = express.Router();
 
 // Valider un code promo
@@ -28,6 +29,7 @@ router.post('/', requireAdmin, (req, res) => {
   try {
     const r = db.prepare('INSERT INTO promo_codes (code, discount_type, value, min_order, max_uses, expires_at, description) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(code.trim().toUpperCase(), discount_type || 'percent', parseFloat(value), parseFloat(min_order) || 0, max_uses ? parseInt(max_uses) : null, expires_at || null, description || '');
+    logActivity(req.user, 'Code promo créé', code.trim().toUpperCase());
     res.status(201).json({ success: true, id: r.lastInsertRowid });
   } catch(e) { res.status(400).json({ error: 'Ce code existe déjà' }); }
 });
@@ -40,7 +42,9 @@ router.put('/:id', requireAdmin, (req, res) => {
 });
 
 router.delete('/:id', requireAdmin, (req, res) => {
+  const existing = db.prepare('SELECT code FROM promo_codes WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM promo_codes WHERE id = ?').run(req.params.id);
+  logActivity(req.user, 'Code promo supprimé', existing?.code || `#${req.params.id}`);
   res.json({ success: true });
 });
 
