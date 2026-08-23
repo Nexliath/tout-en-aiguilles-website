@@ -559,7 +559,18 @@ function changeQty(delta) {
 
 function addToCartFromPage() {
   if (!currentProduct) return;
-  Cart.add(currentProduct, currentQty);
+  const v = window._selectedVariant;
+  if (v) {
+    Cart.add({
+      ...currentProduct,
+      _variantId: v.id,
+      _variantLabel: v.label,
+      _variantPrice: v.price != null ? v.price : currentProduct.price,
+      images: v.images?.length > 0 ? v.images : currentProduct.images
+    }, currentQty);
+  } else {
+    Cart.add(currentProduct, currentQty);
+  }
 }
 
 function toggleFavFromPage() {
@@ -829,38 +840,104 @@ async function subscribeStockAlert() {
   } catch(e) { msg.textContent = e.message || 'Erreur'; msg.style.color = '#d9534f'; msg.style.display = ''; }
 }
 
-// ─── Chargement des variantes ─────────────────────────────────
+// ─── Variantes inline (Etsy-style) ───────────────────────────
 async function loadVariants(product) {
-  if (!product.variant_group_id) return;
   try {
-    const variants = await apiFetch(`/products/variants/${encodeURIComponent(product.variant_group_id)}`);
-    if (variants.length < 2) return; // pas de sélecteur si seulement 1 variante
+    const variants = await apiFetch(`/products/${product.id}/variants`);
+    if (!variants || variants.length === 0) {
+      document.getElementById('variants-section').style.display = 'none';
+      return;
+    }
+
+    window._variants = variants;
+    window._selectedVariant = null;
 
     const section = document.getElementById('variants-section');
     const list    = document.getElementById('variants-list');
-    const title   = document.getElementById('variants-title');
     section.style.display = '';
-
-    // Titre dynamique selon le groupe
-    title.textContent = 'Choisir la variante';
+    document.getElementById('variants-title').textContent = 'Choisir une option';
 
     list.innerHTML = variants.map(v => {
-      const isActive = v.id === product.id;
       const thumb = v.images?.[0] || '';
-      const outOfStock = v.stock === 0;
+      const oos = v.stock === 0;
       return `
-        <a href="/produit.html?id=${v.id}"
-          class="variant-btn${isActive ? ' active' : ''}${outOfStock ? ' out' : ''}"
-          title="${v.variant_label || v.name}${outOfStock ? ' — Rupture de stock' : ''}"
-          ${isActive ? 'aria-current="true"' : ''}>
+        <button type="button" data-vid="${v.id}"
+          class="variant-btn${oos ? ' out' : ''}"
+          onclick="selectVariant(${v.id})"
+          title="${v.label}${oos ? ' — Rupture de stock' : ''}">
           ${thumb
-            ? `<img src="${thumb}" alt="${v.variant_label || v.name}" loading="lazy">`
-            : `<span>${(v.variant_label || v.name).charAt(0)}</span>`}
-          <span class="variant-label">${v.variant_label || v.name}</span>
-          ${outOfStock ? '<span class="variant-oos">✗</span>' : ''}
-        </a>`;
+            ? `<img src="${thumb}" alt="${v.label}" loading="lazy">`
+            : `<span>${v.label.charAt(0).toUpperCase()}</span>`}
+          <span class="variant-label">${v.label}</span>
+          ${oos ? '<span class="variant-oos">✗</span>' : ''}
+        </button>`;
     }).join('');
-  } catch(e) {}
+
+    // Sélectionner la première variante disponible
+    const first = variants.find(v => v.stock > 0) || variants[0];
+    if (first) selectVariant(first.id);
+  } catch(e) {
+    document.getElementById('variants-section').style.display = 'none';
+  }
+}
+
+function selectVariant(vid) {
+  const variants = window._variants || [];
+  const v = variants.find(x => x.id === vid);
+  if (!v) return;
+  window._selectedVariant = v;
+
+  // Highlight bouton actif
+  document.querySelectorAll('#variants-list .variant-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.vid) === vid);
+  });
+
+  // Swap galerie → images de la variante (fallback: images du produit parent)
+  const imgs = v.images?.length > 0 ? v.images : (currentProduct?.images || []);
+  if (imgs.length > 0) renderGallery(imgs, currentProduct?.name || '');
+
+  // Mise à jour prix
+  const price = v.price != null ? v.price : currentProduct?.price;
+  const priceEl = document.getElementById('prod-price');
+  if (priceEl && price != null) priceEl.textContent = Number(price).toFixed(2) + ' €';
+
+  // Mise à jour stock + bouton panier
+  const stockEl = document.getElementById('prod-stock');
+  const cartBtn = document.getElementById('add-cart-btn');
+  if (stockEl) {
+    if (v.stock > 0) {
+      stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${v.stock} dispo.)</span>`;
+      if (cartBtn) cartBtn.disabled = false;
+    } else {
+      stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
+      if (cartBtn) cartBtn.disabled = true;
+    }
+  }
+}
+
+// Reconstruit la galerie avec un nouveau set d'images
+function renderGallery(images, name) {
+  const thumbsEl = document.getElementById('thumbs');
+  const mainEl   = document.getElementById('main-img');
+  if (!thumbsEl || !mainEl) return;
+
+  thumbsEl.innerHTML = images.map((img, i) => `
+    <div class="gallery-thumb ${i === 0 ? 'active' : ''}" onclick="setMainImg('${img}', this)">
+      <img src="${img}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🧶'">
+    </div>`).join('');
+
+  const slides = images.map((img, i) => `
+    <div class="gallery-slide">
+      <img src="${img}" alt="${name}" loading="${i === 0 ? 'eager' : 'lazy'}" onerror="this.parentElement.innerHTML='🧶'">
+    </div>`).join('');
+
+  const dots = images.length > 1 ? `
+    <div class="gallery-dots" id="gallery-dots">
+      ${images.map((_, i) => `<button class="gallery-dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})"></button>`).join('')}
+    </div>` : '';
+
+  mainEl.innerHTML = `<div class="gallery-carousel" id="gallery-carousel">${slides}</div>${dots}`;
+  initGalleryCarousel();
 }
 
 loadProduct();
