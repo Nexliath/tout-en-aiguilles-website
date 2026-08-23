@@ -221,6 +221,13 @@ async function savePromo() {
 
 const ORDER_STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
 
+// Fermeture du panneau d'utilisation à la touche Échap — avant cette
+// correction, seul le bouton "✕ Fermer" le fermait.
+document.addEventListener('keydown', (e) => {
+  const panel = document.getElementById('usage-panel');
+  if (e.key === 'Escape' && panel && panel.style.display !== 'none') panel.style.display = 'none';
+});
+
 async function showUsage(id, code) {
   const panel = document.getElementById('usage-panel');
   const tbody = document.getElementById('usage-tbody');
@@ -249,6 +256,7 @@ async function showUsage(id, code) {
 async function togglePromo(id, isActive) {
   try {
     await apiFetch(`/promo/${id}`, { method: 'PUT', body: { is_active: !isActive } });
+    Toast.show(isActive ? 'Code désactivé ✓' : 'Code activé ✓', 'success');
     await loadPromos();
   } catch (e) { Toast.show(e.message, 'error'); }
 }
