@@ -32,28 +32,20 @@
 
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
-    .product-gallery { display: grid; grid-template-columns: 80px 1fr; gap: 12px; align-items: start; }
-    .gallery-thumbs {
-      display: flex; flex-direction: column; gap: 8px;
-      max-height: 600px; overflow-y: auto; overflow-x: hidden;
-      scrollbar-width: thin; scrollbar-color: var(--rose) transparent;
-      padding-right: 2px;
-    }
-    .gallery-thumbs::-webkit-scrollbar { width: 5px; }
-    .gallery-thumbs::-webkit-scrollbar-thumb { background: var(--rose); border-radius: 4px; }
-    .gallery-thumbs::-webkit-scrollbar-track { background: transparent; }
+    .product-gallery { display: grid; grid-template-columns: 80px 1fr; gap: 12px; }
+    .gallery-thumbs { display: flex; flex-direction: column; gap: 8px; }
     .gallery-thumb {
       width: 72px; height: 72px; border-radius: 8px; overflow: hidden; cursor: pointer;
-      border: 2px solid var(--border); background: var(--cream-dark); flex-shrink: 0;
+      border: 2px solid var(--border); background: var(--cream-dark);
       display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
       transition: border-color var(--transition);
     }
     .gallery-thumb.active { border-color: var(--rose-dark); }
-    .gallery-thumb img { width: 100%; height: 100%; object-fit: contain; }
+    .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
     /* Main image + carousel */
     .gallery-main {
-      position: relative; aspect-ratio: 3 / 4; border-radius: var(--radius-xl); overflow: hidden;
+      position: relative; aspect-ratio: 1; border-radius: var(--radius-xl); overflow: hidden;
       background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 6rem;
     }
     .gallery-carousel {
@@ -64,7 +56,7 @@
       flex: 0 0 100%; width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
     }
-    .gallery-slide img { width: 100%; height: 100%; object-fit: contain; }
+    .gallery-slide img { width: 100%; height: 100%; object-fit: cover; }
 
     /* Dot indicators — overlaid inside image */
     .gallery-dots {
@@ -100,11 +92,12 @@
       .gallery-thumbs::-webkit-scrollbar { display: none; }
       .gallery-thumb { width: 56px !important; height: 56px !important; flex-shrink: 0; border-radius: 6px !important; }
 
-      /* Image compacte, même ratio 3:4 que les photos produit */
+      /* Image compacte — 65vw max comme Etsy/Vinted */
       .gallery-main {
-        aspect-ratio: 3 / 4;
+        aspect-ratio: 1 / 1;
         border-radius: var(--radius-lg) !important;
         margin-bottom: 0;
+        max-height: 65vw;
       }
 
       /* Carousel swipeable sur mobile — prefixes cross-browser */
@@ -173,9 +166,6 @@
       background: var(--cream); border-radius: 16px; padding: 24px;
       margin-bottom: 28px; border: 1px solid var(--border);
     }
-  @media (max-width: 768px) {
-    #trust-strip { grid-template-columns: 1fr !important; gap: 8px !important; }
-  }
   </style>
 </head>
 <body>
@@ -190,16 +180,9 @@
     <nav class="nav">
       <a href="/">Accueil</a>
       <a href="/boutique.html">Boutique</a>
-      <a href="/cadeaux.html">🎁 Cadeaux</a>
       <a href="/actualites.html">Actualités</a>
       <a href="/#contact">Contact</a>
     </nav>
-    
-        <div class="header-search-wrap">
-          <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
-          <span class="header-search-icon">🔍</span>
-          <div class="header-search-dropdown" id="header-search-dropdown"></div>
-        </div>
     <div class="header-actions">
       <button class="icon-btn" id="user-btn">👤</button>
       <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
@@ -244,25 +227,17 @@
         <div>
           <div class="product-gallery">
             <div class="gallery-thumbs" id="thumbs"></div>
-            <div style="position:relative">
-              <div class="gallery-main" id="main-img"><span>🧶</span></div>
-              <button class="gallery-arrow gallery-arrow-prev" id="gallery-prev" onclick="galleryStep(-1)" aria-label="Image précédente">‹</button>
-              <button class="gallery-arrow gallery-arrow-next" id="gallery-next" onclick="galleryStep(1)" aria-label="Image suivante">›</button>
-            </div>
+            <div class="gallery-main" id="main-img"><span>🧶</span></div>
           </div>
-          <!-- Partage sous la galerie -->
-          <div id="share-buttons-wrap" style="margin-top:12px"></div>
         </div>
 
         <!-- Info -->
-        <div class="product-info" style="padding-top:0">
+        <div class="product-info">
           <div id="prod-cat" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sage-dark);margin-bottom:8px"></div>
           <h1 id="prod-name" style="font-size:clamp(1.4rem,3vw,2rem);margin-bottom:12px"></h1>
 
-          <!-- Watching badge -->
-          <div id="watching-badge-wrap"></div>
           <!-- Price + Stock -->
-          <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
             <span id="prod-price" style="font-size:2rem;font-weight:700;color:var(--rose-dark)"></span>
             <span id="prod-stock"></span>
           </div>
@@ -276,71 +251,45 @@
           </div>
 
           <!-- Description -->
-          <div style="background:var(--cream);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:14px">
+          <div style="background:var(--cream);border-radius:var(--radius-lg);padding:20px;margin-bottom:24px">
             <p id="prod-desc" style="color:var(--text);font-size:.95rem;line-height:1.7"></p>
           </div>
 
           <!-- Sélecteur de variantes (couleurs / motifs) -->
-          <div id="variants-section" style="display:none;margin-bottom:14px">
+          <div id="variants-section" style="display:none;margin-bottom:24px">
             <div style="font-size:.82rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px" id="variants-title">Couleur / Motif</div>
             <div id="variants-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
           </div>
 
-          <!-- Sélecteur d'options (libellés libres avec photo/prix/stock propres) -->
-          <div id="options-section" style="display:none;margin-bottom:14px">
-            <div style="font-size:.82rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Choisir une option</div>
-            <div id="options-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-          </div>
-
           <!-- Tags -->
-          <div id="prod-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px"></div>
+          <div id="prod-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px"></div>
 
           <!-- Quantity + Add to cart -->
-          <div id="atc-normal" style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
-            <div class="qty-control">
+          <div style="margin-top:24px;margin-bottom:12px">
+            <div class="qty-control" style="display:inline-flex">
               <button class="qty-btn" onclick="changeQty(-1)">−</button>
               <span class="qty-val" id="qty-display">1</span>
               <button class="qty-btn" onclick="changeQty(1)">+</button>
             </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center">
             <button id="add-cart-btn" class="btn btn-primary" style="flex:1" onclick="addToCartFromPage()">
               🛒 Ajouter au panier
             </button>
             <button id="fav-btn" class="favorite-btn" onclick="toggleFavFromPage()" title="Ajouter aux favoris">🤍</button>
           </div>
-          <!-- Produit personnalisé : demande via formulaire de contact -->
-          <div id="atc-custom-order" style="display:none;margin-bottom:16px">
-            <div style="background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px;font-size:.85rem;color:var(--text)">
-              ✂️ Ce produit est réalisé sur mesure. Dites-nous ce que vous souhaitez (dimensions, options, tissu…) et on échange ensemble avant de valider votre commande.
-            </div>
-            <button class="btn btn-primary btn-block" onclick="requestCustomOrder()">✉️ Faire une demande personnalisée</button>
-          </div>
-          <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="window.location='/panier.html'">Voir mon panier →</button>
+          <button class="btn btn-secondary btn-block" style="margin-bottom:4px" onclick="window.location='/panier.html'">Voir mon panier →</button>
 
-
-        </div>
-      </div>
-
-      <!-- ── Infos livraison + perso (compact) ── -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:32px;margin-bottom:8px" id="trust-strip">
-        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--sage-pale);border-radius:var(--radius-lg);padding:14px">
-          <span style="font-size:1.4rem;flex-shrink:0">🚚</span>
-          <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--sage-dark);margin-bottom:3px">Livraison France</div>
-            <div id="delivery-estimate" style="font-size:.78rem;color:var(--text-light)">Expédition 3–5 jours ouvrés</div>
+          <!-- Shipping info -->
+          <div style="margin-top:24px;padding:16px;background:var(--sage-pale);border-radius:var(--radius-lg)">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:.85rem;font-weight:700;color:var(--sage-dark)">🚚 Livraison</div>
+            <p style="font-size:.82rem;color:var(--text-light)">Expédition sous 3-5 jours ouvrés. Livraison en France métropolitaine.</p>
           </div>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--rose-pale);border-radius:var(--radius-lg);padding:14px">
-          <span style="font-size:1.4rem;flex-shrink:0">🎨</span>
-          <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--rose-dark);margin-bottom:3px">Personnalisation</div>
-            <div style="font-size:.78rem;color:var(--text-light)">Couleur, prénom… <a href="/#contact" style="color:var(--rose-dark);font-weight:700">Contactez-nous</a></div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--cream-dark);border-radius:var(--radius-lg);padding:14px">
-          <span style="font-size:1.4rem;flex-shrink:0">🤲</span>
-          <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:3px">Fait main</div>
-            <div style="font-size:.78rem;color:var(--text-light)">Chaque pièce est unique</div>
+
+          <!-- Custom order note -->
+          <div style="margin-top:12px;padding:16px;background:var(--rose-pale);border-radius:var(--radius-lg)">
+            <div style="font-size:.85rem;font-weight:700;color:var(--rose-dark);margin-bottom:4px">🎨 Personnalisation</div>
+            <p style="font-size:.82rem;color:var(--text-light)">Couleur différente, prénom brodé… <a href="/#contact" style="color:var(--rose-dark);font-weight:700">Contactez-nous</a> pour une commande personnalisée !</p>
           </div>
         </div>
       </div>
@@ -394,25 +343,10 @@
   </div>
 </main>
 
-<!-- Vus récemment -->
-<div class="container" style="padding-bottom:40px">
-  <div class="recently-viewed" id="recently-viewed-section">
-    <h3>👁 Vus récemment</h3>
-    <div class="recently-viewed-grid" id="recently-viewed-grid"></div>
-  </div>
-</div>
-
-<!-- Sticky ATC bar (mobile) -->
-<div class="sticky-atc" id="sticky-atc">
-  <div class="sticky-atc-name" id="sticky-atc-name"></div>
-  <div class="sticky-atc-price" id="sticky-atc-price"></div>
-  <button class="btn btn-primary btn-sm" id="sticky-atc-btn" onclick="addToCartFromPage()" style="flex-shrink:0">🛒 Ajouter</button>
-</div>
-
 <footer class="site-footer">
   <div class="container">
     <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
-      <span>© <span id="footer-yr"></span> Tout en Aiguilles</span>
+      <span>© 2024 Tout en Aiguilles</span>
       <a href="/boutique.html" style="color:rgba(255,255,255,.6)">← Retour boutique</a>
     </div>
   </div>
@@ -423,70 +357,21 @@
 let currentProduct = null;
 let currentQty = 1;
 
-let _mainImgBackup = null;
-function previewVariantImg(images) {
-  if (!images || !images[0]) return;
-  const carousel = document.getElementById('gallery-carousel');
-  if (!carousel) return;
-  const first = carousel.querySelector('.gallery-slide img');
-  if (first) { _mainImgBackup = _mainImgBackup || first.src; first.src = images[0]; }
-}
-function restoreMainImg() {
-  if (!_mainImgBackup) return;
-  const first = document.querySelector('#gallery-carousel .gallery-slide img');
-  if (first) first.src = _mainImgBackup;
-  _mainImgBackup = null;
-}
-
-function switchProdTab(id, btn) {
-  document.querySelectorAll('.prod-tab').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.prod-tab-panel').forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-' + id).classList.add('active');
-  // If switching to avis tab, move reviews content there
-  if (id === 'avis-tab') {
-    const reviewsSection = document.getElementById('reviews-section');
-    const inline = document.getElementById('prod-reviews-inline');
-    if (reviewsSection && inline && !inline.hasChildNodes()) {
-      inline.appendChild(reviewsSection);
-    }
-  }
-}
-
-function initStickyATC(product) {
-  const btn = document.getElementById('add-cart-btn');
-  const sticky = document.getElementById('sticky-atc');
-  if (!sticky || !btn) return;
-  if (product.is_custom_order) { sticky.style.display = 'none'; return; }
-  document.getElementById('sticky-atc-name').textContent = product.name;
-  document.getElementById('sticky-atc-price').textContent = product.price.toFixed(2) + ' €';
-  if (product.stock === 0) document.getElementById('sticky-atc-btn').disabled = true;
-
-  const observer = new IntersectionObserver(([e]) => {
-    sticky.style.display = e.isIntersecting ? 'none' : 'flex';
-  }, { threshold: 0.1 });
-  observer.observe(btn);
-}
-
 async function loadProduct() {
   const params = new URLSearchParams(location.search);
-  // Support both /produit.html?id=X and /produit/:slug URL
-  const pathSlug = location.pathname.startsWith('/produit/') ? location.pathname.split('/produit/')[1] : null;
-  const id = params.get('id') || params.get('slug') || pathSlug;
+  const id = params.get('id');
   if (!id) { showNotFound(); return; }
 
   try {
+    // Try by id first, then slug
     let product;
     try {
+      // Get all products to find by id (or we could use slug route)
       const products = await apiFetch('/products?limit=200');
-      product = products.find(p => p.id == id || p.slug === id || p.slug === decodeURIComponent(id));
+      product = products.find(p => p.id == id || p.slug === id);
     } catch {}
 
     if (!product) { showNotFound(); return; }
-    try {
-      const full = await apiFetch(`/products/${encodeURIComponent(product.slug)}`);
-      product = { ...product, ...full };
-    } catch {}
     currentProduct = product;
     renderProduct(product);
     loadVariants(product);
@@ -505,33 +390,10 @@ async function loadProduct() {
       const s = document.getElementById('recommendations-section');
       if (s) s.style.display = 'none';
     }
-      document.getElementById('loading').style.display = 'none';
+    renderReviewForm();
+    document.getElementById('loading').style.display = 'none';
     document.getElementById('product-detail').style.display = '';
     document.title = `${product.name} — Création crochet faite main | Tout en Aiguilles`;
-  // Sticky ATC
-  initStickyATC(product);
-  // Watching badge
-  initWatchingBadge('watching-badge-wrap');
-  // Update avis count in tab when reviews load
-  // Delivery estimator
-  // Sticky ATC
-  initStickyATC(product);
-  // Watching badge
-  initWatchingBadge('watching-badge-wrap');
-  // Update avis count in tab when reviews load
-  // Delivery estimator — compact text version for trust strip
-  const de = document.getElementById('delivery-estimate');
-  if (de) {
-    const est = getDeliveryEstimate();
-    de.textContent = `Expédié le ${est.ship}`;
-  }
-  // Share buttons
-  renderShareButtons('share-buttons-wrap', product.name, `https://tout-en-aiguilles.com/produit.html?id=${product.id}`);
-  // Recently viewed
-  RecentlyViewed.add(product);
-  RecentlyViewed.render('recently-viewed-grid', product.id);
-  // Footer year
-  const fyr = document.getElementById('footer-yr'); if(fyr) fyr.textContent = new Date().getFullYear();
     // ── SEO dynamique ────────────────────────────────────────
     const BASE = 'https://tout-en-aiguilles.com';
     const slug = new URLSearchParams(location.search).get('slug');
@@ -595,93 +457,32 @@ async function loadProduct() {
 
 function renderProduct(p) {
   document.getElementById('bc-name').textContent = p.name;
-  // Update canonical URL to slug-based
-  if (p.slug) {
-    const newUrl = '/produit/' + p.slug;
-    if (window.history && location.pathname !== newUrl) {
-      window.history.replaceState(null, '', newUrl);
-    }
-  }
   document.getElementById('prod-cat').textContent = p.category_name || '';
   document.getElementById('prod-name').textContent = p.name;
   document.getElementById('prod-price').textContent = p.price.toFixed(2) + ' €';
-  // Description collapsible
-  const descEl = document.getElementById('prod-desc');
-  const fullDesc = p.description || '';
-  descEl.textContent = fullDesc;
-  descEl.style.cssText = 'color:var(--text);font-size:.9rem;line-height:1.65;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden';
-  if (fullDesc.length > 300) {
-    const readMore = document.createElement('button');
-    readMore.style.cssText = 'display:block;margin-top:6px;background:none;border:none;color:var(--rose-dark);font-size:.82rem;font-weight:700;cursor:pointer;padding:0';
-    readMore.textContent = '▼ Lire plus';
-    let expanded = false;
-    readMore.onclick = () => {
-      expanded = !expanded;
-      descEl.style.webkitLineClamp = expanded ? 'unset' : '5';
-      descEl.style.overflow = expanded ? 'visible' : 'hidden';
-      readMore.textContent = expanded ? '▲ Réduire' : '▼ Lire plus';
-    };
-    descEl.parentElement.appendChild(readMore);
-  }
-  // Caractéristiques tab
-  const caractEl = document.getElementById('prod-caract');
-  if (caractEl) {
-    const lines = [];
-    if (p.category_name) lines.push(`<div><strong>Catégorie :</strong> ${p.category_name}</div>`);
-    if (p.stock > 0) lines.push(`<div><strong>Disponibilité :</strong> <span style="color:var(--sage-dark)">En stock (${p.stock} dispo.)</span></div>`);
-    const tags = p.tags || [];
-    if (tags.length) lines.push(`<div><strong>Tags :</strong> ${tags.join(', ')}</div>`);
-    lines.push(`<div><strong>Fabrication :</strong> 100% fait main en France 🇫🇷</div>`);
-    lines.push(`<div><strong>Matériaux :</strong> <a href="/materiaux.html" style="color:var(--rose-dark)">Voir nos matériaux →</a></div>`);
-    caractEl.innerHTML = lines.join('');
-  }
+  document.getElementById('prod-desc').textContent = p.description || '';
 
   // Stock badge
   const stockEl = document.getElementById('prod-stock');
-  if (p.is_custom_order) {
-    stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✂️ Sur commande</span>`;
-  } else if (p.stock > 0) {
+  if (p.stock > 0) {
     stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${p.stock} dispo.)</span>`;
   } else {
     stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
     document.getElementById('add-cart-btn').disabled = true;
   }
-  // Alerte retour en stock (n'a pas de sens pour un produit sur devis)
+  // Alerte retour en stock
   const alertSection = document.getElementById('stock-alert-section');
-  if (alertSection) alertSection.style.display = (!p.is_custom_order && p.stock === 0) ? '' : 'none';
+  if (alertSection) alertSection.style.display = p.stock === 0 ? '' : 'none';
   window._currentProductId = p.id;
 
-  // Tags — max 3 visibles + badge "+N"
+  // Tags
   const tags = p.tags || [];
-  const MAX_TAGS = 3;
-  const visible = tags.slice(0, MAX_TAGS);
-  const hidden  = tags.slice(MAX_TAGS);
-  const tagsEl  = document.getElementById('prod-tags');
-  tagsEl.innerHTML = visible.map(t =>
-    `<span style="background:var(--cream-dark);padding:3px 10px;border-radius:20px;font-size:.75rem;color:var(--text-light)">${t}</span>`
+  document.getElementById('prod-tags').innerHTML = tags.map(t =>
+    `<span style="background:var(--cream-dark);padding:4px 12px;border-radius:20px;font-size:.78rem;color:var(--text-light)">${t}</span>`
   ).join('');
-  if (hidden.length) {
-    const more = document.createElement('span');
-    more.style.cssText = 'background:var(--cream-dark);padding:3px 10px;border-radius:20px;font-size:.75rem;color:var(--text-light);cursor:pointer;border:1px dashed var(--border)';
-    more.title = hidden.join(', ');
-    more.textContent = `+${hidden.length}`;
-    let expanded = false;
-    more.onclick = () => {
-      if (!expanded) {
-        expanded = true;
-        tagsEl.innerHTML = tags.map(t =>
-          `<span style="background:var(--cream-dark);padding:3px 10px;border-radius:20px;font-size:.75rem;color:var(--text-light)">${t}</span>`
-        ).join('');
-      }
-    };
-    tagsEl.appendChild(more);
-  }
 
-  // Gallery — inclut aussi les photos des variations (dédupliquées)
-  const variationImages = (p.variations || []).map(v => v.image_url).filter(Boolean);
-  const images = [...(p.images || [])];
-  for (const vImg of variationImages) { if (!images.includes(vImg)) images.push(vImg); }
-  p.images = images; // pour que applyOption() retrouve l'index de l'image sélectionnée
+  // Gallery
+  const images = p.images || [];
   const thumbsEl = document.getElementById('thumbs');
   const mainEl = document.getElementById('main-img');
 
@@ -706,8 +507,6 @@ function renderProduct(p) {
 
     mainEl.innerHTML = `<div class="gallery-carousel" id="gallery-carousel">${slides}</div>${dots}`;
     initGalleryCarousel();
-    initImageZoom(document.getElementById('main-img'));
-    syncThumbsHeight();
   } else {
     thumbsEl.innerHTML = `<div class="gallery-thumb active">🧶</div>`;
     mainEl.innerHTML = '<span>🧶</span>';
@@ -716,107 +515,6 @@ function renderProduct(p) {
   // Favorites
   const favBtn = document.getElementById('fav-btn');
   if (Favorites.has(p.id)) favBtn.classList.add('active'), favBtn.textContent = '❤️';
-
-  // Produit personnalisé : bouton "faire une demande" à la place du panier
-  if (p.is_custom_order) {
-    document.getElementById('atc-normal').style.display = 'none';
-    document.getElementById('atc-custom-order').style.display = '';
-  } else {
-    document.getElementById('atc-normal').style.display = '';
-    document.getElementById('atc-custom-order').style.display = 'none';
-  }
-
-  renderOptions(p);
-}
-
-// ─── Options (libellés libres avec photo/prix/stock propres) ──
-let currentOptions = [];
-let selectedOption = null;
-
-function renderOptions(p) {
-  currentOptions = p.variations || [];
-  const section = document.getElementById('options-section');
-  const list = document.getElementById('options-list');
-  if (!currentOptions.length) { section.style.display = 'none'; selectedOption = null; return; }
-  section.style.display = '';
-
-  const prices = currentOptions.map(o => (o.price !== null && o.price !== undefined) ? o.price : p.price);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const pricesDiffer = minPrice !== maxPrice;
-
-  list.innerHTML = currentOptions.map((o) => {
-    const oos = !p.is_custom_order && o.stock === 0;
-    return `
-    <button type="button" class="variant-btn${oos ? ' out' : ''}"
-      onclick="selectOption(${o.id})" title="${o.label}${oos ? ' — Rupture de stock' : ''}">
-      ${o.image_url ? `<img src="${o.image_url}" alt="${o.label}" loading="lazy">` : `<span>${o.label.charAt(0)}</span>`}
-      <span class="variant-label">${o.label}</span>
-      ${o.price !== null && o.price !== undefined ? `<span class="variant-label" style="opacity:.7">${Number(o.price).toFixed(2)} €</span>` : ''}
-      ${oos ? '<span class="variant-oos">✗</span>' : ''}
-    </button>`;
-  }).join('');
-
-  if (pricesDiffer) {
-    // Prix "à partir de" tant qu'aucune option n'est choisie
-    selectedOption = null;
-    document.getElementById('prod-price').textContent = minPrice.toFixed(2) + ' €+';
-    if (!p.is_custom_order) {
-      const stockEl = document.getElementById('prod-stock');
-      stockEl.innerHTML = `<span style="background:var(--cream-dark);color:var(--text-light);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Choisissez une option</span>`;
-      const addBtn = document.getElementById('add-cart-btn');
-      if (addBtn) addBtn.disabled = true;
-      const stickyPrice = document.getElementById('sticky-atc-price');
-      const stickyBtn = document.getElementById('sticky-atc-btn');
-      if (stickyPrice) stickyPrice.textContent = minPrice.toFixed(2) + ' €+';
-      if (stickyBtn) stickyBtn.disabled = true;
-    }
-  } else {
-    // Même prix pour toutes les options : pas d'ambiguïté, on présélectionne la première
-    selectedOption = currentOptions[0];
-    document.querySelectorAll('#options-list .variant-btn')[0]?.classList.add('active');
-    applyOption(selectedOption);
-  }
-}
-
-function selectOption(id) {
-  const opt = currentOptions.find(o => o.id === id);
-  if (!opt) return;
-  selectedOption = opt;
-  document.querySelectorAll('#options-list .variant-btn').forEach((btn, i) => btn.classList.toggle('active', currentOptions[i].id === id));
-  applyOption(opt);
-}
-
-function applyOption(opt) {
-  if (!opt || !currentProduct) return;
-  const price = (opt.price !== null && opt.price !== undefined) ? opt.price : currentProduct.price;
-  document.getElementById('prod-price').textContent = Number(price).toFixed(2) + ' €';
-  const stickyPrice = document.getElementById('sticky-atc-price');
-  if (stickyPrice) stickyPrice.textContent = Number(price).toFixed(2) + ' €';
-
-  if (!currentProduct.is_custom_order) {
-    const stock = opt.stock;
-    const stockEl = document.getElementById('prod-stock');
-    const addBtn = document.getElementById('add-cart-btn');
-    const stickyBtn = document.getElementById('sticky-atc-btn');
-    if (stock > 0) {
-      stockEl.innerHTML = `<span style="background:var(--sage-pale);color:var(--sage-dark);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">✓ En stock (${stock} dispo.)</span>`;
-      if (addBtn) addBtn.disabled = false;
-      if (stickyBtn) stickyBtn.disabled = false;
-    } else {
-      stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
-      if (addBtn) addBtn.disabled = true;
-      if (stickyBtn) stickyBtn.disabled = true;
-    }
-  }
-  if (opt.image_url) {
-    const thumbs = document.querySelectorAll('.gallery-thumb');
-    const matchIdx = (currentProduct.images || []).indexOf(opt.image_url);
-    if (matchIdx >= 0) { goToSlide(matchIdx); }
-  }
-  currentQty = 1;
-  const qtyDisplay = document.getElementById('qty-display');
-  if (qtyDisplay) qtyDisplay.textContent = 1;
 }
 
 // ── Gallery carousel ─────────────────────────────────────────
@@ -832,16 +530,6 @@ function updateGalleryDots(idx) {
   const dots = document.getElementById('gallery-dots');
   if (!dots) return;
   dots.querySelectorAll('.gallery-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
-}
-
-function galleryStep(dir) {
-  const carousel = document.getElementById('gallery-carousel');
-  if (!carousel) return;
-  const w = carousel.offsetWidth;
-  const maxScroll = carousel.scrollWidth - w;
-  let next = Math.round(carousel.scrollLeft / w) + dir;
-  next = Math.max(0, Math.min(next, Math.round(maxScroll / w)));
-  carousel.scrollTo({ left: next * w, behavior: 'smooth' });
 }
 
 function initGalleryCarousel() {
@@ -864,41 +552,14 @@ function setMainImg(src, thumb) {
   goToSlide(idx >= 0 ? idx : 0);
 }
 
-// Aligne la hauteur défilable des vignettes sur celle de la photo principale (desktop uniquement)
-function syncThumbsHeight() {
-  const thumbsEl = document.getElementById('thumbs');
-  const mainEl = document.getElementById('main-img');
-  if (!thumbsEl || !mainEl) return;
-  if (window.innerWidth <= 768) { thumbsEl.style.maxHeight = ''; return; }
-  requestAnimationFrame(() => {
-    const h = mainEl.offsetHeight;
-    if (h > 0) thumbsEl.style.maxHeight = h + 'px';
-  });
-}
-window.addEventListener('resize', () => { if (document.getElementById('main-img')) syncThumbsHeight(); });
-
 function changeQty(delta) {
-  const maxStock = selectedOption ? selectedOption.stock : (currentProduct?.stock || 99);
-  currentQty = Math.max(1, Math.min(maxStock || 99, currentQty + delta));
+  currentQty = Math.max(1, Math.min(currentProduct?.stock || 99, currentQty + delta));
   document.getElementById('qty-display').textContent = currentQty;
 }
 
 function addToCartFromPage() {
   if (!currentProduct) return;
-  if (currentOptions.length > 0 && !selectedOption) {
-    Toast.show('Merci de choisir une option avant d\'ajouter au panier', 'error');
-    return;
-  }
-  haptic();
-  Cart.add(currentProduct, currentQty, selectedOption);
-}
-
-function requestCustomOrder() {
-  if (!currentProduct) return;
-  const label = selectedOption ? ` (${selectedOption.label})` : '';
-  const message = `Bonjour, je souhaite faire une demande personnalisée pour : ${currentProduct.name}${label}.\n\nMerci de préciser vos souhaits (dimensions, options, tissu intérieur…) :\n`;
-  try { sessionStorage.setItem('tea_prefill_contact', message); } catch {}
-  window.location.href = '/#contact';
+  Cart.add(currentProduct, currentQty);
 }
 
 function toggleFavFromPage() {
@@ -1023,40 +684,16 @@ function updateStarSelector(n) {
   });
 }
 
-function renderReviewForm(hasPurchased, alreadyReviewed) {
+function renderReviewForm() {
   const user = Auth.getUser();
-  const isAdmin = user?.role === 'admin';
   const area = document.getElementById('review-form-area');
   if (!area) return;
 
   if (!Auth.isLoggedIn()) {
     area.innerHTML = `
-      <div class="review-form-wrap" style="text-align:center;background:var(--cream)">
-        <div style="font-size:1.5rem;margin-bottom:8px">🔐</div>
-        <p style="color:var(--text-light);margin-bottom:12px;font-size:.9rem">Connectez-vous pour laisser un avis</p>
+      <div class="review-form-wrap" style="text-align:center">
+        <p style="color:var(--text-light);margin-bottom:12px">Connectez-vous pour laisser un avis ✍️</p>
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('user-btn').click()">Se connecter</button>
-      </div>`;
-    return;
-  }
-
-  // Already reviewed
-  if (alreadyReviewed) {
-    area.innerHTML = `
-      <div class="review-form-wrap" style="background:var(--sage-pale);border-color:rgba(100,140,100,.2);text-align:center">
-        <div style="font-size:1.3rem;margin-bottom:8px">✅</div>
-        <p style="font-size:.9rem;color:var(--sage-dark)">Vous avez déjà laissé un avis sur ce produit. Merci !</p>
-      </div>`;
-    return;
-  }
-
-  // Not purchased — admins can always leave a review
-  if (!hasPurchased && !isAdmin) {
-    area.innerHTML = `
-      <div class="review-form-wrap" style="background:var(--cream);border:1.5px dashed var(--border);text-align:center">
-        <div style="font-size:1.5rem;margin-bottom:8px">🛒</div>
-        <p style="font-weight:700;margin-bottom:6px;font-size:.9rem">Achetez ce produit pour laisser un avis</p>
-        <p style="font-size:.82rem;color:var(--text-light);margin-bottom:14px">Les avis sont réservés aux clients ayant acheté ce produit — pour garantir leur authenticité.</p>
-        <button class="btn btn-primary btn-sm" onclick="Cart.add(currentProduct)">🛒 Ajouter au panier</button>
       </div>`;
     return;
   }
@@ -1130,10 +767,7 @@ async function submitReview() {
 async function loadReviews(productId) {
   try {
     const data = await apiFetch(`/reviews?product_id=${productId}`);
-    const { reviews, stats, has_purchased, already_reviewed } = data;
-
-    // Update review form based on purchase status
-    renderReviewForm(has_purchased, already_reviewed);
+    const { reviews, stats } = data;
 
     // Badge note moyenne
     const badge = document.getElementById('avg-badge');
@@ -1162,10 +796,7 @@ async function loadReviews(productId) {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
           <div>
             <div class="review-stars">${starsHtml(r.rating)}</div>
-            <div class="review-meta" style="display:flex;align-items:center;gap:8px">
-              <span>${r.first_name} ${r.last_name.charAt(0)}. — ${formatDate(r.created_at)}</span>
-              ${r.verified_purchase ? '<span style="background:#e8f5e9;color:#2e7d32;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid #c8e6c9">✓ Achat vérifié</span>' : ''}
-            </div>
+            <div class="review-meta">${r.first_name} ${r.last_name.charAt(0)}. — ${formatDate(r.created_at)}</div>
           </div>
           <span style="font-size:1.4rem">${r.rating >= 4 ? '😍' : r.rating >= 3 ? '🙂' : '😐'}</span>
         </div>
@@ -1233,7 +864,6 @@ async function loadVariants(product) {
 }
 
 loadProduct();
-initHeaderSearch();
 </script>
 </body>
 </html>
