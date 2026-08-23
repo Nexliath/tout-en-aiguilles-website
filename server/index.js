@@ -47,6 +47,11 @@ app.use(cors({
 }));
 app.use(cookieParser());
 
+// ─── Trust proxy (Railway / Cloudflare reverse proxy) ────────
+// Nécessaire pour que express-rate-limit identifie correctement les IPs
+// via l'en-tête X-Forwarded-For posé par Railway.
+app.set('trust proxy', 1);
+
 // ─── Rate limiting ───────────────────────────────────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
