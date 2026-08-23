@@ -324,11 +324,19 @@ app.listen(PORT, async () => {
   }
   console.log('');
 
-  // ─── Seed des articles d'actualité ──────────────────────────
-  seedNews(db);
-  // ─── Migration des produits Etsy ────────────────────────────
-  const { seedEtsyProducts } = require('./db/seedEtsy');
-  seedEtsyProducts(db);
+  // ─── Seed des articles d'actualité — DÉSACTIVÉ par défaut ────
+  // Le flag anti-rejeu stocké en base s'est avéré peu fiable au redémarrage
+  // (produits supprimés qui revenaient après chaque déploiement). Plutôt que
+  // de dépendre d'un état en base, le seed ne s'exécute plus QUE si la
+  // variable d'env RUN_SEED=true est explicitement définie sur Railway.
+  // Par défaut : aucun seed ne tourne jamais tout seul, donc rien ne peut
+  // jamais réapparaître automatiquement, quoi qu'il arrive à la base.
+  if (process.env.RUN_SEED === 'true') {
+    console.log('🌱 RUN_SEED=true détecté — exécution du seed (news + produits Etsy)…');
+    seedNews(db);
+    const { seedEtsyProducts } = require('./db/seedEtsy');
+    seedEtsyProducts(db);
+  }
   setInterval(checkAbandonedCarts, 60 * 60 * 1000);
   setInterval(checkStockAlerts, 60 * 60 * 1000);
 });
@@ -436,6 +444,3 @@ function seedNews(db) {
   }
   db.prepare(`INSERT OR REPLACE INTO app_settings (key, value) VALUES ('news_seed_done', '1')`).run();
 }
-// deploy-test: 2026-08-23T12:53:56.108921Z — verif persistance seed guard
-
-// deploy-test-2: 2026-08-23T13:00:58.071093Z — verif durabilite apres fix journal_mode DELETE
