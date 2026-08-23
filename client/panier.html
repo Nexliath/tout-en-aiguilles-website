@@ -197,7 +197,7 @@
 
                 <!-- 1 · Domicile -->
                 <div class="delivery-opt is-selected" id="opt-home" onclick="selectDelivery('home')">
-                  <input type="radio" name="delivery" id="del-home" value="home" checked>
+                  <input type="radio" name="delivery" id="del-home" value="home" checked onchange="selectDelivery('home')">
                   <div style="flex:1;min-width:0">
                     <div style="font-weight:600;font-size:.88rem">🏠 Livraison à domicile</div>
                     <div style="font-size:.78rem;color:#888;margin-top:2px">Mondial Relay — 2 à 5 jours ouvrés</div>
@@ -207,7 +207,7 @@
 
                 <!-- 2 · Point relais -->
                 <div class="delivery-opt" id="opt-relay" onclick="selectDelivery('relay')">
-                  <input type="radio" name="delivery" id="del-relay" value="relay">
+                  <input type="radio" name="delivery" id="del-relay" value="relay" onchange="selectDelivery('relay')">
                   <div style="flex:1;min-width:0">
                     <div style="font-weight:600;font-size:.88rem">📦 Point Relais Mondial Relay</div>
                     <div style="font-size:.78rem;color:#888;margin-top:2px">Retrait en point relais — 2 à 5 jours ouvrés</div>
@@ -227,14 +227,14 @@
                   <input type="text" id="co-relay-name" class="form-input" placeholder="Ex : Tabac des Fleurs" style="font-size:.88rem;margin-bottom:10px">
                   <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Adresse *</label>
                   <input type="text" id="co-relay-address" class="form-input" placeholder="12 rue Victor Hugo" style="font-size:.88rem;margin-bottom:10px">
-                  <div style="display:flex;gap:8px">
-                    <div style="flex:0 0 100px">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <div style="flex:0 1 90px;min-width:70px">
                       <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Code postal *</label>
-                      <input type="text" id="co-relay-postal" class="form-input" placeholder="75011" inputmode="numeric" maxlength="5" style="font-size:.88rem">
+                      <input type="text" id="co-relay-postal" class="form-input" placeholder="75011" inputmode="numeric" maxlength="5" style="font-size:.88rem;width:100%;min-width:0;box-sizing:border-box">
                     </div>
-                    <div style="flex:1">
+                    <div style="flex:1;min-width:120px">
                       <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Ville *</label>
-                      <input type="text" id="co-relay-city" class="form-input" placeholder="Paris" style="font-size:.88rem">
+                      <input type="text" id="co-relay-city" class="form-input" placeholder="Paris" style="font-size:.88rem;width:100%;min-width:0;box-sizing:border-box">
                     </div>
                   </div>
                   <p style="font-size:.75rem;color:#aaa;margin-top:8px">
@@ -244,7 +244,7 @@
 
                 <!-- 3 · Remise en main propre -->
                 <div class="delivery-opt is-disabled" id="opt-handover" onclick="selectDelivery('handover')">
-                  <input type="radio" name="delivery" id="del-handover" value="handover" disabled>
+                  <input type="radio" name="delivery" id="del-handover" value="handover" disabled onchange="selectDelivery('handover')">
                   <div style="flex:1;min-width:0">
                     <div style="font-weight:600;font-size:.88rem">
                       🤝 Remise en main propre
