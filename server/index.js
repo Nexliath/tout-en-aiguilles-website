@@ -116,6 +116,11 @@ app.use(express.static(path.join(__dirname, '../client')));
 app.use('/api/auth',            authLimiter, require('./routes/auth'));
 app.use('/api/products',        require('./routes/products'));
 app.use('/api/orders/checkout', checkoutLimiter);
+// Même limiteur que /checkout — sans ça, /paypal/create crée une ligne
+// "orders" (pending) + déclenche un email de notification boutique à
+// CHAQUE appel, sans aucune limite : un script peut spammer indéfiniment.
+app.use('/api/orders/paypal/create',  checkoutLimiter);
+app.use('/api/orders/paypal/capture', checkoutLimiter);
 app.use('/api/orders',          require('./routes/orders'));
 app.use('/api/addresses',       require('./routes/addresses'));
 app.use('/api/promo',      require('./routes/promo'));
