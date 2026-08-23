@@ -273,10 +273,18 @@ app.post('/api/setup', (req, res) => {
     ).run(email, hash, first_name, last_name);
     userId = result.lastInsertRowid;
   }
+  // email_verified est normalement forcé à 1 pour tout compte admin par la
+  // migration de démarrage (server/db/database.js), mais celle-ci ne
+  // s'applique qu'au prochain redémarrage — on le fixe ici tout de suite
+  // pour que /api/auth/login n'exige pas une vérification d'email inutile
+  // avant même le premier redéploiement.
+  db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(userId);
 
-  const user = db.prepare('SELECT id, email, first_name, last_name, role FROM users WHERE id = ?').get(userId);
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user, message: 'Compte administrateur créé avec succès !' });
+  // Le tout premier compte admin doit lui aussi activer le MFA avant de
+  // recevoir un vrai token de session — même règle que /api/auth/login,
+  // pas de contournement possible via la page de setup initiale.
+  const setupToken = jwt.sign({ id: userId, purpose: 'mfa_setup' }, JWT_SECRET, { expiresIn: '15m' });
+  res.json({ mfa_setup_required: true, setup_token: setupToken, message: 'Compte administrateur créé — activez la double authentification pour continuer.' });
 });
 
 // ─── Admin path (pour le lien dans le header — réservé aux admins) ──────────
