@@ -5,6 +5,7 @@ const fs = require('fs');
 const router = express.Router();
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 // ─── Config upload photos d'avis ────────────────────────────
 const reviewStorage = multer.diskStorage({
@@ -132,6 +133,7 @@ router.put('/:id/approve', requireAdmin, (req, res) => {
   const review = db.prepare('SELECT id FROM reviews WHERE id = ?').get(id);
   if (!review) return res.status(404).json({ error: 'Avis introuvable' });
   db.prepare('UPDATE reviews SET is_approved = 1 WHERE id = ?').run(id);
+  logActivity(req.user, 'Avis approuvé', `#${id}`);
   res.json({ message: 'Avis approuvé' });
 });
 
@@ -170,6 +172,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
   }
 
   db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
+  logActivity(req.user, 'Avis supprimé', `#${id}`);
   res.json({ message: 'Avis supprimé' });
 });
 
