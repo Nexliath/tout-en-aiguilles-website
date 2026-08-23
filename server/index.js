@@ -444,3 +444,5 @@ function seedNews(db) {
   }
   db.prepare(`INSERT OR REPLACE INTO app_settings (key, value) VALUES ('news_seed_done', '1')`).run();
 }
+
+// deploy-test-3: 2026-08-23T13:05:51.862813Z — verif finale seed desactive (RUN_SEED)
