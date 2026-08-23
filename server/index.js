@@ -437,3 +437,5 @@ function seedNews(db) {
   db.prepare(`INSERT OR REPLACE INTO app_settings (key, value) VALUES ('news_seed_done', '1')`).run();
 }
 // deploy-test: 2026-08-23T12:53:56.108921Z — verif persistance seed guard
+
+// deploy-test-2: 2026-08-23T13:00:58.071093Z — verif durabilite apres fix journal_mode DELETE
