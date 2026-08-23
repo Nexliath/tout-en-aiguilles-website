@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 const router = express.Router();
 const BASE = () => process.env.BASE_URL || 'https://tout-en-aiguilles.com';
 
@@ -144,6 +145,7 @@ router.post('/send', requireAdmin, async (req, res) => {
     db.prepare('INSERT INTO newsletter_campaigns (subject, html_content, recipients, errors) VALUES (?, ?, ?, ?)')
       .run(subject, html_content, sent, errors);
   } catch (e) {}
+  logActivity(req.user, 'Newsletter envoyée', `"${subject}" → ${sent} destinataire(s)`);
   res.json({ success: true, sent, errors, total: subs.length });
 });
 
