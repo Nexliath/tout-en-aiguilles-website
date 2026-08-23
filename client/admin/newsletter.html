@@ -107,22 +107,7 @@
 <script>
 let allSubs = [];
 
-function checkAdmin() {
-  const guard = document.getElementById('admin-guard');
-  const content = document.getElementById('admin-content');
-  if (!Auth.isLoggedIn() || !Auth.isAdmin()) { content.style.display='none'; guard.style.display='flex'; }
-  else { guard.style.display='none'; content.style.display=''; loadSubscribers(); loadCampaigns(); loadArticlesForImport(); }
-}
-
-document.getElementById('guard-btn').addEventListener('click', function() {
-  const email = document.getElementById('guard-email').value.trim();
-  const password = document.getElementById('guard-password').value;
-  const errEl = document.getElementById('guard-error');
-  errEl.style.display = 'none';
-  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
-    .then(data => { if (data.user.role !== 'admin') throw new Error('Accès refusé'); Auth.save(data.token, data.user); checkAdmin(); })
-    .catch(e => { errEl.textContent = e.message; errEl.style.display = ''; });
-});
+window.ADMIN_ON_READY = function() { loadSubscribers(); loadCampaigns(); loadArticlesForImport(); };
 
 async function loadSubscribers() {
   try {
@@ -273,8 +258,7 @@ function exportSubscribers() {
   XLSX.writeFile(wb, `newsletter_subscribers_${new Date().toISOString().split('T')[0]}.xlsx`);
   Toast.show(`📥 ${allSubs.length} subscriber(s) exporté(s)`, 'success');
 }
-
-checkAdmin();
 </script>
+<script src="/assets/js/admin-guard.js"></script>
 </body>
 </html>
