@@ -118,22 +118,30 @@ function renderAdminSidebar() {
 renderAdminSidebar();
 
 // ─── Mobile nav ──────────────────────────────────────────────
+// window.closeMobileSearch est défini par initHeaderSearch() (plus bas) —
+// les 3 panneaux mobiles (recherche, menu, sidebar admin) peuvent chacun
+// s'ouvrir en plein écran sur petit écran ; en ouvrir un doit fermer les
+// autres pour éviter de les superposer.
 function openMobileNav() {
   const nav = document.getElementById('mobile-nav');
   if (nav) { nav.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  window.closeMobileSearch?.();
+  closeAdminSidebar();
 }
 function closeMobileNav() {
   const nav = document.getElementById('mobile-nav');
   if (nav) { nav.classList.remove('open'); document.body.style.overflow = ''; }
 }
 // Fermer avec la touche Escape
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMobileNav(); closeAdminSidebar(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMobileNav(); closeAdminSidebar(); window.closeMobileSearch?.(); } });
 
 // ─── Admin sidebar (mobile) ────────────────────────────────────
 function toggleAdminSidebar() {
+  const opening = !document.querySelector('.admin-sidebar')?.classList.contains('open');
   document.querySelector('.admin-sidebar')?.classList.toggle('open');
   document.querySelector('.admin-sidebar-backdrop')?.classList.toggle('open');
-  document.body.style.overflow = document.querySelector('.admin-sidebar')?.classList.contains('open') ? 'hidden' : '';
+  document.body.style.overflow = opening ? 'hidden' : '';
+  if (opening) { closeMobileNav(); window.closeMobileSearch?.(); }
 }
 function closeAdminSidebar() {
   document.querySelector('.admin-sidebar')?.classList.remove('open');
@@ -162,13 +170,24 @@ function initHeaderSearch() {
   function closeMobile() {
     if (wrap) wrap.classList.remove('mobile-open');
   }
+  // Exposée globalement pour que le handler Escape (tout en haut du fichier)
+  // et l'ouverture du menu mobile / de la sidebar admin puissent fermer cet
+  // overlay même quand le focus n'est plus dans le champ de recherche —
+  // avant cette correction, Escape ne fermait la recherche mobile que si le
+  // focus était resté dans l'input (voir le listener keydown local ci-dessous).
+  window.closeMobileSearch = closeMobile;
   if (icon && wrap) {
     icon.addEventListener('click', () => {
       if (window.innerWidth > 1024) return; // desktop : icône décorative
       const opening = !wrap.classList.contains('mobile-open');
       wrap.classList.toggle('mobile-open', opening);
-      if (opening) setTimeout(() => input.focus(), 50);
-      else closeDropdown();
+      if (opening) {
+        setTimeout(() => input.focus(), 50);
+        closeMobileNav();
+        closeAdminSidebar();
+      } else {
+        closeDropdown();
+      }
     });
   }
 
@@ -664,6 +683,10 @@ async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('modal-login-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Connexion…';
   try {
     const resp = await apiFetch('/auth/login', { method: 'POST', body: { email, password } });
     // Compte avec MFA déjà actif → écran de vérification du code
@@ -683,6 +706,9 @@ async function doLogin() {
     } else {
       errEl.textContent = e.message;
     }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 }
 
@@ -717,6 +743,10 @@ async function doMfaVerify() {
   const body = { mfa_token: mfaToken };
   if (usingRecovery) body.recovery_code = input.value.trim();
   else body.code = input.value.trim();
+  const btn = document.getElementById('mfa-verify-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Vérification…';
   try {
     const { token, user } = await apiFetch('/auth/mfa/verify', { method: 'POST', body });
     Auth.save(token, user);
@@ -726,6 +756,9 @@ async function doMfaVerify() {
   } catch (e) {
     errEl.style.display = '';
     errEl.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 }
 
@@ -788,6 +821,10 @@ async function doMfaSetupConfirm() {
   const setupToken = step.dataset.setupToken;
   const code = document.getElementById('mfa-setup-code').value.trim();
   const errEl = document.getElementById('mfa-setup-error');
+  const btn = document.getElementById('mfa-setup-confirm-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Activation…';
   try {
     const body = setupToken ? { setup_token: setupToken, code } : { code };
     const data = await apiFetch('/auth/mfa/setup/confirm', { method: 'POST', body });
@@ -799,6 +836,9 @@ async function doMfaSetupConfirm() {
   } catch (e) {
     errEl.style.display = '';
     errEl.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 }
 
