@@ -160,6 +160,8 @@ const migrations = [
   )`,
   "ALTER TABLE order_items ADD COLUMN variant_id INTEGER DEFAULT NULL",
   "ALTER TABLE order_items ADD COLUMN variant_label TEXT DEFAULT NULL",
+  // Compteur de lecture des articles (actualités)
+  "ALTER TABLE news ADD COLUMN views INTEGER NOT NULL DEFAULT 0",
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
