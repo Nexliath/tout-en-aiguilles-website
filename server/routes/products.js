@@ -5,6 +5,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -210,22 +211,25 @@ router.delete('/:id/favorite', requireAuth, (req, res) => {
 
 // POST /api/products — créer un produit
 router.post('/', requireAdmin, upload.array('images', 5), (req, res) => {
-  const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label } = req.body;
+  const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label, cost_price, meta_title, meta_description } = req.body;
   if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
   const slug = slugify(name) + '-' + Date.now();
   const images = (req.files || []).map(f => `/assets/images/products/${f.filename}`);
   const result = db.prepare(`
-    INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label, cost_price, meta_title, meta_description)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(name, slug, description || '', Number(price), Number(stock) || 0,
          category_id || null, JSON.stringify(images), tags || '[]', is_featured ? 1 : 0,
-         variant_group_id?.trim() || null, variant_label?.trim() || null);
+         variant_group_id?.trim() || null, variant_label?.trim() || null,
+         cost_price !== undefined && cost_price !== '' ? Number(cost_price) : null,
+         meta_title?.trim() || null, meta_description?.trim() || null);
+  logActivity(req.user, 'Produit créé', name);
   res.status(201).json({ success: true, id: result.lastInsertRowid });
 });
 
 // PUT /api/products/:id — modifier un produit
 router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
-  const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label } = req.body;
+  const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label, cost_price, meta_title, meta_description } = req.body;
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
 
@@ -237,7 +241,8 @@ router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
 
   db.prepare(`
     UPDATE products SET name=?, description=?, price=?, stock=?, category_id=?,
-    images=?, tags=?, is_featured=?, is_active=?, variant_group_id=?, variant_label=?, updated_at=CURRENT_TIMESTAMP
+    images=?, tags=?, is_featured=?, is_active=?, variant_group_id=?, variant_label=?,
+    cost_price=?, meta_title=?, meta_description=?, updated_at=CURRENT_TIMESTAMP
     WHERE id=?
   `).run(name || existing.name, description ?? existing.description, Number(price) || existing.price,
          Number(stock) ?? existing.stock, category_id || existing.category_id,
@@ -246,13 +251,18 @@ router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
          is_active !== undefined   ? (is_active   === '1' || is_active   === 1 || is_active   === true ? 1 : 0) : existing.is_active,
          variant_group_id?.trim() || existing.variant_group_id || null,
          variant_label?.trim() || existing.variant_label || null,
+         cost_price !== undefined ? (cost_price !== '' ? Number(cost_price) : null) : existing.cost_price,
+         meta_title !== undefined ? (meta_title?.trim() || null) : existing.meta_title,
+         meta_description !== undefined ? (meta_description?.trim() || null) : existing.meta_description,
          req.params.id);
+  logActivity(req.user, 'Produit modifié', name || existing.name);
   res.json({ success: true });
 });
 
 // DELETE /api/products/:id — supprimer définitivement un produit
 router.delete('/:id', requireAdmin, (req, res) => {
   const id = req.params.id;
+  const existing = db.prepare('SELECT name FROM products WHERE id = ?').get(id);
   // Note : les commandes stockent leurs articles en JSON dans orders.items,
   // il n'existe pas de table order_items séparée — pas de nettoyage nécessaire ici.
   db.prepare('DELETE FROM favorites WHERE product_id = ?').run(id);
@@ -262,6 +272,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM review_photos WHERE review_id IN (SELECT id FROM reviews WHERE product_id = ?)').run(id);
   db.prepare('DELETE FROM reviews WHERE product_id = ?').run(id);
   db.prepare('DELETE FROM products WHERE id = ?').run(id);
+  logActivity(req.user, 'Produit supprimé', existing?.name || `#${id}`);
   res.json({ success: true });
 });
 
