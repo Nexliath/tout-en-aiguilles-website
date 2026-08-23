@@ -456,6 +456,45 @@ function openAuthModal() {
           <div id="reg-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
           <button class="btn btn-primary btn-block" id="modal-register-btn">Créer mon compte</button>
         </div>
+        <!-- MFA — vérification à la connexion (compte ayant déjà activé le MFA) -->
+        <div id="tab-mfa-verify" style="display:none">
+          <div style="text-align:center;margin-bottom:16px">
+            <div style="font-size:2rem;margin-bottom:8px">🔐</div>
+            <p style="font-size:.85rem;color:var(--text-light)">Entrez le code à 6 chiffres généré par votre application d'authentification.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Code de vérification</label>
+            <input id="mfa-verify-code" type="text" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456" style="text-align:center;font-size:1.3rem;letter-spacing:.3em">
+          </div>
+          <div id="mfa-verify-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+          <button class="btn btn-primary btn-block" id="mfa-verify-btn">Vérifier</button>
+          <p style="text-align:center;margin-top:14px"><a href="#" id="mfa-use-recovery-link" style="font-size:.8rem;color:var(--text-light)">Appareil perdu ? Utiliser un code de secours</a></p>
+        </div>
+        <!-- MFA — activation forcée (admin sans MFA) ou volontaire (compte) -->
+        <div id="tab-mfa-setup" style="display:none">
+          <div id="mfa-setup-step-qr">
+            <p style="font-size:.85rem;color:var(--text-light);margin-bottom:14px" id="mfa-setup-intro">Scannez ce QR code avec Google Authenticator, Authy ou 1Password, puis entrez le code affiché pour activer la double authentification.</p>
+            <div style="text-align:center;margin-bottom:14px">
+              <img id="mfa-qr-img" src="" alt="QR code MFA" style="width:180px;height:180px;border:1px solid var(--border);border-radius:12px;padding:8px;background:white">
+            </div>
+            <p style="font-size:.75rem;color:var(--text-light);text-align:center;margin-bottom:14px">Impossible de scanner ? Entrez ce code manuellement :<br><code id="mfa-secret-text" style="user-select:all;font-size:.8rem;background:var(--cream-dark);padding:4px 8px;border-radius:6px;display:inline-block;margin-top:6px"></code></p>
+            <div class="form-group">
+              <label class="form-label">Code de confirmation</label>
+              <input id="mfa-setup-code" type="text" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456" style="text-align:center;font-size:1.3rem;letter-spacing:.3em">
+            </div>
+            <div id="mfa-setup-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+            <button class="btn btn-primary btn-block" id="mfa-setup-confirm-btn">Activer la double authentification</button>
+          </div>
+          <div id="mfa-setup-step-recovery" style="display:none">
+            <div style="text-align:center;margin-bottom:12px">
+              <div style="font-size:2rem;margin-bottom:8px">✅</div>
+              <p style="font-weight:700">Double authentification activée !</p>
+              <p style="font-size:.82rem;color:var(--text-light);margin-top:6px">Notez ces codes de secours dans un endroit sûr — chacun ne peut être utilisé qu'une fois si vous perdez l'accès à votre application.</p>
+            </div>
+            <div id="mfa-recovery-codes-list" style="background:var(--cream);border-radius:10px;padding:14px;font-family:monospace;font-size:.85rem;line-height:1.9;text-align:center;margin-bottom:16px"></div>
+            <button class="btn btn-primary btn-block" id="mfa-recovery-done-btn">J'ai noté mes codes, continuer</button>
+          </div>
+        </div>
       </div>`;
     document.body.appendChild(modal);
 
@@ -489,6 +528,40 @@ function openAuthModal() {
     document.getElementById('modal-forgot-btn').addEventListener('click', doForgotPassword);
     document.getElementById('forgot-email').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') doForgotPassword();
+    });
+
+    // MFA — vérification à la connexion
+    document.getElementById('mfa-verify-btn').addEventListener('click', doMfaVerify);
+    document.getElementById('mfa-verify-code').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doMfaVerify();
+    });
+    document.getElementById('mfa-use-recovery-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      var input = document.getElementById('mfa-verify-code');
+      var usingRecovery = input.dataset.recovery === '1';
+      input.dataset.recovery = usingRecovery ? '' : '1';
+      input.value = '';
+      if (usingRecovery) {
+        input.setAttribute('maxlength', '6');
+        input.setAttribute('placeholder', '123456');
+        input.style.letterSpacing = '.3em';
+        e.target.textContent = 'Appareil perdu ? Utiliser un code de secours';
+      } else {
+        input.removeAttribute('maxlength');
+        input.setAttribute('placeholder', 'Code de secours');
+        input.style.letterSpacing = 'normal';
+        e.target.textContent = '← Revenir au code à 6 chiffres';
+      }
+    });
+
+    // MFA — activation (setup)
+    document.getElementById('mfa-setup-confirm-btn').addEventListener('click', doMfaSetupConfirm);
+    document.getElementById('mfa-setup-code').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doMfaSetupConfirm();
+    });
+    document.getElementById('mfa-recovery-done-btn').addEventListener('click', function() {
+      modal.classList.remove('open');
+      setTimeout(() => location.reload(), 300);
     });
 
     // Touche Entrée dans les champs
@@ -532,7 +605,12 @@ async function doLogin() {
   const password = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
   try {
-    const { token, user } = await apiFetch('/auth/login', { method: 'POST', body: { email, password } });
+    const resp = await apiFetch('/auth/login', { method: 'POST', body: { email, password } });
+    // Compte avec MFA déjà actif → écran de vérification du code
+    if (resp.mfa_required) { showMfaVerifyStep(resp.mfa_token); return; }
+    // Compte admin sans MFA → activation obligatoire avant tout accès
+    if (resp.mfa_setup_required) { showMfaSetupStep(resp.setup_token, true); return; }
+    const { token, user } = resp;
     Auth.save(token, user);
     Toast.show(`Bienvenue, ${user.first_name} ! 🌸`, 'success');
     document.getElementById('auth-modal').classList.remove('open');
@@ -545,6 +623,96 @@ async function doLogin() {
     } else {
       errEl.textContent = e.message;
     }
+  }
+}
+
+// ─── MFA — étapes dans le modal de connexion ──────────────────
+function hideAllAuthSteps() {
+  const modal = document.getElementById('auth-modal');
+  modal.querySelector('.modal-tabs').style.display = 'none';
+  ['tab-login', 'tab-register', 'tab-forgot', 'tab-mfa-verify', 'tab-mfa-setup'].forEach(function(id) {
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
+function showMfaVerifyStep(mfaToken) {
+  hideAllAuthSteps();
+  const step = document.getElementById('tab-mfa-verify');
+  step.style.display = '';
+  step.dataset.mfaToken = mfaToken;
+  document.getElementById('mfa-verify-error').style.display = 'none';
+  document.getElementById('mfa-verify-code').value = '';
+  setTimeout(function() { document.getElementById('mfa-verify-code').focus(); }, 50);
+}
+
+async function doMfaVerify() {
+  const step = document.getElementById('tab-mfa-verify');
+  const mfaToken = step.dataset.mfaToken;
+  const input = document.getElementById('mfa-verify-code');
+  const errEl = document.getElementById('mfa-verify-error');
+  const usingRecovery = input.dataset.recovery === '1';
+  const body = { mfa_token: mfaToken };
+  if (usingRecovery) body.recovery_code = input.value.trim();
+  else body.code = input.value.trim();
+  try {
+    const { token, user } = await apiFetch('/auth/mfa/verify', { method: 'POST', body });
+    Auth.save(token, user);
+    Toast.show(`Bienvenue, ${user.first_name} ! 🌸`, 'success');
+    document.getElementById('auth-modal').classList.remove('open');
+    setTimeout(() => location.reload(), 500);
+  } catch (e) {
+    errEl.style.display = '';
+    errEl.textContent = e.message;
+  }
+}
+
+// forceLogin : true quand appelé depuis le flux de connexion (compte admin
+// sans MFA — activation obligatoire) ; false pour l'auto-activation
+// volontaire depuis "Mon compte" (voir compte.html).
+function showMfaSetupStep(setupToken, forceLogin) {
+  hideAllAuthSteps();
+  const modal = document.getElementById('auth-modal');
+  modal.classList.add('open');
+  const step = document.getElementById('tab-mfa-setup');
+  step.style.display = '';
+  step.dataset.setupToken = setupToken || '';
+  document.getElementById('mfa-setup-intro').textContent = forceLogin
+    ? 'Compte administrateur : la double authentification est obligatoire. Scannez ce QR code avec Google Authenticator, Authy ou 1Password, puis entrez le code affiché.'
+    : "Scannez ce QR code avec Google Authenticator, Authy ou 1Password, puis entrez le code affiché pour activer la double authentification.";
+  document.getElementById('mfa-setup-step-qr').style.display = '';
+  document.getElementById('mfa-setup-step-recovery').style.display = 'none';
+  document.getElementById('mfa-setup-error').style.display = 'none';
+  document.getElementById('mfa-setup-code').value = '';
+  initMfaSetupQr(setupToken);
+}
+
+async function initMfaSetupQr(setupToken) {
+  try {
+    const body = setupToken ? { setup_token: setupToken } : {};
+    const data = await apiFetch('/auth/mfa/setup/init', { method: 'POST', body });
+    document.getElementById('mfa-qr-img').src = data.qr;
+    document.getElementById('mfa-secret-text').textContent = data.secret;
+  } catch (e) {
+    Toast.show(e.message, 'error');
+  }
+}
+
+async function doMfaSetupConfirm() {
+  const step = document.getElementById('tab-mfa-setup');
+  const setupToken = step.dataset.setupToken;
+  const code = document.getElementById('mfa-setup-code').value.trim();
+  const errEl = document.getElementById('mfa-setup-error');
+  try {
+    const body = setupToken ? { setup_token: setupToken, code } : { code };
+    const data = await apiFetch('/auth/mfa/setup/confirm', { method: 'POST', body });
+    Auth.save(data.token, data.user);
+    document.getElementById('mfa-setup-step-qr').style.display = 'none';
+    const list = document.getElementById('mfa-recovery-codes-list');
+    list.innerHTML = data.recovery_codes.map(function(c) { return `<div>${c}</div>`; }).join('');
+    document.getElementById('mfa-setup-step-recovery').style.display = '';
+  } catch (e) {
+    errEl.style.display = '';
+    errEl.textContent = e.message;
   }
 }
 
