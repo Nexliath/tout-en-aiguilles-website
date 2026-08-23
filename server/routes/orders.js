@@ -30,6 +30,60 @@ for (const col of [
   try { db.exec(col); } catch (e) { /* colonne déjà présente */ }
 }
 
+// ─── Résolution des lignes de commande (produit + variante) ──
+// Un item panier peut porter un variant_id (couleur/motif choisi sur la
+// fiche produit — voir product_variants). Avant, seul product_id/qty
+// étaient pris en compte : le prix et le libellé de la variante étaient
+// perdus entre le panier et la commande. Cette fonction centralise la
+// résolution (prix, stock, libellé) pour les 3 chemins de paiement
+// (Stripe, PayPal, mode démo) afin qu'ils restent cohérents.
+function resolveOrderItems(items) {
+  let productsTotal = 0;
+  const resolved = [];
+  for (const item of items) {
+    const product = db.prepare('SELECT * FROM products WHERE id = ? AND is_active = 1').get(item.product_id);
+    if (!product) throw new Error(`Produit ${item.product_id} introuvable`);
+
+    let variant = null;
+    if (item.variant_id) {
+      variant = db.prepare('SELECT * FROM product_variants WHERE id = ? AND product_id = ? AND is_active = 1').get(item.variant_id, item.product_id);
+      if (!variant) throw new Error(`Option choisie indisponible pour ${product.name}`);
+    }
+
+    const stock = variant ? variant.stock : product.stock;
+    if (stock < item.qty) throw new Error(`Stock insuffisant pour ${product.name}${variant ? ' (' + variant.label + ')' : ''}`);
+
+    const price = variant && variant.price != null ? variant.price : product.price;
+    const images = variant && JSON.parse(variant.images || '[]').length > 0
+      ? JSON.parse(variant.images || '[]')
+      : JSON.parse(product.images || '[]');
+
+    productsTotal += price * item.qty;
+    resolved.push({
+      product_id: item.product_id,
+      name: product.name,
+      price,
+      qty: item.qty,
+      image: images[0] || '',
+      variant_id: variant ? variant.id : null,
+      variant_label: variant ? variant.label : null,
+    });
+  }
+  return { resolved, productsTotal };
+}
+
+// Décrémente le stock du produit ou, si l'article porte une variante,
+// le stock de cette variante spécifiquement.
+function decrementStockForItems(items) {
+  for (const item of items) {
+    if (item.variant_id) {
+      db.prepare('UPDATE product_variants SET stock = stock - ? WHERE id = ?').run(item.qty, item.variant_id);
+    } else {
+      db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
+    }
+  }
+}
+
 // Stripe — initialisé uniquement si la clé est disponible
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -74,26 +128,25 @@ router.post('/checkout', async (req, res) => {
   const deliveryFee   = typeof delivery?.fee === 'number' ? delivery.fee : 0;
   const relayPoint    = delivery?.relay_point || null;
 
-  // Valider les produits et calculer le total
-  let lineItems = [];
-  let productsTotal = 0;
-  for (const item of items) {
-    const product = db.prepare('SELECT * FROM products WHERE id = ? AND is_active = 1').get(item.product_id);
-    if (!product) return res.status(400).json({ error: `Produit ${item.product_id} introuvable` });
-    if (product.stock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${product.name}` });
-    productsTotal += product.price * item.qty;
-    lineItems.push({
-      price_data: {
-        currency: 'eur',
-        product_data: {
-          name: product.name,
-          images: JSON.parse(product.images || '[]').slice(0, 1).map(img => `${process.env.BASE_URL || 'http://localhost:3000'}${img}`),
-        },
-        unit_amount: Math.round(product.price * 100),
-      },
-      quantity: item.qty,
-    });
+  // Valider les produits (+ variantes choisies) et calculer le total
+  let orderItems, productsTotal;
+  try {
+    ({ resolved: orderItems, productsTotal } = resolveOrderItems(items));
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
   }
+
+  const lineItems = orderItems.map(oi => ({
+    price_data: {
+      currency: 'eur',
+      product_data: {
+        name: oi.variant_label ? `${oi.name} — ${oi.variant_label}` : oi.name,
+        images: oi.image ? [`${process.env.BASE_URL || 'http://localhost:3000'}${oi.image}`] : [],
+      },
+      unit_amount: Math.round(oi.price * 100),
+    },
+    quantity: oi.qty,
+  }));
 
   // Ajouter les frais de livraison comme ligne Stripe (si > 0)
   if (deliveryFee > 0) {
@@ -113,10 +166,7 @@ router.post('/checkout', async (req, res) => {
   const total = productsTotal + deliveryFee;
 
   // Créer la commande en base (status: pending)
-  const orderData = JSON.stringify(items.map(item => {
-    const p = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id);
-    return { product_id: item.product_id, name: p.name, price: p.price, qty: item.qty, image: JSON.parse(p.images || '[]')[0] || '' };
-  }));
+  const orderData = JSON.stringify(orderItems);
 
   const orderResult = db.prepare(`
     INSERT INTO orders (user_id, email, first_name, last_name, address, city, postal_code, country, total, items, notes, delivery_type, delivery_fee, relay_point)
@@ -134,9 +184,7 @@ router.post('/checkout', async (req, res) => {
   // Mode démo (sans Stripe)
   if (!stripe) {
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
-    for (const item of items) {
-      db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
-    }
+    decrementStockForItems(orderItems);
     const demoOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
     if (demoOrder) {
       sendNewOrderNotification({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
@@ -187,9 +235,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
       const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
       if (order) {
         const parsedItems = JSON.parse(order.items || '[]');
-        for (const item of parsedItems) {
-          db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
-        }
+        decrementStockForItems(parsedItems);
         // Email client : paiement confirmé + facture
         sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
       }
@@ -332,15 +378,12 @@ router.post('/paypal/create', async (req, res) => {
   const deliveryFee  = typeof delivery?.fee === 'number' ? delivery.fee : 0;
   const relayPoint   = delivery?.relay_point || null;
 
-  // Valider les produits
-  let productsTotal = 0;
-  const orderItems = [];
-  for (const item of items) {
-    const p = db.prepare('SELECT * FROM products WHERE id = ? AND is_active = 1').get(item.product_id);
-    if (!p) return res.status(400).json({ error: `Produit ${item.product_id} introuvable` });
-    if (p.stock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${p.name}` });
-    productsTotal += p.price * item.qty;
-    orderItems.push({ product_id: item.product_id, name: p.name, price: p.price, qty: item.qty, image: JSON.parse(p.images || '[]')[0] || '' });
+  // Valider les produits (+ variantes choisies)
+  let orderItems, productsTotal;
+  try {
+    ({ resolved: orderItems, productsTotal } = resolveOrderItems(items));
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
   }
   const total = productsTotal + deliveryFee;
 
@@ -365,7 +408,7 @@ router.post('/paypal/create', async (req, res) => {
   if (!token) {
     // Mode démo sans PayPal
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
-    for (const item of items) db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
+    decrementStockForItems(orderItems);
     return res.json({ demo: true, order_id: orderId });
   }
 
@@ -401,7 +444,7 @@ router.post('/paypal/capture', async (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
   if (order) {
     const parsedItems = JSON.parse(order.items || '[]');
-    for (const item of parsedItems) db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
+    decrementStockForItems(parsedItems);
     sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
   }
   res.json({ success: true, order_id });
