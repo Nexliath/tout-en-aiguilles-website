@@ -1,14 +1,8 @@
 const express = require('express');
-let _loyaltyAward = null;
-function awardLoyaltyPoints(userId, action, points, ref) {
-  try {
-    if (!_loyaltyAward) _loyaltyAward = require('./loyalty').awardPoints;
-    _loyaltyAward(userId, action, points, ref);
-  } catch {}
-}
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail } = require('../utils/email');
+const { logActivity } = require('../utils/activityLog');
 
 // ─── Migrations colonnes supplémentaires ─────────────────────
 try { db.exec('ALTER TABLE orders ADD COLUMN review_requested_at TEXT'); } catch(e) {}
@@ -59,35 +53,6 @@ async function paypalRequest(method, path, body, token) {
   return { ok: r.ok, status: r.status, data: await r.json() };
 }
 
-// ─── Résolution produit / variation (prix + stock effectifs) ──────────
-// Si l'item du panier référence une variation, son prix et son stock priment sur ceux du produit.
-function resolveOrderItem(item) {
-  const product = db.prepare('SELECT * FROM products WHERE id = ? AND is_active = 1').get(item.product_id);
-  if (!product) return null;
-  let price = product.price;
-  let availableStock = product.stock;
-  let variation = null;
-  if (item.variation_id) {
-    variation = db.prepare('SELECT * FROM product_variations WHERE id = ? AND product_id = ?')
-      .get(item.variation_id, item.product_id);
-    if (variation) {
-      if (variation.price !== null && variation.price !== undefined) price = variation.price;
-      availableStock = variation.stock;
-    }
-  }
-  const displayName = variation ? `${product.name} (${variation.label})` : product.name;
-  return { product, variation, price, availableStock, displayName };
-}
-
-// Décrémente le stock de la variation choisie, sinon celui du produit
-function decrementItemStock(item) {
-  if (item.variation_id) {
-    db.prepare('UPDATE product_variations SET stock = stock - ? WHERE id = ?').run(item.qty, item.variation_id);
-  } else {
-    db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
-  }
-}
-
 // POST /api/orders/checkout — créer une session Stripe Checkout
 router.post('/checkout', async (req, res) => {
   const { items, customer, delivery, success_url, cancel_url } = req.body;
@@ -102,20 +67,18 @@ router.post('/checkout', async (req, res) => {
   let lineItems = [];
   let productsTotal = 0;
   for (const item of items) {
-    const resolved = resolveOrderItem(item);
-    if (!resolved) return res.status(400).json({ error: `Produit ${item.product_id} introuvable` });
-    const { product, price, availableStock, displayName } = resolved;
-    if (product.is_custom_order) return res.status(400).json({ error: `${product.name} est un produit sur devis — merci de nous contacter directement pour cette création.` });
-    if (availableStock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${displayName}` });
-    productsTotal += price * item.qty;
+    const product = db.prepare('SELECT * FROM products WHERE id = ? AND is_active = 1').get(item.product_id);
+    if (!product) return res.status(400).json({ error: `Produit ${item.product_id} introuvable` });
+    if (product.stock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${product.name}` });
+    productsTotal += product.price * item.qty;
     lineItems.push({
       price_data: {
         currency: 'eur',
         product_data: {
-          name: displayName,
+          name: product.name,
           images: JSON.parse(product.images || '[]').slice(0, 1).map(img => `${process.env.BASE_URL || 'http://localhost:3000'}${img}`),
         },
-        unit_amount: Math.round(price * 100),
+        unit_amount: Math.round(product.price * 100),
       },
       quantity: item.qty,
     });
@@ -140,15 +103,8 @@ router.post('/checkout', async (req, res) => {
 
   // Créer la commande en base (status: pending)
   const orderData = JSON.stringify(items.map(item => {
-    const { product, variation, price, displayName } = resolveOrderItem(item);
-    return {
-      product_id: item.product_id,
-      variation_id: item.variation_id || null,
-      name: displayName,
-      price,
-      qty: item.qty,
-      image: (variation?.image_url) || JSON.parse(product.images || '[]')[0] || ''
-    };
+    const p = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id);
+    return { product_id: item.product_id, name: p.name, price: p.price, qty: item.qty, image: JSON.parse(p.images || '[]')[0] || '' };
   }));
 
   const orderResult = db.prepare(`
@@ -168,13 +124,12 @@ router.post('/checkout', async (req, res) => {
   if (!stripe) {
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
     for (const item of items) {
-      decrementItemStock(item);
+      db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
     }
     const demoOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
     if (demoOrder) {
       sendNewOrderNotification({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
       sendOrderStatusEmail({ ...demoOrder, items: JSON.parse(demoOrder.items || '[]') }).catch(console.error);
-      if (demoOrder.user_id) awardLoyaltyPoints(demoOrder.user_id, 'purchase', Math.floor(demoOrder.total), String(orderId));
     }
     return res.json({ demo: true, order_id: orderId, message: 'Commande enregistrée (mode démo)' });
   }
@@ -222,7 +177,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
       if (order) {
         const parsedItems = JSON.parse(order.items || '[]');
         for (const item of parsedItems) {
-          decrementItemStock(item);
+          db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
         }
         // Email client : paiement confirmé + facture
         sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
@@ -233,18 +188,6 @@ router.post('/webhook', express.raw({ type: 'application/json' }), (req, res) =>
 });
 
 // GET /api/orders/my — mes commandes
-// GET /api/orders/track — suivi public par id + email
-router.get('/track', (req, res) => {
-  const { id, email } = req.query;
-  if (!id || !email) return res.status(400).json({ error: 'id et email requis' });
-  const order = db.prepare(
-    "SELECT id, status, created_at, total, items, delivery_type, delivery_fee, tracking_number, email FROM orders WHERE id = ? AND LOWER(email) = LOWER(?)"
-  ).get(id, email.trim());
-  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
-  // Don't expose sensitive fields
-  res.json({ ...order, items: JSON.parse(order.items || '[]') });
-});
-
 router.get('/my', requireAuth, (req, res) => {
   const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
     .map(o => ({ ...o, items: JSON.parse(o.items || '[]') }));
@@ -264,12 +207,6 @@ router.get('/:id', requireAuth, (req, res) => {
 // ─── Admin ──────────────────────────────────────────────────
 
 // GET /api/orders — toutes les commandes (admin)
-router.get('/admin/all', requireAdmin, (req, res) => {
-  const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all()
-    .map(o => ({ ...o, items: JSON.parse(o.items || '[]') }));
-  res.json(orders);
-});
-
 router.get('/', requireAdmin, (req, res) => {
   const { status } = req.query;
   let query = 'SELECT * FROM orders';
@@ -296,7 +233,30 @@ router.put('/:id/status', requireAdmin, (req, res) => {
   if (order && order.email) {
     sendOrderStatusEmail({ ...order, items: JSON.parse(order.items || '[]') }).catch(console.error);
   }
+  logActivity(req.user, 'Statut commande modifié', `#${req.params.id} → ${status}`);
   res.json({ success: true });
+});
+
+// ─── PUT /api/orders/bulk/status — changement de statut groupé ─
+router.put('/bulk/status', requireAdmin, (req, res) => {
+  const { ids, status } = req.body;
+  const valid = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'];
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Aucune commande sélectionnée' });
+  if (!valid.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
+
+  const update = db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  let updated = 0;
+  for (const id of ids) {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    if (!order) continue;
+    update.run(status, id);
+    updated++;
+    if (order.email) {
+      sendOrderStatusEmail({ ...order, status, items: JSON.parse(order.items || '[]') }).catch(console.error);
+    }
+  }
+  logActivity(req.user, 'Statut commandes modifié (groupé)', `${updated} commande(s) → ${status}`);
+  res.json({ success: true, updated });
 });
 
 // PUT /api/orders/:id/relay-point — changer le point relais + notifier le client
@@ -337,20 +297,11 @@ router.post('/paypal/create', async (req, res) => {
   let productsTotal = 0;
   const orderItems = [];
   for (const item of items) {
-    const resolved = resolveOrderItem(item);
-    if (!resolved) return res.status(400).json({ error: `Produit ${item.product_id} introuvable` });
-    const { product, variation, price, availableStock, displayName } = resolved;
-    if (product.is_custom_order) return res.status(400).json({ error: `${product.name} est un produit sur devis — merci de nous contacter directement pour cette création.` });
-    if (availableStock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${displayName}` });
-    productsTotal += price * item.qty;
-    orderItems.push({
-      product_id: item.product_id,
-      variation_id: item.variation_id || null,
-      name: displayName,
-      price,
-      qty: item.qty,
-      image: (variation?.image_url) || JSON.parse(product.images || '[]')[0] || ''
-    });
+    const p = db.prepare('SELECT * FROM products WHERE id = ? AND is_active = 1').get(item.product_id);
+    if (!p) return res.status(400).json({ error: `Produit ${item.product_id} introuvable` });
+    if (p.stock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${p.name}` });
+    productsTotal += p.price * item.qty;
+    orderItems.push({ product_id: item.product_id, name: p.name, price: p.price, qty: item.qty, image: JSON.parse(p.images || '[]')[0] || '' });
   }
   const total = productsTotal + deliveryFee;
 
@@ -375,7 +326,7 @@ router.post('/paypal/create', async (req, res) => {
   if (!token) {
     // Mode démo sans PayPal
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
-    for (const item of items) decrementItemStock(item);
+    for (const item of items) db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
     return res.json({ demo: true, order_id: orderId });
   }
 
@@ -411,7 +362,7 @@ router.post('/paypal/capture', async (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
   if (order) {
     const parsedItems = JSON.parse(order.items || '[]');
-    for (const item of parsedItems) decrementItemStock(item);
+    for (const item of parsedItems) db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(item.qty, item.product_id);
     sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
   }
   res.json({ success: true, order_id });
