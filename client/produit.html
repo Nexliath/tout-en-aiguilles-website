@@ -341,7 +341,7 @@
 <footer class="site-footer">
   <div class="container">
     <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
-      <span>© 2024 Tout en Aiguilles</span>
+      <span>© <span id="footer-year"></span> Tout en Aiguilles</span>
       <a href="/boutique.html" style="color:rgba(255,255,255,.6)">← Retour boutique</a>
     </div>
   </div>
@@ -349,6 +349,9 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
+const fyEl = document.getElementById('footer-year');
+if (fyEl) fyEl.textContent = new Date().getFullYear();
+
 let currentProduct = null;
 let currentQty = 1;
 
@@ -398,7 +401,10 @@ async function loadProduct() {
     const desc = product.meta_description?.trim() || (product.description
       ? product.description.slice(0, 160).replace(/\n/g, ' ')
       : `${product.name} — création artisanale crochet faite main par Tout en Aiguilles.`);
-    const img = product.images?.[0] ? `${BASE}${product.images[0]}` : '';
+    // Repli sur le logo du site si le produit n'a aucune photo — sans ça,
+    // un partage sur les réseaux sociaux d'un produit sans image affichait
+    // une carte cassée (content="" sur og:image/twitter:image).
+    const img = product.images?.[0] ? `${BASE}${product.images[0]}` : `${BASE}/assets/images/favicon.svg`;
 
     // Meta description
     let metaDesc = document.querySelector('meta[name="description"]');
@@ -499,7 +505,7 @@ function renderProduct(p) {
     // Dot indicators (only if multiple images)
     const dots = images.length > 1 ? `
       <div class="gallery-dots" id="gallery-dots">
-        ${images.map((_, i) => `<button class="gallery-dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})"></button>`).join('')}
+        ${images.map((_, i) => `<button class="gallery-dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})" aria-label="Photo ${i + 1}"></button>`).join('')}
       </div>` : '';
 
     mainEl.innerHTML = `<div class="gallery-carousel" id="gallery-carousel">${slides}</div>${dots}`;
@@ -856,15 +862,15 @@ async function loadReviews(productId) {
   }
 }
 
-function showNotFound() {
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('not-found').style.display = '';
-}
-
 async function subscribeStockAlert() {
   const email = document.getElementById('stock-alert-email').value.trim();
   const msg = document.getElementById('stock-alert-msg');
   if (!email || !window._currentProductId) return;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    msg.textContent = "Le format de l'email ne semble pas valide";
+    msg.style.color = '#d9534f'; msg.style.display = '';
+    return;
+  }
   try {
     await apiFetch('/products/stock-alert', { method: 'POST', body: { product_id: window._currentProductId, email }});
     msg.textContent = '✓ Parfait ! Vous recevrez un email dès que ce produit sera de nouveau disponible.';
@@ -972,7 +978,7 @@ function renderGallery(images, name) {
 
   const dots = images.length > 1 ? `
     <div class="gallery-dots" id="gallery-dots">
-      ${images.map((_, i) => `<button class="gallery-dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})"></button>`).join('')}
+      ${images.map((_, i) => `<button class="gallery-dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})" aria-label="Photo ${i + 1}"></button>`).join('')}
     </div>` : '';
 
   mainEl.innerHTML = `<div class="gallery-carousel" id="gallery-carousel">${slides}</div>${dots}`;
