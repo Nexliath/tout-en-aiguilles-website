@@ -202,9 +202,57 @@ const migrations = [
     sort_order INTEGER DEFAULT 0,
     UNIQUE(news_id, product_id)
   )`,
+  // Mot de passe oublié (client + admin)
+  `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
+}
+
+// ─── Backfill SEO des articles existants ────────────────────
+// Remplit meta_title / meta_description pour les articles créés avant
+// l'ajout de ces champs (17/2026), pour éviter à Victorine de le faire à la
+// main un par un. Ne touche jamais un champ déjà rempli — sans danger à
+// chaque redémarrage (idempotent : plus rien à faire une fois tous remplis).
+function stripHtmlTags(html) {
+  return String(html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;|&rsquo;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function truncateAt(str, max) {
+  if (str.length <= max) return str;
+  const cut = str.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trim() + '…';
+}
+try {
+  const articlesToFill = _db.prepare(`
+    SELECT id, title, excerpt, content FROM news
+    WHERE meta_title IS NULL OR TRIM(meta_title) = '' OR meta_description IS NULL OR TRIM(meta_description) = ''
+  `).all();
+  if (articlesToFill.length > 0) {
+    const updateStmt = _db.prepare('UPDATE news SET meta_title = ?, meta_description = ? WHERE id = ?');
+    for (const a of articlesToFill) {
+      const metaTitle = truncateAt(String(a.title || '').trim(), 60);
+      const sourceText = stripHtmlTags(a.excerpt) || stripHtmlTags(a.content);
+      const metaDescription = truncateAt(sourceText, 155);
+      updateStmt.run(metaTitle, metaDescription, a.id);
+    }
+    console.log(`🔍 SEO : champs meta_title/meta_description complétés automatiquement pour ${articlesToFill.length} article(s) existant(s).`);
+  }
+} catch (e) {
+  console.error('⚠️  Backfill SEO articles échoué (non bloquant) :', e.message);
 }
 
 // ─── Fix BigInt ──────────────────────────────────────────────
