@@ -95,8 +95,14 @@ router.get('/admin/:id', requireAdmin, (req, res) => {
 router.get('/:slug', (req, res) => {
   const article = db.prepare(`SELECT * FROM news WHERE slug = ? AND ${PUBLIC_WHERE}`).get(req.params.slug);
   if (!article) return res.status(404).json({ error: 'Article introuvable' });
-  db.prepare('UPDATE news SET views = views + 1 WHERE id = ?').run(article.id);
-  article.views = (article.views || 0) + 1;
+  // Dédupliqué par cookie (24h) — évite qu'un script qui rafraîchit la page
+  // en boucle gonfle artificiellement le compteur affiché à l'admin.
+  const viewedCookie = `tea_viewed_news_${article.id}`;
+  if (!req.cookies || !req.cookies[viewedCookie]) {
+    db.prepare('UPDATE news SET views = views + 1 WHERE id = ?').run(article.id);
+    article.views = (article.views || 0) + 1;
+    res.cookie(viewedCookie, '1', { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax' });
+  }
 
   attachRelatedProducts(article);
 
