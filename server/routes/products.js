@@ -75,9 +75,28 @@ router.get('/variants/:groupId', (req, res) => {
 });
 
 // GET /api/products/categories — toutes les catégories
+// ?active_only=1 : ne retourne que les catégories ayant au moins un produit actif
+// (utilisé côté boutique pour ne pas afficher de catégories vides dans les filtres)
 router.get('/categories', (req, res) => {
-  const cats = db.prepare('SELECT * FROM categories ORDER BY type, name').all();
+  const query = req.query.active_only === '1'
+    ? `SELECT c.* FROM categories c
+       WHERE EXISTS (SELECT 1 FROM products p WHERE p.category_id = c.id AND p.is_active = 1)
+       ORDER BY c.type, c.name`
+    : 'SELECT * FROM categories ORDER BY type, name';
+  const cats = db.prepare(query).all();
   res.json(cats);
+});
+
+// POST /api/products/categories — créer une catégorie (admin)
+router.post('/categories', requireAdmin, (req, res) => {
+  const { name, type } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Nom requis' });
+  if (!['crochet', 'couture'].includes(type)) return res.status(400).json({ error: 'Type invalide' });
+  const slug = slugify(name);
+  const existing = db.prepare('SELECT * FROM categories WHERE slug = ?').get(slug);
+  if (existing) return res.status(409).json({ error: 'Une catégorie avec ce nom existe déjà', category: existing });
+  const result = db.prepare('INSERT INTO categories (name, slug, type) VALUES (?, ?, ?)').run(name.trim(), slug, type);
+  res.status(201).json({ id: result.lastInsertRowid, name: name.trim(), slug, type });
 });
 
 // ─── Favoris (authentifié) ──────────────────────────────────
