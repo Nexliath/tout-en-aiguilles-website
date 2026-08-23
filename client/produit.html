@@ -404,16 +404,22 @@ let currentQty = 1;
 
 async function loadProduct() {
   const params = new URLSearchParams(location.search);
-  const id = params.get('id');
-  if (!id) { showNotFound(); return; }
+  // Les cartes produit (boutique, panier) lient via ?id=, tandis que le
+  // sitemap et la recherche header lient via ?slug= — les deux doivent
+  // fonctionner. Avant cette correction, seul ?id= était lu ici : les liens
+  // ?slug= tombaient systématiquement sur "produit introuvable".
+  const ref = params.get('id') || params.get('slug');
+  if (!ref) { showNotFound(); return; }
 
   try {
-    // Try by id first, then slug
+    // Fiche produit unique via /products/:ref (accepte id ou slug côté
+    // serveur) — avant cette correction, la page chargeait jusqu'à 200
+    // produits pour retrouver le bon par id côté client, ce qui échouait
+    // silencieusement dès que le catalogue dépassait la limite de pagination
+    // de GET /products.
     let product;
     try {
-      // Get all products to find by id (or we could use slug route)
-      const products = await apiFetch('/products?limit=200');
-      product = products.find(p => p.id == id || p.slug === id);
+      product = await apiFetch(`/products/${encodeURIComponent(ref)}`);
     } catch {}
 
     if (!product) { showNotFound(); return; }
@@ -443,8 +449,10 @@ async function loadProduct() {
     document.title = product.meta_title?.trim() || `${product.name} — Création crochet faite main | Tout en Aiguilles`;
     // ── SEO dynamique ────────────────────────────────────────
     const BASE = 'https://tout-en-aiguilles.com';
-    const slug = new URLSearchParams(location.search).get('slug');
-    const pageUrl = `${BASE}/produit.html?slug=${slug}`;
+    // Utilise toujours le slug du produit chargé (pas le paramètre d'URL tel
+    // quel) : avant cette correction, arriver via ?id=... laissait `slug`
+    // à null et produisait une URL canonique/OG cassée (?slug=null).
+    const pageUrl = `${BASE}/produit.html?slug=${product.slug}`;
     const desc = product.meta_description?.trim() || (product.description
       ? product.description.slice(0, 160).replace(/\n/g, ' ')
       : `${product.name} — création artisanale crochet faite main par Tout en Aiguilles.`);
