@@ -76,6 +76,38 @@
     </div>
   </div>
 
+  <!-- Activation obligatoire du MFA avant tout accès admin -->
+  <div id="view-mfa" style="display:none;">
+    <div style="background:white; border-radius:var(--radius-xl); padding:32px; box-shadow:0 8px 40px var(--shadow-lg);">
+      <div id="mfa-step-qr">
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:2.2rem;margin-bottom:8px">🔐</div>
+          <h2 style="font-size:1.15rem;margin-bottom:8px">Double authentification obligatoire</h2>
+          <p style="font-size:.85rem;color:var(--text-light)">Les comptes administrateur doivent activer le MFA. Scannez ce QR code avec Google Authenticator, Authy ou 1Password.</p>
+        </div>
+        <div style="text-align:center;margin-bottom:14px">
+          <img id="s-mfa-qr" src="" alt="QR code MFA" style="width:180px;height:180px;border:1px solid var(--border);border-radius:12px;padding:8px;background:white">
+        </div>
+        <p style="font-size:.75rem;color:var(--text-light);text-align:center;margin-bottom:14px">Impossible de scanner ? Entrez ce code manuellement :<br><code id="s-mfa-secret" style="user-select:all;font-size:.8rem;background:var(--cream-dark);padding:4px 8px;border-radius:6px;display:inline-block;margin-top:6px"></code></p>
+        <div class="form-group">
+          <label class="form-label">Code de confirmation</label>
+          <input id="s-mfa-code" type="text" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456" style="text-align:center;font-size:1.3rem;letter-spacing:.3em">
+        </div>
+        <div id="s-mfa-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+        <button class="btn btn-primary btn-block" id="s-mfa-confirm-btn" type="button">Activer la double authentification</button>
+      </div>
+      <div id="mfa-step-recovery" style="display:none">
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="font-size:2rem;margin-bottom:8px">✅</div>
+          <p style="font-weight:700">Double authentification activée !</p>
+          <p style="font-size:.82rem;color:var(--text-light);margin-top:6px">Notez ces codes de secours dans un endroit sûr — chacun ne peut être utilisé qu'une fois.</p>
+        </div>
+        <div id="s-mfa-recovery-list" style="background:var(--cream);border-radius:10px;padding:14px;font-family:monospace;font-size:.85rem;line-height:1.9;text-align:center;margin-bottom:16px"></div>
+        <button class="btn btn-primary btn-block" id="s-mfa-done-btn" type="button">J'ai noté mes codes, continuer</button>
+      </div>
+    </div>
+  </div>
+
   <div id="view-success" style="display:none; text-align:center;">
     <div style="background:white; border-radius:var(--radius-xl); padding:40px; box-shadow:0 8px 40px var(--shadow-lg);">
       <div style="font-size:3rem; margin-bottom:16px;">🎉</div>
@@ -172,10 +204,16 @@
       if (!result.ok) {
         throw new Error(result.data.error || 'Erreur serveur (' + result.ok + ')');
       }
-      // Sauvegarder le token
+      if (result.data.mfa_setup_required) {
+        // Le compte est créé mais aucun token de session n'est délivré tant
+        // que le MFA (obligatoire pour un admin) n'est pas activé.
+        document.getElementById('view-form').style.display = 'none';
+        showMfaStep(result.data.setup_token, fname);
+        return;
+      }
+      // Ancien comportement de secours (ne devrait plus arriver) : token direct
       localStorage.setItem('tea_token', result.data.token);
       localStorage.setItem('tea_user', JSON.stringify(result.data.user));
-      // Afficher succès
       document.getElementById('success-name').textContent = fname;
       document.getElementById('view-form').style.display = 'none';
       document.getElementById('view-success').style.display = 'block';
@@ -184,6 +222,60 @@
       showError('Erreur : ' + err.message);
       btn.disabled = false;
       btn.innerHTML = '🚀 Créer mon compte admin';
+    });
+  }
+
+  // ─── MFA obligatoire ────────────────────────────────────────
+  function showMfaStep(setupToken, fname) {
+    document.getElementById('view-mfa').style.display = 'block';
+    document.getElementById('mfa-step-qr').style.display = '';
+    document.getElementById('mfa-step-recovery').style.display = 'none';
+
+    fetch(API + '/auth/mfa/setup/init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ setup_token: setupToken })
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      document.getElementById('s-mfa-qr').src = data.qr;
+      document.getElementById('s-mfa-secret').textContent = data.secret;
+    });
+
+    document.getElementById('s-mfa-confirm-btn').addEventListener('click', function () {
+      var code = document.getElementById('s-mfa-code').value.trim();
+      var errEl = document.getElementById('s-mfa-error');
+      errEl.style.display = 'none';
+      fetch(API + '/auth/mfa/setup/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setup_token: setupToken, code: code })
+      })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { throw new Error(result.data.error || 'Code invalide'); }
+        localStorage.setItem('tea_token', result.data.token);
+        localStorage.setItem('tea_user', JSON.stringify(result.data.user));
+        document.getElementById('mfa-step-qr').style.display = 'none';
+        var list = document.getElementById('s-mfa-recovery-list');
+        list.innerHTML = '';
+        result.data.recovery_codes.forEach(function (c) {
+          var div = document.createElement('div');
+          div.textContent = c;
+          list.appendChild(div);
+        });
+        document.getElementById('mfa-step-recovery').style.display = '';
+        document.getElementById('success-name').textContent = fname;
+      })
+      .catch(function (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = '';
+      });
+    });
+
+    document.getElementById('s-mfa-done-btn').addEventListener('click', function () {
+      document.getElementById('view-mfa').style.display = 'none';
+      document.getElementById('view-success').style.display = 'block';
     });
   }
 
