@@ -319,7 +319,11 @@ function renderPagination(pages, total) {
   var paginEl = document.getElementById('pagination');
   if (pages <= 1) { paginEl.innerHTML = ''; return; }
 
-  var html = '<div class="pagination-info">' + (state.page + 1) + ' / ' + pages + '</div>';
+  // Indicateur "Page X / Y" en légende au-dessus, boutons centrés en dessous
+  // (schéma courant chez la concurrence : le repère textuel n'interfère pas
+  // avec le centrage visuel des numéros de page)
+  var html = '<div class="pagination-info">Page ' + (state.page + 1) + ' / ' + pages + '</div>';
+  html += '<div class="pagination-buttons">';
 
   // Bouton précédent
   html += '<button class="page-btn' + (state.page === 0 ? ' disabled' : '') + '" data-page="' + (state.page - 1) + '" ' + (state.page === 0 ? 'disabled' : '') + '>‹</button>';
@@ -341,6 +345,7 @@ function renderPagination(pages, total) {
 
   // Bouton suivant
   html += '<button class="page-btn' + (state.page === pages - 1 ? ' disabled' : '') + '" data-page="' + (state.page + 1) + '" ' + (state.page === pages - 1 ? 'disabled' : '') + '>›</button>';
+  html += '</div>';
 
   paginEl.innerHTML = html;
   paginEl.querySelectorAll('.page-btn:not(.disabled)').forEach(function(btn) {
