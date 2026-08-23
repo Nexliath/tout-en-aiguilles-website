@@ -47,6 +47,8 @@ router.get('/admin/all', requireAdmin, (req, res) => {
 router.get('/:slug', (req, res) => {
   const article = db.prepare('SELECT * FROM news WHERE slug = ? AND published = 1').get(req.params.slug);
   if (!article) return res.status(404).json({ error: 'Article introuvable' });
+  db.prepare('UPDATE news SET views = views + 1 WHERE id = ?').run(article.id);
+  article.views = (article.views || 0) + 1;
   res.json(article);
 });
 
