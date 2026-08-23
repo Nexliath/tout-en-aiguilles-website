@@ -60,15 +60,12 @@
   </div>
 </div>
 
-<!-- Mobile top bar -->
-<div class="admin-mobile-bar" id="admin-mobile-bar">
-  <button class="admin-hamburger" onclick="openAdminDrawer()" aria-label="Menu">☰</button>
-  <div class="admin-mobile-bar-title" id="admin-bar-title">Administration</div>
-  <a href="/panier.html" style="color:white;font-size:1.1rem;text-decoration:none">🛒</a>
-</div>
-<div class="admin-drawer-overlay" id="admin-drawer-overlay" onclick="closeAdminDrawer()"></div>
-
 <div id="admin-content" class="admin-layout">
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
+    <span class="admin-mobile-title">🧶 Administration</span>
+  </div>
+  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
   <!-- Sidebar -->
   <aside class="admin-sidebar">
     <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
@@ -81,7 +78,6 @@
       <a href="avis.html">⭐ Avis</a>
       <a href="promo.html">🏷️ Codes promo</a>
       <a href="newsletter.html">📧 Newsletter</a>
-      <a href="analytiques.html">📈 Analytiques</a>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
       <a href="/" target="_blank">🌐 Voir le site</a>
       <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
@@ -419,49 +415,6 @@ function exportXLS() {
 }
 
 checkAdmin();
-</script>
-
-<script>
-function openAdminDrawer() {
-  document.querySelector('.admin-sidebar').classList.add('open');
-  document.getElementById('admin-drawer-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeAdminDrawer() {
-  document.querySelector('.admin-sidebar').classList.remove('open');
-  document.getElementById('admin-drawer-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-}
-// Set page title in mobile bar
-document.addEventListener('DOMContentLoaded', () => {
-  const active = document.querySelector('.admin-nav a.active');
-  if (active) {
-    const t = document.getElementById('admin-bar-title');
-    if (t) t.textContent = active.textContent.replace(/^[^\w]+/, '').trim();
-  }
-  // Close drawer on nav link click
-  document.querySelectorAll('.admin-nav a').forEach(a => {
-    a.addEventListener('click', closeAdminDrawer);
-  });
-});
-</script>
-
-<script>
-// Auto-label table cells for mobile card layout
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.admin-table').forEach(table => {
-    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
-    table.querySelectorAll('tbody tr').forEach(row => {
-      Array.from(row.querySelectorAll('td')).forEach((td, i) => {
-        if (headers[i]) td.setAttribute('data-label', headers[i]);
-        // Hide photo/image column label
-        if (i === 0 && (td.querySelector('img') || td.querySelector('.table-img'))) {
-          td.removeAttribute('data-label');
-        }
-      });
-    });
-  });
-});
 </script>
 </body>
 </html>
