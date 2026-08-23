@@ -373,6 +373,7 @@ async function loadProduct() {
 
     if (!product) { showNotFound(); return; }
     currentProduct = product;
+    if (typeof RecentlyViewed !== 'undefined') RecentlyViewed.add(product.id);
     renderProduct(product);
     loadVariants(product);
     loadRelated(product);
