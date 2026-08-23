@@ -413,8 +413,19 @@ function openAuthModal() {
         <div id="tab-login">
           <div class="form-group"><label class="form-label">Email</label><input id="login-email" type="email" class="form-input" placeholder="votre@email.fr"></div>
           <div class="form-group"><label class="form-label">Mot de passe</label><input id="login-password" type="password" class="form-input" placeholder="••••••••"></div>
+          <p style="text-align:right;margin:-8px 0 12px">
+            <a href="#" id="forgot-password-link" style="font-size:.8rem;color:var(--text-light)">Mot de passe oublié ?</a>
+          </p>
           <div id="login-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
           <button class="btn btn-primary btn-block" id="modal-login-btn">Se connecter</button>
+        </div>
+        <!-- Mot de passe oublié -->
+        <div id="tab-forgot" style="display:none">
+          <p style="font-size:.85rem;color:var(--text-light);margin:0 0 16px">Indiquez votre email, nous vous enverrons un lien pour réinitialiser votre mot de passe.</p>
+          <div class="form-group"><label class="form-label">Email</label><input id="forgot-email" type="email" class="form-input" placeholder="votre@email.fr"></div>
+          <div id="forgot-msg" style="display:none;font-size:.85rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
+          <button class="btn btn-primary btn-block" id="modal-forgot-btn">Envoyer le lien</button>
+          <p style="text-align:center;margin-top:14px"><a href="#" id="back-to-login-link" style="font-size:.85rem;color:var(--text-light)">← Retour à la connexion</a></p>
         </div>
         <!-- Register -->
         <div id="tab-register" style="display:none">
@@ -458,6 +469,27 @@ function openAuthModal() {
 
     // Bouton inscription
     document.getElementById('modal-register-btn').addEventListener('click', doRegister);
+
+    // Mot de passe oublié
+    document.getElementById('forgot-password-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('forgot-email').value = document.getElementById('login-email').value.trim();
+      document.getElementById('forgot-msg').style.display = 'none';
+      modal.querySelector('.modal-tabs').style.display = 'none';
+      document.getElementById('tab-login').style.display = 'none';
+      document.getElementById('tab-register').style.display = 'none';
+      document.getElementById('tab-forgot').style.display = '';
+    });
+    document.getElementById('back-to-login-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      modal.querySelector('.modal-tabs').style.display = '';
+      document.getElementById('tab-forgot').style.display = 'none';
+      document.getElementById('tab-login').style.display = '';
+    });
+    document.getElementById('modal-forgot-btn').addEventListener('click', doForgotPassword);
+    document.getElementById('forgot-email').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doForgotPassword();
+    });
 
     // Touche Entrée dans les champs
     document.getElementById('login-password').addEventListener('keydown', function(e) {
@@ -521,6 +553,83 @@ async function resendVerification(email) {
     await apiFetch('/auth/resend-verification', { method: 'POST', body: { email } });
     Toast.show('📧 Email de confirmation renvoyé !', 'success');
   } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  const msgEl = document.getElementById('forgot-msg');
+  const btn = document.getElementById('modal-forgot-btn');
+  if (!email) {
+    msgEl.style.cssText = 'display:block;color:#d9534f;background:#f8d7da;font-size:.85rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+    msgEl.textContent = 'Merci de renseigner votre email';
+    return;
+  }
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Envoi…';
+  try {
+    const data = await apiFetch('/auth/forgot-password', { method: 'POST', body: { email } });
+    msgEl.style.cssText = 'display:block;color:#3d6b4f;background:#e3f0e7;font-size:.85rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+    msgEl.textContent = data.message || 'Si un compte existe avec cet email, un lien vient de lui être envoyé.';
+  } catch (e) {
+    msgEl.style.cssText = 'display:block;color:#d9534f;background:#f8d7da;font-size:.85rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+    msgEl.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// ─── Mot de passe oublié — espace admin ───────────────────────
+// Fonction partagée appelée depuis le lien "Mot de passe oublié ?" des 8
+// pages admin (admin-guard), pour éviter de dupliquer 8x cette logique.
+function openAdminForgotPassword() {
+  let modal = document.getElementById('admin-forgot-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'admin-forgot-modal';
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10000;align-items:center;justify-content:center';
+    modal.innerHTML = `
+      <div style="background:white;border-radius:16px;padding:32px;max-width:380px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+        <h3 style="margin:0 0 8px">🔑 Mot de passe oublié</h3>
+        <p style="font-size:.85rem;color:var(--text-light);margin:0 0 16px">Indiquez votre email admin, un lien de réinitialisation vous sera envoyé.</p>
+        <div class="form-group"><label class="form-label">Email</label><input type="email" id="admin-forgot-email" class="form-input" placeholder="victorine@..."></div>
+        <div id="admin-forgot-msg" style="display:none;font-size:.85rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
+        <div style="display:flex;gap:12px">
+          <button class="btn btn-secondary" id="admin-forgot-cancel">Fermer</button>
+          <button class="btn btn-primary" id="admin-forgot-send">Envoyer le lien</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('admin-forgot-cancel').addEventListener('click', () => modal.style.display = 'none');
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.getElementById('admin-forgot-send').addEventListener('click', async function() {
+      const email = document.getElementById('admin-forgot-email').value.trim();
+      const msgEl = document.getElementById('admin-forgot-msg');
+      const btn = this;
+      if (!email) return;
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = 'Envoi…';
+      try {
+        const data = await apiFetch('/auth/forgot-password', { method: 'POST', body: { email } });
+        msgEl.style.cssText = 'display:block;color:#3d6b4f;background:#e3f0e7;font-size:.85rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+        msgEl.textContent = data.message || 'Si un compte existe avec cet email, un lien vient de lui être envoyé.';
+      } catch (e) {
+        msgEl.style.cssText = 'display:block;color:#d9534f;background:#f8d7da;font-size:.85rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+        msgEl.textContent = e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+    document.getElementById('admin-forgot-email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('admin-forgot-send').click();
+    });
+  }
+  document.getElementById('admin-forgot-msg').style.display = 'none';
+  document.getElementById('admin-forgot-email').value = '';
+  modal.style.display = 'flex';
 }
 
 // ─── Jauge force mot de passe ─────────────────────────────────
