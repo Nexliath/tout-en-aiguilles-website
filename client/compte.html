@@ -288,7 +288,7 @@
 <footer class="site-footer">
   <div class="container">
     <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
-      <span>© 2024 Tout en Aiguilles</span>
+      <span>© <span id="footer-year"></span> Tout en Aiguilles</span>
       <a href="/" style="color:rgba(255,255,255,.6)">Accueil</a>
     </div>
   </div>
@@ -296,6 +296,9 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
+const fyEl = document.getElementById('footer-year');
+if (fyEl) fyEl.textContent = new Date().getFullYear();
+
 const STATUS_LABELS = {
   pending: 'En attente', paid: 'Payée', shipped: 'Expédiée',
   delivered: 'Livrée', cancelled: 'Annulée'
@@ -378,7 +381,14 @@ async function initAccount() {
     } else {
       document.getElementById('avatar-initials-text').textContent = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
     }
-  } catch {}
+  } catch (e) {
+    // Avant cette correction, un token expiré/invalide était avalé
+    // silencieusement : la page restait affichée en état "connecté" avec
+    // des placeholders statiques, sans jamais dire au client qu'il doit se
+    // reconnecter.
+    Auth.logout();
+    return;
+  }
 
   // Gestion des redirections depuis confirm-email-change
   const params = new URLSearchParams(location.search);
@@ -596,6 +606,14 @@ async function saveAddress() {
     errEl.style.display = '';
     return;
   }
+  // Même validation que sur le checkout (panier.html) — sans ça, une adresse
+  // avec un code postal invalide pouvait être enregistrée dans le carnet
+  // d'adresses et n'était détectée qu'au moment de payer.
+  if (!/^\d{5}$/.test(payload.postal_code)) {
+    errEl.textContent = 'Le code postal doit contenir 5 chiffres';
+    errEl.style.display = '';
+    return;
+  }
   try {
     if (id) {
       await apiFetch(`/addresses/${id}`, { method: 'PUT', body: payload });
@@ -646,11 +664,19 @@ function resetAddrForm() {
 }
 
 // ─── Facture PDF ──────────────────────────────────────────────
+// Échappe les champs saisis par le client (nom, adresse...) avant de les
+// injecter dans document.write() — sans ça, un nom ou une adresse contenant
+// des balises HTML/JS serait exécuté dans la fenêtre de facture (self-XSS).
+function escInvoiceHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
 async function openInvoice(orderId) {
   try {
     const o = await apiFetch(`/orders/${orderId}`);
     const items = o.items || [];
     const win = window.open('', '_blank');
+    const eh = escInvoiceHtml;
     win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <title>Facture #${o.id} — Tout en Aiguilles</title>
     <style>
@@ -669,15 +695,15 @@ async function openInvoice(orderId) {
       </div>
     </div>
     <div style="background:#fdf6ef;padding:16px;border-radius:8px;margin-bottom:24px;font-size:.9rem">
-      <strong>Destinataire</strong><br>${o.first_name} ${o.last_name}<br>${o.email}<br>${o.address}, ${o.postal_code} ${o.city}, ${o.country||'France'}
+      <strong>Destinataire</strong><br>${eh(o.first_name)} ${eh(o.last_name)}<br>${eh(o.email)}<br>${eh(o.address)}, ${eh(o.postal_code)} ${eh(o.city)}, ${eh(o.country||'France')}
     </div>
     <table>
       <thead><tr><th>Article</th><th>Qté</th><th>Prix unitaire</th><th>Sous-total</th></tr></thead>
       <tbody>
-        ${items.map(i=>`<tr><td>${i.name}${i.variant_label ? ' — ' + i.variant_label : ''}</td><td>${i.qty}</td><td>${Number(i.price).toFixed(2)} €</td><td>${(i.qty*Number(i.price)).toFixed(2)} €</td></tr>`).join('')}
+        ${items.map(i=>`<tr><td>${eh(i.name)}${i.variant_label ? ' — ' + eh(i.variant_label) : ''}</td><td>${eh(i.qty)}</td><td>${Number(i.price).toFixed(2)} €</td><td>${(i.qty*Number(i.price)).toFixed(2)} €</td></tr>`).join('')}
         ${Number(o.delivery_fee||0)>0?`<tr><td colspan="3">Frais de livraison</td><td>${Number(o.delivery_fee).toFixed(2)} €</td></tr>`:''}
         ${Number(o.gift_wrap_fee||0)>0?`<tr><td colspan="3">Emballage cadeau</td><td>2.00 €</td></tr>`:''}
-        ${Number(o.promo_discount||0)>0?`<tr><td colspan="3" style="color:#2d5a3d">Réduction code "${o.promo_code||''}"</td><td style="color:#2d5a3d">-${Number(o.promo_discount).toFixed(2)} €</td></tr>`:''}
+        ${Number(o.promo_discount||0)>0?`<tr><td colspan="3" style="color:#2d5a3d">Réduction code "${eh(o.promo_code||'')}"</td><td style="color:#2d5a3d">-${Number(o.promo_discount).toFixed(2)} €</td></tr>`:''}
       </tbody>
       <tfoot><tr style="background:#fdf6ef"><td colspan="3" style="font-weight:bold;padding:12px">Total TTC</td><td class="total" style="padding:12px">${Number(o.total).toFixed(2)} €</td></tr></tfoot>
     </table>
