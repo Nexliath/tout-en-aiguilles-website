@@ -226,6 +226,27 @@
               <button class="btn btn-primary" onclick="changePassword()">Modifier le mot de passe</button>
             </div>
 
+            <!-- Double authentification (MFA) -->
+            <div style="border-top:1px solid var(--border);padding-top:32px;margin-bottom:32px">
+              <div class="account-panel-title" style="margin-bottom:8px">🔐 Double authentification</div>
+              <p style="font-size:.875rem;color:var(--text-light);margin-bottom:20px" id="mfa-status-text">Chargement…</p>
+              <div style="max-width:400px">
+                <button class="btn btn-primary" id="mfa-enable-btn" onclick="startMfaSelfEnroll()" style="display:none">Activer la double authentification</button>
+                <div id="mfa-disable-form" style="display:none">
+                  <div class="form-group">
+                    <label class="form-label">Mot de passe actuel</label>
+                    <input type="password" id="mfa-disable-password" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Code de vérification</label>
+                    <input type="text" id="mfa-disable-code" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456">
+                  </div>
+                  <div id="mfa-disable-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+                  <button class="btn btn-ghost" style="border-color:#d9534f;color:#d9534f" onclick="disableMfa()">Désactiver la double authentification</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Changer l'adresse email -->
             <div style="border-top:1px solid var(--border);padding-top:32px">
               <div class="account-panel-title" style="margin-bottom:8px">📧 Changer d'adresse email</div>
@@ -386,6 +407,24 @@ async function initAccount() {
     } else {
       document.getElementById('avatar-initials-text').textContent = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
     }
+
+    // État de la double authentification
+    const mfaStatusEl = document.getElementById('mfa-status-text');
+    const mfaEnableBtn = document.getElementById('mfa-enable-btn');
+    const mfaDisableForm = document.getElementById('mfa-disable-form');
+    if (mfaStatusEl) {
+      if (user.mfa_enabled) {
+        mfaStatusEl.textContent = '✅ La double authentification est active sur votre compte.';
+        mfaEnableBtn.style.display = 'none';
+        mfaDisableForm.style.display = '';
+      } else {
+        mfaStatusEl.textContent = user.role === 'admin'
+          ? 'La double authentification est obligatoire pour les comptes administrateur — elle vous sera demandée à la prochaine connexion.'
+          : "Ajoutez une couche de sécurité supplémentaire avec une application d'authentification (Google Authenticator, Authy, 1Password…).";
+        mfaEnableBtn.style.display = '';
+        mfaDisableForm.style.display = 'none';
+      }
+    }
   } catch (e) {
     // Avant cette correction, un token expiré/invalide était avalé
     // silencieusement : la page restait affichée en état "connecté" avec
@@ -524,6 +563,35 @@ async function changePassword() {
     document.getElementById('pw-new').value = '';
     document.getElementById('pw-confirm').value = '';
   } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+// ─── Double authentification (MFA) — auto-activation volontaire ────
+// Réutilise le modal partagé (main.js) et son écran de configuration MFA,
+// mais sans setup_token (l'utilisateur est déjà connecté — le backend
+// utilise alors le Bearer token classique, voir resolveMfaUser côté API).
+function startMfaSelfEnroll() {
+  openAuthModal();
+  showMfaSetupStep(null, false);
+}
+
+async function disableMfa() {
+  const password = document.getElementById('mfa-disable-password').value;
+  const code = document.getElementById('mfa-disable-code').value.trim();
+  const errEl = document.getElementById('mfa-disable-error');
+  errEl.style.display = 'none';
+  try {
+    await apiFetch('/auth/mfa/disable', { method: 'POST', body: { password, code } });
+    Toast.show('Double authentification désactivée.', 'success');
+    // Rafraîchir l'utilisateur en cache localement (mfa_enabled: false)
+    const user = Auth.getUser();
+    if (user) { user.mfa_enabled = false; localStorage.setItem('tea_user', JSON.stringify(user)); }
+    document.getElementById('mfa-disable-password').value = '';
+    document.getElementById('mfa-disable-code').value = '';
+    initAccount();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+  }
 }
 
 // ─── Confidentialité / RGPD ─────────────────────────────────────
