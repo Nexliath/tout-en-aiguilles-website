@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
@@ -9,6 +10,14 @@ const { processAndSaveImage } = require('../utils/imageProcess');
 const { asyncRoute } = require('../middleware/asyncRoute');
 const router = express.Router();
 const BASE = () => process.env.BASE_URL || 'https://tout-en-aiguilles.com';
+const JWT_SECRET = process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024';
+
+// Jeton de désabonnement dérivé de l'email — évite qu'une simple image
+// cachée (<img src=".../unsubscribe?email=victime@...">) sur un site tiers
+// puisse désabonner n'importe quel email connu (CSRF sur une action GET).
+function unsubToken(email) {
+  return crypto.createHmac('sha256', JWT_SECRET).update(String(email).toLowerCase().trim()).digest('hex').slice(0, 32);
+}
 
 // Upload d'images pour le contenu de newsletter — en mémoire : redimensionnées
 // et compressées (sharp) avant écriture sur disque, voir saveNewsletterImage().
@@ -45,12 +54,16 @@ router.post('/subscribe', (req, res) => {
 
 // ─── Désabonnement (lien dans les emails) ───────────────────
 router.get('/unsubscribe', (req, res) => {
-  const { email } = req.query;
+  const { email, token } = req.query;
   if (!email) return res.status(400).send('Email manquant');
+  const decodedEmail = decodeURIComponent(email).toLowerCase();
+  if (!token || token !== unsubToken(decodedEmail)) {
+    return res.status(403).send('Lien de désabonnement invalide ou expiré. Vous pouvez gérer vos préférences newsletter depuis votre compte.');
+  }
   try {
-    db.prepare('UPDATE newsletter_subscribers SET is_active = 0 WHERE email = ?').run(decodeURIComponent(email).toLowerCase());
+    db.prepare('UPDATE newsletter_subscribers SET is_active = 0 WHERE email = ?').run(decodedEmail);
     // Aussi mettre à jour newsletter_opt_out dans users si l'email correspond
-    db.prepare('UPDATE users SET newsletter_opt_out = 1 WHERE email = ?').run(decodeURIComponent(email).toLowerCase());
+    db.prepare('UPDATE users SET newsletter_opt_out = 1 WHERE email = ?').run(decodedEmail);
   } catch(e) {}
   res.send(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Désabonnement — Tout en Aiguilles</title>
   <style>body{font-family:Georgia,serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fdf8f5;}
@@ -75,7 +88,7 @@ router.get('/subscribers', requireAdmin, (req, res) => {
 const senderEmail = () => process.env.SMTP_FROM?.match(/<(.+)>/)?.[1] || process.env.SMTP_USER || 'noreply@toutenaiguilles.fr';
 
 async function sendOne(toEmail, toName, subject, html_content) {
-  const unsubUrl = `${BASE()}/api/newsletter/unsubscribe?email=${encodeURIComponent(toEmail)}`;
+  const unsubUrl = `${BASE()}/api/newsletter/unsubscribe?email=${encodeURIComponent(toEmail)}&token=${unsubToken(toEmail)}`;
   const fullHtml = `${html_content}
     <div style="margin-top:32px;padding-top:16px;border-top:1px solid #f0e8e0;text-align:center;font-size:11px;color:#b8a090">
       Vous recevez cet email car vous êtes abonné(e) aux actualités de Tout en Aiguilles.<br>
