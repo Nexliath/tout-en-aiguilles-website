@@ -47,6 +47,13 @@
       <div class="admin-panel">
         <div class="admin-panel-title">✉️ Envoyer une newsletter</div>
         <div class="form-group">
+          <label class="form-label">Importer depuis un article publié <span style="font-weight:400;color:var(--text-light)">(optionnel)</span></label>
+          <div style="display:flex;gap:8px">
+            <select id="nl-import-article" class="form-input" style="flex:1"><option value="">— Choisir un article —</option></select>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="importFromArticle()">📰 Importer</button>
+          </div>
+        </div>
+        <div class="form-group">
           <label class="form-label">Sujet *</label>
           <input type="text" id="nl-subject" class="form-input" placeholder="Nouveautés printemps 2026 🌸">
         </div>
@@ -106,7 +113,7 @@ function checkAdmin() {
   const guard = document.getElementById('admin-guard');
   const content = document.getElementById('admin-content');
   if (!Auth.isLoggedIn() || !Auth.isAdmin()) { content.style.display='none'; guard.style.display='flex'; }
-  else { guard.style.display='none'; content.style.display=''; loadSubscribers(); loadCampaigns(); }
+  else { guard.style.display='none'; content.style.display=''; loadSubscribers(); loadCampaigns(); loadArticlesForImport(); }
 }
 
 document.getElementById('guard-btn').addEventListener('click', function() {
@@ -140,6 +147,34 @@ async function loadSubscribers() {
         <td style="font-size:.78rem;color:var(--text-light)">${new Date(s.subscribed_at).toLocaleDateString('fr-FR')}</td>
       </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-light)">Aucun subscriber</td></tr>';
   } catch(e) { Toast.show(e.message, 'error'); }
+}
+
+let _nlArticles = [];
+async function loadArticlesForImport() {
+  try {
+    _nlArticles = await apiFetch('/news/admin/all');
+    const published = _nlArticles.filter(a => a.published);
+    const sel = document.getElementById('nl-import-article');
+    sel.innerHTML = '<option value="">— Choisir un article —</option>' +
+      published.map(a => `<option value="${a.id}">${a.title}</option>`).join('');
+  } catch { /* pas bloquant */ }
+}
+
+function importFromArticle() {
+  const id = Number(document.getElementById('nl-import-article').value);
+  if (!id) return;
+  const a = _nlArticles.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('nl-subject').value = a.title;
+  const url = `${location.origin}/actualites.html?slug=${a.slug}`;
+  const coverHtml = a.cover_image
+    ? `<img src="${location.origin}${a.cover_image}" alt="" style="max-width:100%;border-radius:8px;display:block;margin:0 0 16px">`
+    : '';
+  const html = `${coverHtml}<h2 style="font-family:Georgia,serif;color:#a8617a;margin:0 0 12px">${a.title}</h2>` +
+    `<p>${a.excerpt || ''}</p>` +
+    `<p style="margin-top:20px"><a href="${url}" style="color:#a8617a;font-weight:700;text-decoration:none">Lire l'article complet →</a></p>`;
+  document.getElementById('nl-content').value = html;
+  Toast.show('Contenu importé depuis l\'article ✓ (pensez à relire avant l\'envoi)', 'success');
 }
 
 async function insertNlImage(input) {
