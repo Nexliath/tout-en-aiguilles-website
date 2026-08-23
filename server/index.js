@@ -158,6 +158,13 @@ app.get('/sitemap.xml', (req, res) => {
     "SELECT slug, updated_at FROM products WHERE is_active = 1 ORDER BY updated_at DESC"
   ).all();
 
+  let articles = [];
+  try {
+    articles = db.prepare(
+      "SELECT slug, updated_at FROM news WHERE published = 1 AND (publish_at IS NULL OR publish_at <= CURRENT_TIMESTAMP) ORDER BY updated_at DESC"
+    ).all();
+  } catch (e) {}
+
   const urls = [
     ...staticPages.map(p => `
   <url>
@@ -172,6 +179,13 @@ app.get('/sitemap.xml', (req, res) => {
     <lastmod>${(p.updated_at || today).split('T')[0]}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>`),
+    ...articles.map(a => `
+  <url>
+    <loc>${BASE}/actualites.html?slug=${a.slug}</loc>
+    <lastmod>${(a.updated_at || today).split('T')[0]}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>`),
   ];
 
