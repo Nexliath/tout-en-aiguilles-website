@@ -281,17 +281,27 @@ function renderUsers(users) {
       <td style="font-size:.8rem;color:var(--text-light)">${formatDate(u.created_at)}</td>
       <td>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="showUserOrders(${u.id}, '${(u.email || '').replace(/'/g,"\\'")}', '${u.first_name} ${u.last_name}')">📦 Commandes</button>
+          <button class="btn btn-ghost btn-sm" onclick="showUserOrders(${u.id}, '${escJsAttr(u.email)}', '${escJsAttr(u.first_name + ' ' + u.last_name)}')">📦 Commandes</button>
           ${u.id !== me?.id ? `
             ${u.role === 'admin'
-              ? `<button class="btn btn-secondary btn-sm" onclick="changeRole(${u.id}, 'user')">Rétrograder</button>`
-              : `<button class="btn btn-primary btn-sm" onclick="changeRole(${u.id}, 'admin')">Promouvoir admin</button>`}
-            <button class="btn btn-sm" style="background:#f8d7da;color:#d9534f;border:none" onclick="confirmDelete(${u.id}, '${u.first_name} ${u.last_name}')">🗑️</button>
+              ? `<button class="btn btn-secondary btn-sm" onclick="changeRole(${u.id}, 'customer')">Rétrograder</button>`
+              : `<button class="btn btn-primary btn-sm" onclick="promoteToAdmin(${u.id}, '${escJsAttr(u.first_name + ' ' + u.last_name)}')">Promouvoir admin</button>`}
+            <button class="btn btn-sm" style="background:#f8d7da;color:#d9534f;border:none" onclick="confirmDelete(${u.id}, '${escJsAttr(u.first_name + ' ' + u.last_name)}')">🗑️</button>
           ` : ''}
         </div>
       </td>
     </tr>`;
   }).join('');
+}
+
+// Échappe une valeur pour une utilisation sûre à l'intérieur d'un attribut
+// onclick="...('...')" — protège contre les apostrophes (noms "O'Brien",
+// "N'Diaye"...) qui cassaient silencieusement le handler avant cette correction.
+function escJsAttr(str) {
+  return String(str || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;');
 }
 
 // ─── Historique de commandes d'un client ──────────────────
@@ -337,6 +347,14 @@ async function changeRole(userId, newRole) {
     Toast.show(newRole === 'admin' ? '✅ Compte promu admin !' : '✅ Rôle retiré', 'success');
     loadUsers();
   } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+// Promouvoir admin donne un accès complet (produits, commandes, finances,
+// autres comptes) — contrairement à la suppression qui a déjà une modale de
+// confirmation, un simple mis-clic ne doit pas suffire pour cette action.
+function promoteToAdmin(userId, name) {
+  if (!confirm(`Donner les droits administrateur à ${name} ?\n\nCe compte pourra alors tout gérer : produits, commandes, finances, et les autres comptes utilisateurs.`)) return;
+  changeRole(userId, 'admin');
 }
 
 function confirmDelete(userId, name) {
