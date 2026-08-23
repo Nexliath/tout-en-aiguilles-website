@@ -643,9 +643,20 @@ p  { color: var(--text-light); }
 .article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
 .article-body li { margin-bottom: 6px; }
 .article-body figure { margin: 28px 0; }
-.article-body figure img { width: 100%; border-radius: var(--radius-lg); }
+.article-body figure img { width: 100%; border-radius: var(--radius-lg); display: block; }
 .article-body figure figcaption { font-size: .8rem; color: var(--text-light); text-align: center; margin-top: 8px; }
 .article-body a { color: var(--rose-dark); text-decoration: underline; }
+
+/* Mise en page des images dans un article — inspiré des éditeurs de blog
+   (Medium/Shopify/Substack) : pleine largeur, moyenne centrée, ou côte à côte */
+.article-body figure.img-medium { max-width: 62%; margin-left: auto; margin-right: auto; }
+.article-body .img-row { display: flex; gap: 16px; margin: 28px 0; align-items: flex-start; }
+.article-body .img-row figure { margin: 0; flex: 1 1 0; min-width: 0; }
+.article-body .img-row figure img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 1; }
+@media (max-width: 768px) {
+  .article-body figure.img-medium { max-width: 100%; }
+  .article-body .img-row { flex-direction: column; }
+}
 
 /* ─── Admin ──────────────────────────────────────────────────── */
 .admin-layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
