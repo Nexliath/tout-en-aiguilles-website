@@ -23,7 +23,6 @@
   <meta property="og:title" content="Boutique — Doudous, peluches & créations crochet faites main">
   <meta property="og:description" content="Découvrez toutes nos créations crochet et couture artisanales. Doudous, peluches, tote bags, accessoires bébé — faits main avec amour.">
   <meta property="og:url" content="https://tout-en-aiguilles.com/boutique.html">
-  <meta property="og:image" content="https://tout-en-aiguilles.com/assets/images/victorine-marche.jpg">
   <meta property="og:locale" content="fr_FR">
 
   <!-- Twitter Card -->
@@ -57,16 +56,9 @@
     <nav class="nav">
       <a href="/">Accueil</a>
       <a href="/boutique.html" class="active">Boutique</a>
-      <a href="/cadeaux.html">🎁 Cadeaux</a>
       <a href="/actualites.html">Actualités</a>
       <a href="/#contact">Contact</a>
     </nav>
-    
-        <div class="header-search-wrap">
-          <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
-          <span class="header-search-icon">🔍</span>
-          <div class="header-search-dropdown" id="header-search-dropdown"></div>
-        </div>
     <div class="header-actions">
       <button class="icon-btn" id="user-btn" title="Mon compte">👤</button>
       <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
@@ -82,7 +74,6 @@
     <nav class="mobile-nav-links">
       <a href="/">🏠 Accueil</a>
       <a href="/boutique.html" class="active">🛍️ Boutique</a>
-      <a href="/cadeaux.html">🎁 Cadeaux</a>
       <a href="/actualites.html">📰 Actualités</a>
       <a href="/#contact">✉️ Contact</a>
       <div class="mobile-nav-divider"></div>
@@ -170,13 +161,6 @@
           </select>
         </div>
 
-        <!-- Stock filter -->
-        <div class="filter-group">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;font-weight:700">
-            <input type="checkbox" id="filter-in-stock" onchange="state.page=0;renderProducts();updateFilterBadge()" style="accent-color:var(--rose-dark);width:16px;height:16px">
-            En stock seulement
-          </label>
-        </div>
         <button id="reset-filters-btn" class="btn btn-ghost btn-block btn-sm" style="margin-top:8px">Réinitialiser les filtres</button>
       </aside>
 
@@ -187,7 +171,7 @@
         </div>
 
         <div id="products-grid" class="grid-3" style="min-height:200px">
-<div id="skeleton-grid" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px;width:100%"></div>
+          <div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Chargement des créations…</div>
         </div>
 
         <!-- Pagination -->
@@ -247,7 +231,7 @@ function resetFilters() {
 
 async function loadCategories() {
   try {
-    var cats = await apiFetch('/products/categories');
+    var cats = await apiFetch('/products/categories?active_only=1');
     var filtered = state.type ? cats.filter(function(c) { return c.type === state.type; }) : cats;
     var html = '<label class="filter-opt"><input type="radio" name="cat" value="" ' + (!state.category ? 'checked' : '') + '> Toutes</label>';
     filtered.forEach(function(c) {
@@ -292,8 +276,6 @@ function renderProducts() {
 
   // Filtre prix
   var filtered = _allProducts.filter(function(p) {
-    const inStockOnly = document.getElementById('filter-in-stock')?.checked;
-    if (inStockOnly && p.stock === 0) return false;
     return (!pMin || p.price >= pMin) && (pMax === Infinity || p.price <= pMax);
   });
 
@@ -464,7 +446,6 @@ if (state.type) {
 
 loadCategories();
 loadProducts();
-initHeaderSearch();
 </script>
 </body>
 </html>
