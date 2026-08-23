@@ -234,8 +234,11 @@ router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
 // DELETE /api/products/:id — supprimer définitivement un produit
 router.delete('/:id', requireAdmin, (req, res) => {
   const id = req.params.id;
+  // Note : les commandes stockent leurs articles en JSON dans orders.items,
+  // il n'existe pas de table order_items séparée — pas de nettoyage nécessaire ici.
   db.prepare('DELETE FROM favorites WHERE product_id = ?').run(id);
-  db.prepare('DELETE FROM order_items WHERE product_id = ?').run(id);
+  db.prepare('DELETE FROM product_variants WHERE product_id = ?').run(id);
+  db.prepare('DELETE FROM stock_alerts WHERE product_id = ?').run(id);
   db.prepare('DELETE FROM products WHERE id = ?').run(id);
   res.json({ success: true });
 });
