@@ -86,9 +86,28 @@
         </div>
         <div class="form-group">
           <label class="form-label">Catégorie</label>
-          <select id="f-category" class="form-select">
+          <select id="f-category" class="form-select" onchange="onCategorySelectChange()">
             <option value="">— Sélectionner —</option>
           </select>
+          <div id="new-category-box" style="display:none;margin-top:10px;padding:12px;background:var(--cream-dark);border-radius:var(--radius)">
+            <div class="form-row" style="margin-bottom:8px">
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Nom de la nouvelle catégorie</label>
+                <input type="text" id="new-cat-name" class="form-input" placeholder="ex: Bijoux crochet" style="font-size:.85rem">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Type</label>
+                <select id="new-cat-type" class="form-select" style="font-size:.85rem">
+                  <option value="crochet">🧶 Crochet</option>
+                  <option value="couture">✂️ Couture</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn btn-primary btn-sm" onclick="createCategory()">+ Créer et sélectionner</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="cancelNewCategory()">Annuler</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="form-group">
@@ -198,8 +217,40 @@ async function loadCategories() {
     categories = await apiFetch('/products/categories');
     const sel = document.getElementById('f-category');
     sel.innerHTML = '<option value="">— Sélectionner —</option>' +
-      categories.map(c => `<option value="${c.id}">${c.type === 'crochet' ? '🧶' : '✂️'} ${c.name}</option>`).join('');
+      categories.map(c => `<option value="${c.id}">${c.type === 'crochet' ? '🧶' : '✂️'} ${c.name}</option>`).join('') +
+      '<option value="__new__">+ Créer une nouvelle catégorie…</option>';
   } catch {}
+}
+
+function onCategorySelectChange() {
+  const sel = document.getElementById('f-category');
+  const box = document.getElementById('new-category-box');
+  if (sel.value === '__new__') {
+    box.style.display = '';
+    document.getElementById('new-cat-name').focus();
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function cancelNewCategory() {
+  document.getElementById('new-category-box').style.display = 'none';
+  document.getElementById('f-category').value = '';
+  document.getElementById('new-cat-name').value = '';
+}
+
+async function createCategory() {
+  const name = document.getElementById('new-cat-name').value.trim();
+  const type = document.getElementById('new-cat-type').value;
+  if (!name) { Toast.show('Le nom de la catégorie est requis', 'error'); return; }
+  try {
+    const newCat = await apiFetch('/products/categories', { method: 'POST', body: { name, type } });
+    Toast.show(`Catégorie "${name}" créée ✓`, 'success');
+    await loadCategories();
+    document.getElementById('f-category').value = newCat.id;
+    document.getElementById('new-category-box').style.display = 'none';
+    document.getElementById('new-cat-name').value = '';
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 async function loadProducts() {
@@ -273,6 +324,8 @@ function hideForm() {
   document.getElementById('current-images').innerHTML = '';
   window._currentProductImages = [];
   document.getElementById('form-error').style.display = 'none';
+  document.getElementById('new-category-box').style.display = 'none';
+  document.getElementById('new-cat-name').value = '';
   // Reset variantes
   _variantRows = [];
   document.getElementById('f-has-variants').checked = false;
@@ -347,6 +400,11 @@ async function saveProduct() {
   errEl.style.display = 'none';
 
   if (!name || !price) { errEl.textContent = 'Le nom et le prix sont requis'; errEl.style.display = ''; return; }
+  if (document.getElementById('f-category').value === '__new__') {
+    errEl.textContent = 'Cliquez sur "Créer et sélectionner" pour valider la nouvelle catégorie avant d\'enregistrer';
+    errEl.style.display = '';
+    return;
+  }
 
   const formData = new FormData();
   formData.append('name',        name);
