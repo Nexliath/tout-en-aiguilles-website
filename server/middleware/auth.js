@@ -9,7 +9,15 @@ function requireAuth(req, res, next) {
   }
   try {
     const token = auth.slice(7);
-    req.user = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
+    // Les tokens à finalité limitée (mfa_challenge, mfa_setup — voir
+    // routes/auth.js) ne sont jamais des tokens de session valides, même
+    // s'ils sont signés avec le même secret : un vol de token MFA en transit
+    // ne doit pas donner accès à l'API.
+    if (payload.purpose) {
+      return res.status(401).json({ error: 'Token invalide ou expiré' });
+    }
+    req.user = payload;
     next();
   } catch {
     return res.status(401).json({ error: 'Token invalide ou expiré' });
