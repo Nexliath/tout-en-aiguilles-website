@@ -674,7 +674,7 @@ async function openInvoice(orderId) {
     <table>
       <thead><tr><th>Article</th><th>Qté</th><th>Prix unitaire</th><th>Sous-total</th></tr></thead>
       <tbody>
-        ${items.map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${Number(i.price).toFixed(2)} €</td><td>${(i.qty*Number(i.price)).toFixed(2)} €</td></tr>`).join('')}
+        ${items.map(i=>`<tr><td>${i.name}${i.variant_label ? ' — ' + i.variant_label : ''}</td><td>${i.qty}</td><td>${Number(i.price).toFixed(2)} €</td><td>${(i.qty*Number(i.price)).toFixed(2)} €</td></tr>`).join('')}
         ${Number(o.delivery_fee||0)>0?`<tr><td colspan="3">Frais de livraison</td><td>${Number(o.delivery_fee).toFixed(2)} €</td></tr>`:''}
         ${Number(o.gift_wrap_fee||0)>0?`<tr><td colspan="3">Emballage cadeau</td><td>2.00 €</td></tr>`:''}
         ${Number(o.promo_discount||0)>0?`<tr><td colspan="3" style="color:#2d5a3d">Réduction code "${o.promo_code||''}"</td><td style="color:#2d5a3d">-${Number(o.promo_discount).toFixed(2)} €</td></tr>`:''}
