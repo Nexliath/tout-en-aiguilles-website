@@ -224,6 +224,15 @@ const migrations = [
   "CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)",
   "CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(email)",
   "CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)",
+  // Index manquants identifiés lors du round 5 (filtres boutique / fiche
+  // produit exécutés à chaque requête).
+  "CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id)",
+  "CREATE INDEX IF NOT EXISTS idx_variants_product_id ON product_variants(product_id)",
+  // Double opt-in newsletter : un nouvel abonné doit confirmer son email
+  // avant de recevoir de vraies campagnes (voir routes/newsletter.js) —
+  // les abonnés déjà présents avant cette migration restent considérés
+  // confirmés (confirmed=1 par défaut), pour ne pas les couper brutalement.
+  "ALTER TABLE newsletter_subscribers ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 1",
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
