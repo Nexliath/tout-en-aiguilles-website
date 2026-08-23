@@ -146,7 +146,7 @@
 <footer class="site-footer">
   <div class="container">
     <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
-      <span>© 2024 Tout en Aiguilles</span>
+      <span>© <span id="footer-year"></span> Tout en Aiguilles</span>
       <a href="/" style="color:rgba(255,255,255,.6)">Accueil</a>
     </div>
   </div>
@@ -154,6 +154,9 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
+const fyEl = document.getElementById('footer-year');
+if (fyEl) fyEl.textContent = new Date().getFullYear();
+
 let allNewsArticles = [];
 let featuredArticle = null;
 let allCategories = [];
@@ -215,10 +218,16 @@ function renderFeatured() {
     </div>`;
 }
 
+// Échappe une catégorie pour une utilisation sûre dans onclick="...('...')" —
+// une catégorie contenant une apostrophe cassait silencieusement le filtre
+// avant cette correction (attribut onclick mal formé).
+function escCategoryAttr(str) {
+  return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
 function renderCategoryChips(categories) {
   const box = document.getElementById('news-categories');
   if (!categories.length) { box.innerHTML = ''; return; }
-  const chip = (val, label) => `<button type="button" class="btn btn-sm ${activeCategory === val ? 'btn-primary' : 'btn-secondary'}" onclick="setCategory('${val}')">${label}</button>`;
+  const chip = (val, label) => `<button type="button" class="btn btn-sm ${activeCategory === val ? 'btn-primary' : 'btn-secondary'}" onclick="setCategory('${escCategoryAttr(val)}')">${label}</button>`;
   box.innerHTML = chip('all', 'Toutes') + categories.map(c => chip(c.category, `${c.category} (${c.count})`)).join('');
 }
 
@@ -326,7 +335,14 @@ async function openArticle(slug) {
     document.getElementById('article-loading').style.display = 'none';
     document.getElementById('article-body').style.display = '';
   } catch {
-    document.getElementById('article-loading').innerHTML = '<p class="text-muted">Article introuvable.</p>';
+    // Avant cette correction, l'utilisateur restait bloqué sur un simple
+    // texte sans action possible (à la différence de produit.html qui
+    // propose un bouton de retour dans son état équivalent).
+    document.getElementById('article-loading').innerHTML = `
+      <div style="text-align:center;padding:40px 20px">
+        <p class="text-muted" style="margin-bottom:16px">Cet article est introuvable — il a peut-être été retiré.</p>
+        <a href="/actualites.html" class="btn btn-primary">← Retour aux actualités</a>
+      </div>`;
   }
 }
 
