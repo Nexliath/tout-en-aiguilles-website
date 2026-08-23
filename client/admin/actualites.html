@@ -125,6 +125,17 @@
           <button type="button" class="btn btn-secondary btn-sm" onclick="openFullPreview()">👁 Aperçu complet côté client</button>
         </div>
       </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:20px">
+        <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">🔍 Référencement (SEO) <span style="font-weight:400;color:var(--text-light)">(optionnel)</span></div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label">Titre SEO <span style="font-weight:400;color:var(--text-light)">(sinon le titre de l'article est utilisé)</span></label>
+          <input type="text" id="f-meta-title" class="form-input" placeholder="Titre optimisé pour Google">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Description SEO <span style="font-weight:400;color:var(--text-light)">(sinon le résumé est utilisé)</span></label>
+          <input type="text" id="f-meta-desc" class="form-input" placeholder="Description affichée dans les résultats Google…">
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label">Photo de couverture</label>
         <input type="file" id="f-cover" accept="image/*" class="form-input">
@@ -338,6 +349,8 @@ function hideForm() {
   document.getElementById('f-excerpt').value = '';
   document.getElementById('f-content').innerHTML = '';
   document.getElementById('f-cover').value = '';
+  document.getElementById('f-meta-title').value = '';
+  document.getElementById('f-meta-desc').value = '';
   document.getElementById('f-published').checked = true;
   document.getElementById('current-cover').innerHTML = '';
   document.getElementById('art-form-error').style.display = 'none';
@@ -351,6 +364,8 @@ function editArticle(id) {
   document.getElementById('f-title').value = a.title;
   document.getElementById('f-excerpt').value = a.excerpt || '';
   document.getElementById('f-content').innerHTML = a.content;
+  document.getElementById('f-meta-title').value = a.meta_title || '';
+  document.getElementById('f-meta-desc').value = a.meta_description || '';
   document.getElementById('f-published').checked = !!a.published;
   if (a.cover_image) {
     document.getElementById('current-cover').innerHTML = `<img src="${a.cover_image}" style="height:80px;border-radius:8px;object-fit:cover">`;
@@ -375,6 +390,8 @@ async function saveArticle() {
   formData.append('excerpt',   document.getElementById('f-excerpt').value.trim());
   formData.append('content',   content);
   formData.append('published', document.getElementById('f-published').checked ? '1' : '0');
+  formData.append('meta_title',       document.getElementById('f-meta-title').value.trim());
+  formData.append('meta_description', document.getElementById('f-meta-desc').value.trim());
   const cover = document.getElementById('f-cover').files[0];
   if (cover) formData.append('cover_image', cover);
 
