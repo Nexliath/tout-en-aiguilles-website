@@ -729,32 +729,41 @@ p  { color: var(--text-light); }
 .article-body hr { border: none !important; border-top: 2px solid var(--border) !important; margin: 32px 0 !important; }
 .article-body table { display: block; overflow-x: auto; max-width: 100%; margin-bottom: 20px; }
 
-/* Images/vidéos : toujours contenues, jamais en dehors du cadre — y
-   compris les <img> collés sans balise <figure> (anciens articles). */
+/* Images/vidéos ─────────────────────────────────────────────────
+   Hauteur plafonnée avec recadrage intelligent (object-fit: cover),
+   comme sur un site de blog (Medium/Instagram) : une image ne peut
+   jamais "prendre toute la page", quelle que soit sa taille d'origine
+   ou qu'elle soit collée sans mise en forme (anciens articles). */
 .article-body img, .article-body video, .article-body iframe {
-  max-width: 100% !important; height: auto !important; display: block;
-  margin: 24px auto !important; border-radius: var(--radius-lg);
+  width: 100% !important; max-width: 100% !important;
+  height: 420px !important; object-fit: cover !important;
+  display: block; margin: 24px auto !important; border-radius: var(--radius-lg);
 }
 .article-body figure { margin: 28px 0 !important; max-width: 100% !important; }
-.article-body figure img { width: 100%; border-radius: var(--radius-lg); display: block; margin: 0 !important; }
+.article-body figure img { margin: 0 !important; }
 .article-body figure figcaption, .article-body figure figcaption * {
   font-size: .8rem !important; color: var(--text-light) !important; text-align: center !important;
   margin-top: 8px !important; font-style: normal !important;
 }
 
 /* Mise en page des images dans un article — inspiré des éditeurs de blog
-   (Medium/Shopify/Substack) : pleine largeur, moyenne centrée, ou côte à côte */
+   (Medium/Shopify/Substack) : pleine largeur, moyenne centrée, petite, ou côte à côte */
 .article-body figure.img-medium { max-width: 62% !important; margin-left: auto !important; margin-right: auto !important; }
+.article-body figure.img-medium img { height: 320px !important; }
+.article-body figure.img-small { max-width: 38% !important; margin-left: auto !important; margin-right: auto !important; }
+.article-body figure.img-small img { height: 220px !important; }
 .article-body .img-row { display: flex; gap: 16px; margin: 28px 0; align-items: flex-start; max-width: 100%; }
 .article-body .img-row figure { margin: 0 !important; flex: 1 1 0; min-width: 0; }
-.article-body .img-row figure img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 1; }
+.article-body .img-row figure img { height: 220px !important; }
 @media (max-width: 768px) {
-  .article-body figure.img-medium { max-width: 100% !important; }
+  .article-body figure.img-medium, .article-body figure.img-small { max-width: 100% !important; }
   .article-body .img-row { flex-direction: column; }
 }
 @media (max-width: 480px) {
   .article-cover { max-height: 260px; }
   .article-body, .article-body * { font-size: 1rem !important; line-height: 1.75 !important; }
+  .article-body img, .article-body video, .article-body iframe { height: 240px !important; }
+  .article-body figure.img-medium img, .article-body figure.img-small img, .article-body .img-row figure img { height: 180px !important; }
 }
 
 /* ─── Admin ──────────────────────────────────────────────────── */
