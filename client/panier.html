@@ -49,6 +49,7 @@
     .saved-addr-card:hover:not(.selected) { border-color: #ccc; background: #fafafa; }
     .saved-addr-card-label { font-weight: 700; margin-bottom: 2px; color: var(--text); }
     .saved-addr-card-addr { color: var(--text-light); font-size: .76rem; line-height: 1.4; }
+    .field-invalid { border-color: #d9534f !important; background: #fff8f8; }
   </style>
 </head>
 <body>
@@ -209,18 +210,28 @@
                 </div>
                 <div class="relay-detail-box" id="relay-details" style="display:none">
                   <p style="margin-bottom:10px;font-size:.85rem">
-                    1️⃣ Cherchez un point relais près de chez vous, notez son nom et adresse.<br>
-                    2️⃣ Revenez ici et saisissez-le dans le champ ci-dessous.
+                    1️⃣ Cherchez un point relais près de chez vous.<br>
+                    2️⃣ Revenez ici et recopiez son nom et son adresse ci-dessous.
                   </p>
                   <button type="button" onclick="window.open('https://www.mondialrelay.fr/trouver-le-point-relais-le-plus-proche-de-chez-moi/','_blank','noopener,noreferrer')"
                     style="display:block;width:100%;margin-bottom:12px;padding:10px 14px;background:#fff;border:1.5px solid #c06060;border-radius:8px;color:#c06060;font-weight:700;font-size:.85rem;cursor:pointer;text-align:center">
                     🗺️ Trouver mon point relais Mondial Relay
                   </button>
-                  <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Nom + adresse du point relais choisi *</label>
-                  <input type="text" id="co-relay" class="form-input"
-                    placeholder="Ex : Tabac des Fleurs — 12 rue Victor Hugo, 75011 Paris"
-                    style="font-size:.88rem">
-                  <p style="font-size:.75rem;color:#aaa;margin-top:6px">
+                  <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Nom du point relais *</label>
+                  <input type="text" id="co-relay-name" class="form-input" placeholder="Ex : Tabac des Fleurs" style="font-size:.88rem;margin-bottom:10px">
+                  <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Adresse *</label>
+                  <input type="text" id="co-relay-address" class="form-input" placeholder="12 rue Victor Hugo" style="font-size:.88rem;margin-bottom:10px">
+                  <div style="display:flex;gap:8px">
+                    <div style="flex:0 0 100px">
+                      <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Code postal *</label>
+                      <input type="text" id="co-relay-postal" class="form-input" placeholder="75011" inputmode="numeric" maxlength="5" style="font-size:.88rem">
+                    </div>
+                    <div style="flex:1">
+                      <label style="font-size:.8rem;color:#888;display:block;margin-bottom:4px">Ville *</label>
+                      <input type="text" id="co-relay-city" class="form-input" placeholder="Paris" style="font-size:.88rem">
+                    </div>
+                  </div>
+                  <p style="font-size:.75rem;color:#aaa;margin-top:8px">
                     ⚠️ Si le point relais est indisponible au moment de l'expédition, nous vous proposerons une alternative et vous en informerons par email.
                   </p>
                 </div>
@@ -495,23 +506,23 @@ function renderCart() {
       </a>
       <div class="cart-item-info">
         <a href="/produit.html?id=${item.product_id}" style="text-decoration:none;color:inherit">
-        <div class="cart-item-name" style="hover:text-decoration:underline">${item.name}</div>
+        <div class="cart-item-name" style="hover:text-decoration:underline">${item.name}${item.variant_label ? ` <span style="font-weight:400;color:var(--text-light)">— ${item.variant_label}</span>` : ''}</div>
         </a>
         <div class="cart-item-price">${item.price.toFixed(2)} €</div>
         <div class="qty-control">
-          <button class="qty-btn" onclick="updateQty(${item.product_id}, ${item.qty - 1})">−</button>
+          <button class="qty-btn" onclick="updateQty(${item.product_id}, ${item.qty - 1}, ${item.variant_id || 'null'})">−</button>
           <span class="qty-val">${item.qty}</span>
-          <button class="qty-btn" onclick="updateQty(${item.product_id}, ${item.qty + 1})">+</button>
+          <button class="qty-btn" onclick="updateQty(${item.product_id}, ${item.qty + 1}, ${item.variant_id || 'null'})">+</button>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
         <span style="font-weight:700;color:var(--rose-dark)">${(item.price * item.qty).toFixed(2)} €</span>
-        <button onclick="Cart.remove(${item.product_id}); renderCart();" style="border:none;background:none;color:var(--text-light);font-size:.8rem;cursor:pointer">✕ Supprimer</button>
+        <button onclick="Cart.remove(${item.product_id}, ${item.variant_id || 'null'}); renderCart();" style="border:none;background:none;color:var(--text-light);font-size:.8rem;cursor:pointer">✕ Supprimer</button>
       </div>
     </div>`).join('');
 
   document.getElementById('cart-summary').innerHTML = items.map(i =>
-    `<div class="cart-total-row"><span>${i.name} × ${i.qty}</span><span>${(i.price * i.qty).toFixed(2)} €</span></div>`
+    `<div class="cart-total-row"><span>${i.name}${i.variant_label ? ` (${i.variant_label})` : ''} × ${i.qty}</span><span>${(i.price * i.qty).toFixed(2)} €</span></div>`
   ).join('');
 
   updateDeliveryRow();
@@ -535,13 +546,80 @@ function renderCart() {
   }
 }
 
-function updateQty(id, qty) { Cart.updateQty(id, qty); renderCart(); }
+// ── Plafond de quantité selon le stock réel ────────────────────
+// Le panier ne connaît que ce qui a été mémorisé au moment de l'ajout ;
+// on récupère le stock à jour pour ne pas laisser le client cliquer "+"
+// au-delà de ce qui est réellement disponible (le serveur bloque déjà à
+// la validation, mais autant lui éviter de le découvrir à la fin).
+let _stockCache = {};
+
+async function loadStockCache(items) {
+  try {
+    const products = await apiFetch('/products?limit=200');
+    products.forEach(p => { _stockCache[p.id] = p.stock; });
+    const withVariant = items.filter(i => i.variant_id);
+    for (const i of withVariant) {
+      try {
+        const variants = await apiFetch(`/products/${i.product_id}/variants`);
+        const v = variants.find(v => v.id === i.variant_id);
+        if (v) _stockCache[`${i.product_id}:${i.variant_id}`] = v.stock;
+      } catch {}
+    }
+  } catch {}
+}
+
+function maxStockFor(product_id, variant_id) {
+  if (variant_id && _stockCache[`${product_id}:${variant_id}`] != null) return _stockCache[`${product_id}:${variant_id}`];
+  return _stockCache[product_id] != null ? _stockCache[product_id] : 99;
+}
+
+function updateQty(id, qty, variant_id) {
+  const items = Cart.get();
+  const current = items.find(i => i.product_id === id && (i.variant_id || null) === (variant_id || null));
+  if (current && qty > current.qty) {
+    const max = maxStockFor(id, variant_id);
+    if (qty > max) {
+      Toast.show(max > 0 ? `Stock limité à ${max} pour cet article` : 'Cet article n\'est plus en stock', 'error');
+      return;
+    }
+  }
+  Cart.updateQty(id, qty, variant_id);
+  renderCart();
+}
 function clearCart() {
   if (!confirm('Vider le panier ?')) return;
   Cart.clear(); renderCart();
 }
 
-async function startCheckout() {
+// ── Validation du formulaire de checkout ──────────────────────
+// Centralise la collecte + validation des champs (adresse + point relais)
+// pour les 2 modes de paiement (CB via startCheckout, PayPal via
+// getCheckoutPayload). Affiche un message précis ET surligne le champ
+// fautif, au lieu d'un message générique "remplissez les champs".
+const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const POSTAL_RE = /^\d{5}$/;
+
+function clearFieldErrors() {
+  document.querySelectorAll('.field-invalid').forEach(el => el.classList.remove('field-invalid'));
+}
+
+function showFieldError(fieldId, message) {
+  clearFieldErrors();
+  const errEl = document.getElementById('checkout-error');
+  errEl.textContent = message;
+  errEl.style.display = '';
+  const field = document.getElementById(fieldId);
+  if (field) {
+    field.classList.add('field-invalid');
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    field.focus();
+  }
+}
+
+function collectCheckoutData() {
+  clearFieldErrors();
+  document.getElementById('checkout-error').style.display = 'none';
+
   const fname   = document.getElementById('co-fname').value.trim();
   const lname   = document.getElementById('co-lname').value.trim();
   const email   = document.getElementById('co-email').value.trim();
@@ -549,45 +627,54 @@ async function startCheckout() {
   const postal  = document.getElementById('co-postal').value.trim();
   const city    = document.getElementById('co-city').value.trim();
   const notes   = document.getElementById('co-notes').value.trim();
-  const relay   = (document.getElementById('co-relay')?.value || '').trim();
-  const errEl   = document.getElementById('checkout-error');
-  errEl.style.display = 'none';
 
-  if (!fname || !lname || !email || !address || !postal || !city) {
-    errEl.textContent = 'Veuillez remplir tous les champs obligatoires (*)';
-    errEl.style.display = '';
-    return;
+  const required = [
+    ['co-fname', fname, "Merci d'indiquer votre prénom"],
+    ['co-lname', lname, "Merci d'indiquer votre nom"],
+    ['co-email', email, "Merci d'indiquer votre email"],
+    ['co-address', address, "Merci d'indiquer votre adresse"],
+    ['co-postal', postal, "Merci d'indiquer votre code postal"],
+    ['co-city', city, "Merci d'indiquer votre ville"],
+  ];
+  for (const [id, val, msg] of required) {
+    if (!val) { showFieldError(id, msg); return null; }
   }
-  if (selectedDelivery === 'relay' && !relay) {
-    errEl.textContent = 'Veuillez indiquer le point relais choisi';
-    errEl.style.display = '';
-    return;
+  if (!EMAIL_RE.test(email)) { showFieldError('co-email', "Le format de l'email ne semble pas valide"); return null; }
+  if (!POSTAL_RE.test(postal)) { showFieldError('co-postal', 'Le code postal doit contenir 5 chiffres'); return null; }
+
+  let relay = null;
+  if (selectedDelivery === 'relay') {
+    const rName    = (document.getElementById('co-relay-name')?.value || '').trim();
+    const rAddress = (document.getElementById('co-relay-address')?.value || '').trim();
+    const rPostal  = (document.getElementById('co-relay-postal')?.value || '').trim();
+    const rCity    = (document.getElementById('co-relay-city')?.value || '').trim();
+    if (!rName)    { showFieldError('co-relay-name', 'Merci d\'indiquer le nom du point relais'); return null; }
+    if (!rAddress) { showFieldError('co-relay-address', "Merci d'indiquer l'adresse du point relais"); return null; }
+    if (!POSTAL_RE.test(rPostal)) { showFieldError('co-relay-postal', 'Le code postal du point relais doit contenir 5 chiffres'); return null; }
+    if (!rCity)    { showFieldError('co-relay-city', 'Merci d\'indiquer la ville du point relais'); return null; }
+    relay = `${rName} — ${rAddress}, ${rPostal} ${rCity}`;
   }
+
+  return {
+    items: Cart.get().map(i => ({ product_id: i.product_id, qty: i.qty, variant_id: i.variant_id || null })),
+    delivery: { type: selectedDelivery, fee: DELIVERY_FEES[selectedDelivery], relay_point: relay },
+    customer: { user_id: Auth.getUser()?.id || null, email, first_name: fname, last_name: lname, address, city, postal_code: postal, country: 'France', notes },
+  };
+}
+
+async function startCheckout() {
+  const payload = collectCheckoutData();
+  if (!payload) return;
+  payload.gift_wrap = document.getElementById('co-gift-wrap')?.checked || false;
+  payload.gift_message = document.getElementById('co-gift-message')?.value.trim() || '';
+  payload.promo_code = _appliedPromo?.code || null;
+  payload.promo_discount = _appliedPromo?.discount_amount || 0;
 
   const btn = document.getElementById('checkout-btn');
   btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;margin:0 auto"></div>';
 
   try {
-    const result = await apiFetch('/orders/checkout', {
-      method: 'POST',
-      body: {
-        items: Cart.get().map(i => ({ product_id: i.product_id, qty: i.qty })),
-        delivery: {
-          type: selectedDelivery,
-          fee: DELIVERY_FEES[selectedDelivery],
-          relay_point: relay || null,
-        },
-        customer: {
-          user_id: Auth.getUser()?.id || null,
-          email, first_name: fname, last_name: lname,
-          address, city, postal_code: postal, country: 'France', notes,
-        },
-        gift_wrap: document.getElementById('co-gift-wrap')?.checked || false,
-        gift_message: document.getElementById('co-gift-message')?.value.trim() || '',
-        promo_code: _appliedPromo?.code || null,
-        promo_discount: _appliedPromo?.discount_amount || 0,
-      }
-    });
+    const result = await apiFetch('/orders/checkout', { method: 'POST', body: payload });
 
     if (result.checkout_url) {
       Cart.clear();
@@ -597,6 +684,7 @@ async function startCheckout() {
       window.location.href = `/commande-confirmee.html?order=${result.order_id}&demo=true`;
     }
   } catch (e) {
+    const errEl = document.getElementById('checkout-error');
     errEl.textContent = e.message;
     errEl.style.display = '';
     btn.disabled = false;
@@ -619,21 +707,7 @@ function selectPaymentMethod(mode) {
 }
 
 function getCheckoutPayload() {
-  const fname   = document.getElementById('co-fname').value.trim();
-  const lname   = document.getElementById('co-lname').value.trim();
-  const email   = document.getElementById('co-email').value.trim();
-  const address = document.getElementById('co-address').value.trim();
-  const postal  = document.getElementById('co-postal').value.trim();
-  const city    = document.getElementById('co-city').value.trim();
-  const notes   = document.getElementById('co-notes').value.trim();
-  const relay   = (document.getElementById('co-relay')?.value || '').trim();
-  if (!fname || !lname || !email || !address || !postal || !city) return null;
-  if (selectedDelivery === 'relay' && !relay) return null;
-  return {
-    items: Cart.get().map(i => ({ product_id: i.product_id, qty: i.qty })),
-    delivery: { type: selectedDelivery, fee: DELIVERY_FEES[selectedDelivery], relay_point: relay || null },
-    customer: { user_id: Auth.getUser()?.id || null, email, first_name: fname, last_name: lname, address, city, postal_code: postal, country: 'France', notes },
-  };
+  return collectCheckoutData();
 }
 
 async function initPayPal() {
@@ -665,13 +739,10 @@ function renderPayPalButton() {
     style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay', height: 48 },
     createOrder: async () => {
       const payload = getCheckoutPayload();
-      const errEl = document.getElementById('checkout-error');
       if (!payload) {
-        errEl.textContent = 'Veuillez remplir tous les champs obligatoires (*)';
-        errEl.style.display = '';
+        // Le champ fautif est déjà surligné et le message déjà affiché par collectCheckoutData()
         throw new Error('Form incomplete');
       }
-      errEl.style.display = 'none';
       const result = await apiFetch('/orders/paypal/create', { method: 'POST', body: payload });
       if (result.demo) {
         Cart.clear();
@@ -766,6 +837,7 @@ function selectSavedAddress(id, silent) {
 
 renderCart();
 loadSavedAddresses();
+loadStockCache(Cart.get());
 
 // Écoute du code postal & ville pour la vérification de zone
 document.getElementById('co-postal').addEventListener('input', scheduleGeoCheck);
