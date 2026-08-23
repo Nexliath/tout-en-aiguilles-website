@@ -13,39 +13,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Commandes — Admin Tout en Aiguilles</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
-<div class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:3rem;margin-bottom:12px">🔐</div>
+      <h2 style="margin-bottom:8px">Espace admin</h2>
+      <p style="font-size:.875rem;color:var(--text-light)">Connectez-vous avec votre compte administrateur.</p>
+    </div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" id="guard-email" class="form-input" placeholder="victorine@..."></div>
+    <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" id="guard-password" class="form-input" placeholder="••••••••"></div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
   </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html">📊 Tableau de bord</a>
-      <a href="produits.html">🧶 Produits</a>
-      <a href="commandes.html" class="active">📦 Commandes</a>
-      <a href="actualites.html">📝 Actualités</a>
-      <a href="utilisateurs.html">👥 Utilisateurs</a>
-      <a href="avis.html">⭐ Avis</a>
-      <a href="promo.html">🏷️ Codes promo</a>
-      <a href="newsletter.html">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <main class="admin-main">
     <div class="admin-header">
       <h1>Gestion des commandes</h1>
-      <div style="font-size:.85rem;color:var(--text-light)" id="order-count"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:.85rem;color:var(--text-light)" id="order-count"></div>
+        <button class="btn btn-secondary btn-sm" onclick="exportOrdersXLS()">📤 Exporter Excel</button>
+      </div>
+    </div>
+
+    <!-- Recherche + dates -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <input type="text" id="order-search" class="form-input" placeholder="🔎 Client, email, n° commande…" style="max-width:260px" oninput="applyFilters()">
+      <label style="font-size:.78rem;color:var(--text-light);display:flex;align-items:center;gap:6px">Du
+        <input type="date" id="order-date-from" class="form-input" style="max-width:150px" onchange="applyFilters()">
+      </label>
+      <label style="font-size:.78rem;color:var(--text-light);display:flex;align-items:center;gap:6px">au
+        <input type="date" id="order-date-to" class="form-input" style="max-width:150px" onchange="applyFilters()">
+      </label>
+      <button class="btn btn-ghost btn-sm" onclick="resetDateFilter()">✕ Réinitialiser dates</button>
     </div>
 
     <!-- Status filter tabs -->
@@ -116,8 +127,43 @@ const NEXT_STATUSES = {
   cancelled: ['pending'],
 };
 
+function checkAdmin() {
+  const guard   = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) {
+    content.style.display = 'none';
+    guard.style.display   = 'flex';
+  } else {
+    guard.style.display   = 'none';
+    content.style.display = '';
+    init();
+  }
+}
+
+document.getElementById('guard-btn').addEventListener('click', function() {
+  const email = document.getElementById('guard-email').value.trim();
+  const password = document.getElementById('guard-password').value;
+  const errEl = document.getElementById('guard-error');
+  const btn = document.getElementById('guard-btn');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis'; errEl.style.display = ''; return; }
+  btn.disabled = true; btn.textContent = '…';
+  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
+    .then(data => {
+      if (data.user.role !== 'admin') throw new Error('Ce compte n\'est pas administrateur.');
+      Auth.save(data.token, data.user);
+      checkAdmin();
+    })
+    .catch(e => {
+      errEl.textContent = e.message; errEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Se connecter →';
+    });
+});
+document.getElementById('guard-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('guard-btn').click();
+});
+
 async function init() {
-  if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
   await loadOrders();
 }
 
@@ -135,8 +181,72 @@ function filterStatus(status, btn) {
   currentFilter = status;
   document.querySelectorAll('.admin-main .cat-chip').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  const filtered = status ? allOrders.filter(o => o.status === status) : allOrders;
+  applyFilters();
+}
+
+function applyFilters() {
+  const search = (document.getElementById('order-search')?.value || '').trim().toLowerCase();
+  const from = document.getElementById('order-date-from')?.value;
+  const to   = document.getElementById('order-date-to')?.value;
+
+  let filtered = currentFilter ? allOrders.filter(o => o.status === currentFilter) : allOrders;
+
+  if (search) {
+    filtered = filtered.filter(o =>
+      `${o.first_name} ${o.last_name}`.toLowerCase().includes(search) ||
+      (o.email || '').toLowerCase().includes(search) ||
+      String(o.id).includes(search)
+    );
+  }
+  if (from) {
+    const fromDate = new Date(from + 'T00:00:00');
+    filtered = filtered.filter(o => new Date(o.created_at) >= fromDate);
+  }
+  if (to) {
+    const toDate = new Date(to + 'T23:59:59');
+    filtered = filtered.filter(o => new Date(o.created_at) <= toDate);
+  }
+
   renderOrders(filtered);
+}
+
+function resetDateFilter() {
+  document.getElementById('order-date-from').value = '';
+  document.getElementById('order-date-to').value = '';
+  applyFilters();
+}
+
+function exportOrdersXLS() {
+  const search = (document.getElementById('order-search')?.value || '').trim().toLowerCase();
+  const from = document.getElementById('order-date-from')?.value;
+  const to   = document.getElementById('order-date-to')?.value;
+  let list = currentFilter ? allOrders.filter(o => o.status === currentFilter) : allOrders;
+  if (search) {
+    list = list.filter(o =>
+      `${o.first_name} ${o.last_name}`.toLowerCase().includes(search) ||
+      (o.email || '').toLowerCase().includes(search) ||
+      String(o.id).includes(search)
+    );
+  }
+  if (from) { const f = new Date(from + 'T00:00:00'); list = list.filter(o => new Date(o.created_at) >= f); }
+  if (to)   { const t = new Date(to + 'T23:59:59');   list = list.filter(o => new Date(o.created_at) <= t); }
+
+  if (!list.length) { Toast.show('Aucune commande à exporter', 'info'); return; }
+
+  const rows = list.map(o => ({
+    'N°': o.id, 'Client': `${o.first_name} ${o.last_name}`, 'Email': o.email,
+    'Articles': o.items.length, 'Total (€)': Number(o.total),
+    'Statut': STATUS[o.status] || o.status,
+    'Livraison': DELIVERY_LABEL[o.delivery_type] || o.delivery_type || '',
+    'N° suivi': o.tracking_number || '',
+    'Date': o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:6},{wch:20},{wch:26},{wch:9},{wch:10},{wch:12},{wch:16},{wch:16},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Commandes');
+  XLSX.writeFile(wb, `commandes_${new Date().toISOString().split('T')[0]}.xlsx`);
+  Toast.show(`📤 ${list.length} commande(s) exportée(s)`, 'success');
 }
 
 function renderOrders(orders) {
@@ -267,7 +377,7 @@ async function changeRelayPoint(id) {
   } catch(e) { Toast.show(e.message, 'error'); }
 }
 
-init();
+checkAdmin();
 </script>
 </body>
 </html>
