@@ -257,14 +257,21 @@ router.get('/me', requireAuth, (req, res) => {
 
 // ─── PUT /api/auth/me ───────────────────────────────────────
 router.put('/me', requireAuth, (req, res) => {
+  const existingUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!existingUser) return res.status(404).json({ error: 'Utilisateur introuvable' });
   const { first_name, last_name, username, newsletter_opt_out } = req.body;
-  const usernameClean = username?.trim() || null;
+  // node:sqlite n'accepte pas `undefined` comme valeur liée — un appel qui ne
+  // renvoie qu'un sous-ensemble des champs (ex. juste newsletter_opt_out) ne
+  // doit pas faire planter la requête ni effacer les champs non fournis.
+  const finalFirstName = first_name !== undefined ? first_name : existingUser.first_name;
+  const finalLastName  = last_name  !== undefined ? last_name  : existingUser.last_name;
+  const usernameClean = username !== undefined ? (username?.trim() || null) : existingUser.username;
   if (usernameClean) {
     const conflict = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(usernameClean, req.user.id);
     if (conflict) return res.status(409).json({ error: 'Ce pseudo est déjà utilisé' });
   }
   db.prepare('UPDATE users SET first_name = ?, last_name = ?, username = ?, newsletter_opt_out = ? WHERE id = ?')
-    .run(first_name, last_name, usernameClean, newsletter_opt_out !== undefined ? (newsletter_opt_out ? 1 : 0) : 0, req.user.id);
+    .run(finalFirstName, finalLastName, usernameClean, newsletter_opt_out !== undefined ? (newsletter_opt_out ? 1 : 0) : existingUser.newsletter_opt_out, req.user.id);
   // Synchroniser le statut dans newsletter_subscribers
   if (newsletter_opt_out !== undefined) {
     const user = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.id);
@@ -272,7 +279,7 @@ router.put('/me', requireAuth, (req, res) => {
       if (newsletter_opt_out) {
         db.prepare('UPDATE newsletter_subscribers SET is_active = 0 WHERE email = ?').run(user.email);
       } else {
-        db.prepare('INSERT OR IGNORE INTO newsletter_subscribers (email, first_name, source) VALUES (?, ?, \'user\')').run(user.email, first_name || '');
+        db.prepare('INSERT OR IGNORE INTO newsletter_subscribers (email, first_name, source) VALUES (?, ?, \'user\')').run(user.email, finalFirstName || '');
         db.prepare('UPDATE newsletter_subscribers SET is_active = 1 WHERE email = ?').run(user.email);
       }
     }
@@ -400,7 +407,14 @@ router.delete('/account', requireAuth, (req, res) => {
     return res.status(401).json({ error: 'Mot de passe incorrect' });
   }
 
+  // orders.user_id n'a pas de ON DELETE CASCADE/SET NULL en base (volontaire :
+  // on ne veut jamais perdre une commande) — il faut détacher manuellement les
+  // commandes du compte avant de le supprimer, sinon la contrainte de clé
+  // étrangère (PRAGMA foreign_keys = ON) bloque le DELETE ci-dessous avec une
+  // erreur pour TOUT client ayant déjà passé au moins une commande.
+  db.prepare('UPDATE orders SET user_id = NULL WHERE user_id = ?').run(user.id);
   db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(user.id);
+  db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
   db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
 
   res.json({ success: true, message: 'Votre compte a été supprimé.' });
