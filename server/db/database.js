@@ -190,6 +190,18 @@ const migrations = [
     details TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  // Actualités : catégorie, mise en avant, publication programmée
+  "ALTER TABLE news ADD COLUMN category TEXT DEFAULT NULL",
+  "ALTER TABLE news ADD COLUMN is_featured INTEGER DEFAULT 0",
+  "ALTER TABLE news ADD COLUMN publish_at DATETIME DEFAULT NULL",
+  // Produits liés à un article (mis en avant en bas d'article)
+  `CREATE TABLE IF NOT EXISTS news_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    sort_order INTEGER DEFAULT 0,
+    UNIQUE(news_id, product_id)
+  )`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
