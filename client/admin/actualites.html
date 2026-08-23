@@ -64,6 +64,7 @@
       <div class="stat-card"><div class="stat-val" id="stat-total">—</div><div class="stat-label">Articles</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-published">—</div><div class="stat-label">Publiés</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-drafts">—</div><div class="stat-label">Brouillons</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-scheduled">—</div><div class="stat-label">Programmés</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-views">—</div><div class="stat-label">Vues totales</div></div>
     </div>
 
@@ -80,6 +81,10 @@
         <option value="all">Tous les statuts</option>
         <option value="published">Publiés</option>
         <option value="draft">Brouillons</option>
+        <option value="scheduled">Programmés</option>
+      </select>
+      <select id="art-cat-filter" class="form-input" style="max-width:180px" onchange="renderTable()">
+        <option value="all">Toutes catégories</option>
       </select>
     </div>
 
@@ -94,6 +99,33 @@
       <div class="form-group">
         <label class="form-label">Résumé <span style="font-weight:400;color:var(--text-light)">(affiché dans la liste)</span></label>
         <input type="text" id="f-excerpt" class="form-input" placeholder="Un court texte d'accroche…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adresse de l'article (slug) <span style="font-weight:400;color:var(--text-light)">(généré automatiquement si vide)</span></label>
+        <input type="text" id="f-slug" class="form-input" placeholder="ex : nouveautes-printemps">
+        <div id="f-slug-draft-hint" style="font-size:.75rem;color:var(--text-light);margin-top:4px"></div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+        <div class="form-group" style="flex:1;min-width:200px;margin-bottom:0">
+          <label class="form-label">Catégorie</label>
+          <input type="text" id="f-category" class="form-input" list="category-options" placeholder="ex : Nouveautés, Coulisses…">
+          <datalist id="category-options"></datalist>
+        </div>
+        <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0">
+          <label class="form-label">Publier le <span style="font-weight:400;color:var(--text-light)">(optionnel, publication différée)</span></label>
+          <input type="datetime-local" id="f-publish-at" class="form-input">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="f-featured">
+          <span class="form-label" style="margin:0">⭐ Mettre en avant (un seul article à la fois)</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Produits associés <span style="font-weight:400;color:var(--text-light)">(affichés en bas de l'article)</span></label>
+        <input type="text" id="rp-search" class="form-input" placeholder="🔎 Filtrer les produits…" style="margin-bottom:8px" oninput="renderProductPicker()">
+        <div id="rp-list" style="max-height:180px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Contenu de l'article *</label>
@@ -209,6 +241,10 @@
 <script src="/assets/js/main.js"></script>
 <script>
 let allArticles = [];
+let allProducts = [];
+let selectedRelatedProducts = [];
+const AUTOSAVE_KEY = 'tea_admin_news_draft';
+let autosaveTimer = null;
 
 function checkAdmin() {
   const guard   = document.getElementById('admin-guard');
@@ -248,26 +284,52 @@ document.getElementById('guard-password').addEventListener('keydown', e => {
 
 async function init() {
   loadArticles();
+  loadProductsForPicker();
+  checkGlobalDraft();
 }
 
 async function loadArticles() {
   try {
     allArticles = await apiFetch('/news/admin/all');
     renderStats();
+    populateCategoryFilter();
     renderTable();
   } catch (e) {
     document.getElementById('articles-tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
 }
 
+async function loadProductsForPicker() {
+  try {
+    allProducts = await apiFetch('/products?limit=500');
+    if (allProducts.products) allProducts = allProducts.products; // au cas où l'API renverrait {products:[...]}
+  } catch { allProducts = []; }
+}
+
+function isScheduled(a) {
+  return !!a.publish_at && new Date(a.publish_at) > new Date();
+}
+
 function renderStats() {
   const total = allArticles.length;
   const published = allArticles.filter(a => a.published).length;
+  const scheduled = allArticles.filter(a => isScheduled(a)).length;
   const totalViews = allArticles.reduce((sum, a) => sum + (a.views || 0), 0);
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-published').textContent = published;
   document.getElementById('stat-drafts').textContent = total - published;
+  document.getElementById('stat-scheduled').textContent = scheduled;
   document.getElementById('stat-views').textContent = totalViews.toLocaleString('fr-FR');
+}
+
+function populateCategoryFilter() {
+  const cats = [...new Set(allArticles.map(a => a.category).filter(Boolean))].sort();
+  const sel = document.getElementById('art-cat-filter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="all">Toutes catégories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = cats.includes(current) ? current : 'all';
+  const dl = document.getElementById('category-options');
+  if (dl) dl.innerHTML = cats.map(c => `<option value="${c}">`).join('');
 }
 
 function renderTable() {
@@ -275,11 +337,14 @@ function renderTable() {
   const search = (document.getElementById('art-search')?.value || '').trim().toLowerCase();
   const sort = document.getElementById('art-sort')?.value || 'date_desc';
   const filter = document.getElementById('art-filter')?.value || 'all';
+  const catFilter = document.getElementById('art-cat-filter')?.value || 'all';
 
   let list = allArticles.filter(a => {
     if (search && !a.title.toLowerCase().includes(search)) return false;
     if (filter === 'published' && !a.published) return false;
     if (filter === 'draft' && a.published) return false;
+    if (filter === 'scheduled' && !isScheduled(a)) return false;
+    if (catFilter !== 'all' && a.category !== catFilter) return false;
     return true;
   });
 
@@ -306,10 +371,15 @@ function renderTable() {
           ? `<img src="${a.cover_image}" style="width:60px;height:40px;border-radius:6px;object-fit:cover">`
           : '<div style="width:60px;height:40px;border-radius:6px;background:var(--rose-pale);display:flex;align-items:center;justify-content:center">🌸</div>'}
       </td>
-      <td style="font-weight:700">${a.title}</td>
+      <td style="font-weight:700">
+        ${a.is_featured ? '⭐ ' : ''}${a.title}
+        ${a.category ? `<div style="font-weight:400;font-size:.72rem;color:var(--rose-dark);margin-top:2px">🏷️ ${a.category}</div>` : ''}
+      </td>
       <td style="font-size:.8rem;color:var(--text-light);max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${a.excerpt || '—'}</td>
       <td>
-        <span class="order-status ${a.published ? 'status-delivered' : 'status-pending'}" style="cursor:pointer" onclick="togglePublish(${a.id}, ${a.published ? 0 : 1})" title="Cliquer pour ${a.published ? 'dépublier' : 'publier'}">${a.published ? 'Publié' : 'Brouillon'}</span>
+        ${isScheduled(a)
+          ? `<span class="order-status status-pending" title="Publication programmée">🕓 ${formatDate(a.publish_at)}</span>`
+          : `<span class="order-status ${a.published ? 'status-delivered' : 'status-pending'}" style="cursor:pointer" onclick="togglePublish(${a.id}, ${a.published ? 0 : 1})" title="Cliquer pour ${a.published ? 'dépublier' : 'publier'}">${a.published ? 'Publié' : 'Brouillon'}</span>`}
       </td>
       <td style="font-size:.85rem;color:var(--text-light)">👁 ${(a.views || 0).toLocaleString('fr-FR')}</td>
       <td style="font-size:.8rem;color:var(--text-light)">${formatDate(a.created_at)}</td>
@@ -340,6 +410,7 @@ function showForm(title = 'Écrire un article') {
   document.getElementById('art-form-title').textContent = title;
   document.getElementById('article-form-panel').style.display = '';
   document.getElementById('article-form-panel').scrollIntoView({ behavior: 'smooth' });
+  startAutosave();
 }
 
 function hideForm() {
@@ -347,6 +418,10 @@ function hideForm() {
   document.getElementById('edit-art-id').value = '';
   document.getElementById('f-title').value = '';
   document.getElementById('f-excerpt').value = '';
+  document.getElementById('f-slug').value = '';
+  document.getElementById('f-category').value = '';
+  document.getElementById('f-publish-at').value = '';
+  document.getElementById('f-featured').checked = false;
   document.getElementById('f-content').innerHTML = '';
   document.getElementById('f-cover').value = '';
   document.getElementById('f-meta-title').value = '';
@@ -354,22 +429,64 @@ function hideForm() {
   document.getElementById('f-published').checked = true;
   document.getElementById('current-cover').innerHTML = '';
   document.getElementById('art-form-error').style.display = 'none';
+  document.getElementById('f-slug-draft-hint').textContent = '';
+  selectedRelatedProducts = [];
+  document.getElementById('rp-search').value = '';
+  renderProductPicker();
+  stopAutosave();
+  clearAutosave();
 }
 
-function editArticle(id) {
+async function editArticle(id) {
   const a = allArticles.find(x => x.id === id);
   if (!a) return;
   showForm('Modifier l\'article');
   document.getElementById('edit-art-id').value = id;
   document.getElementById('f-title').value = a.title;
   document.getElementById('f-excerpt').value = a.excerpt || '';
+  document.getElementById('f-slug').value = a.slug || '';
+  document.getElementById('f-category').value = a.category || '';
+  document.getElementById('f-publish-at').value = a.publish_at ? toDatetimeLocal(a.publish_at) : '';
+  document.getElementById('f-featured').checked = !!a.is_featured;
   document.getElementById('f-content').innerHTML = a.content;
   document.getElementById('f-meta-title').value = a.meta_title || '';
   document.getElementById('f-meta-desc').value = a.meta_description || '';
   document.getElementById('f-published').checked = !!a.published;
+  selectedRelatedProducts = [];
+  renderProductPicker();
   if (a.cover_image) {
     document.getElementById('current-cover').innerHTML = `<img src="${a.cover_image}" style="height:80px;border-radius:8px;object-fit:cover">`;
   }
+  try {
+    const full = await apiFetch(`/news/admin/${id}`);
+    selectedRelatedProducts = (full.related_products || []).map(p => p.id);
+    renderProductPicker();
+  } catch { /* pas bloquant */ }
+}
+
+function toDatetimeLocal(isoStr) {
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ─── Produits associés ─────────────────────────────────────────
+function renderProductPicker() {
+  const box = document.getElementById('rp-list');
+  const q = (document.getElementById('rp-search')?.value || '').trim().toLowerCase();
+  if (!allProducts.length) { box.innerHTML = '<p style="font-size:.8rem;color:var(--text-light);margin:4px">Aucun produit disponible.</p>'; return; }
+  const filtered = allProducts.filter(p => !q || p.name.toLowerCase().includes(q)).slice(0, 60);
+  box.innerHTML = filtered.map(p => `
+    <label style="display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer;font-size:.85rem">
+      <input type="checkbox" value="${p.id}" ${selectedRelatedProducts.includes(p.id) ? 'checked' : ''} onchange="toggleRelatedProduct(${p.id}, this.checked)">
+      <span>${p.name}</span>
+    </label>`).join('') || '<p style="font-size:.8rem;color:var(--text-light);margin:4px">Aucun résultat.</p>';
+}
+
+function toggleRelatedProduct(id, checked) {
+  if (checked) { if (!selectedRelatedProducts.includes(id)) selectedRelatedProducts.push(id); }
+  else { selectedRelatedProducts = selectedRelatedProducts.filter(x => x !== id); }
 }
 
 async function saveArticle() {
@@ -392,6 +509,12 @@ async function saveArticle() {
   formData.append('published', document.getElementById('f-published').checked ? '1' : '0');
   formData.append('meta_title',       document.getElementById('f-meta-title').value.trim());
   formData.append('meta_description', document.getElementById('f-meta-desc').value.trim());
+  formData.append('slug',      document.getElementById('f-slug').value.trim());
+  formData.append('category',  document.getElementById('f-category').value.trim());
+  formData.append('is_featured', document.getElementById('f-featured').checked ? '1' : '0');
+  const publishAtVal = document.getElementById('f-publish-at').value;
+  formData.append('publish_at', publishAtVal ? new Date(publishAtVal).toISOString() : '');
+  formData.append('related_products', JSON.stringify(selectedRelatedProducts));
   const cover = document.getElementById('f-cover').files[0];
   if (cover) formData.append('cover_image', cover);
 
@@ -403,9 +526,78 @@ async function saveArticle() {
       await apiFetchForm('/news', formData, 'POST');
       Toast.show('Article publié ✓', 'success');
     }
+    clearAutosave();
     hideForm();
     loadArticles();
   } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+// ─── Brouillon automatique (autosave) ──────────────────────────
+// Sauvegarde périodiquement le contenu du formulaire dans localStorage,
+// pour ne pas perdre un article en cas de fermeture accidentelle de l'onglet.
+function startAutosave() {
+  stopAutosave();
+  autosaveTimer = setInterval(saveDraftNow, 8000);
+}
+function stopAutosave() {
+  if (autosaveTimer) { clearInterval(autosaveTimer); autosaveTimer = null; }
+}
+function saveDraftNow() {
+  const title = document.getElementById('f-title').value.trim();
+  const content = document.getElementById('f-content').innerHTML.trim();
+  if (!title && (!content || content === '<br>')) return; // rien à sauvegarder
+  const draft = {
+    id: document.getElementById('edit-art-id').value || null,
+    title,
+    excerpt: document.getElementById('f-excerpt').value,
+    slug: document.getElementById('f-slug').value,
+    category: document.getElementById('f-category').value,
+    publish_at: document.getElementById('f-publish-at').value,
+    featured: document.getElementById('f-featured').checked,
+    content,
+    meta_title: document.getElementById('f-meta-title').value,
+    meta_desc: document.getElementById('f-meta-desc').value,
+    published: document.getElementById('f-published').checked,
+    relatedProducts: selectedRelatedProducts,
+    savedAt: Date.now()
+  };
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(draft)); } catch {}
+  const hint = document.getElementById('f-slug-draft-hint');
+  if (hint) hint.textContent = `💾 Brouillon enregistré automatiquement à ${new Date().toLocaleTimeString('fr-FR')}`;
+}
+function clearAutosave() {
+  try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
+}
+function checkGlobalDraft() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); } catch { draft = null; }
+  if (!draft || !draft.savedAt) return;
+  const ageMin = Math.round((Date.now() - draft.savedAt) / 60000);
+  if (ageMin > 24 * 60) { clearAutosave(); return; } // brouillon trop ancien (>1 jour), on l'ignore
+  const label = draft.id ? `de l'article "${draft.title || '(sans titre)'}"` : `d'un nouvel article "${draft.title || '(sans titre)'}"`;
+  if (confirm(`Un brouillon non enregistré ${label} a été trouvé (il y a ${ageMin < 1 ? 'moins d\'1 min' : ageMin + ' min'}). Voulez-vous le restaurer ?`)) {
+    restoreDraft(draft);
+  } else {
+    clearAutosave();
+  }
+}
+function restoreDraft(draft) {
+  showForm(draft.id ? 'Modifier l\'article' : 'Écrire un article');
+  document.getElementById('edit-art-id').value = draft.id || '';
+  document.getElementById('f-title').value = draft.title || '';
+  document.getElementById('f-excerpt').value = draft.excerpt || '';
+  document.getElementById('f-slug').value = draft.slug || '';
+  document.getElementById('f-category').value = draft.category || '';
+  document.getElementById('f-publish-at').value = draft.publish_at || '';
+  document.getElementById('f-featured').checked = !!draft.featured;
+  document.getElementById('f-content').innerHTML = draft.content || '';
+  document.getElementById('f-meta-title').value = draft.meta_title || '';
+  document.getElementById('f-meta-desc').value = draft.meta_desc || '';
+  document.getElementById('f-published').checked = !!draft.published;
+  selectedRelatedProducts = draft.relatedProducts || [];
+  renderProductPicker();
+  updateWordCount();
+  Toast.show('Brouillon restauré ✓', 'success');
 }
 
 async function deleteArticle(id, title) {
