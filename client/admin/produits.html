@@ -407,33 +407,46 @@ function updateBulkBar() {
   }
 }
 
+// Chaque produit est traité indépendamment (Promise.allSettled) : si l'un
+// échoue au milieu de la sélection, les autres ne sont pas bloqués, on
+// affiche un compte-rendu clair (X réussis / Y échoués), et la table est
+// TOUJOURS rafraîchie pour refléter ce qui a réellement été fait — avant
+// cette correction, un échec partiel laissait la table périmée sans dire
+// quels produits avaient été modifiés, au risque de recliquer et dupliquer
+// l'action sur les produits déjà traités.
 async function bulkSetActive(active) {
   if (!selectedIds.size) return;
   const ids = [...selectedIds];
-  try {
-    for (const id of ids) {
-      const fd = new FormData();
-      fd.append('is_active', active ? '1' : '0');
-      await apiFetchForm(`/products/${id}`, fd, 'PUT');
-    }
-    Toast.show(`${ids.length} produit(s) ${active ? 'activé(s)' : 'désactivé(s)'} ✓`, 'success');
-    clearSelection();
-    loadProducts();
-  } catch (e) { Toast.show(e.message, 'error'); }
+  const results = await Promise.allSettled(ids.map(id => {
+    const fd = new FormData();
+    fd.append('is_active', active ? '1' : '0');
+    return apiFetchForm(`/products/${id}`, fd, 'PUT');
+  }));
+  const okCount = results.filter(r => r.status === 'fulfilled').length;
+  const failCount = results.length - okCount;
+  if (failCount === 0) {
+    Toast.show(`${okCount} produit(s) ${active ? 'activé(s)' : 'désactivé(s)'} ✓`, 'success');
+  } else {
+    Toast.show(`${okCount} réussi(s), ${failCount} échec(s) — voir la table pour l'état réel`, failCount === results.length ? 'error' : 'info');
+  }
+  clearSelection();
+  loadProducts();
 }
 
 async function bulkDelete() {
   if (!selectedIds.size) return;
   if (!confirm(`Supprimer définitivement ${selectedIds.size} produit(s) ? Cette action est irréversible.`)) return;
   const ids = [...selectedIds];
-  try {
-    for (const id of ids) {
-      await apiFetch(`/products/${id}`, { method: 'DELETE' });
-    }
-    Toast.show(`${ids.length} produit(s) supprimé(s) ✓`, 'success');
-    clearSelection();
-    loadProducts();
-  } catch (e) { Toast.show(e.message, 'error'); }
+  const results = await Promise.allSettled(ids.map(id => apiFetch(`/products/${id}`, { method: 'DELETE' })));
+  const okCount = results.filter(r => r.status === 'fulfilled').length;
+  const failCount = results.length - okCount;
+  if (failCount === 0) {
+    Toast.show(`${okCount} produit(s) supprimé(s) ✓`, 'success');
+  } else {
+    Toast.show(`${okCount} supprimé(s), ${failCount} échec(s) — voir la table pour l'état réel`, failCount === results.length ? 'error' : 'info');
+  }
+  clearSelection();
+  loadProducts();
 }
 
 // ── Export Excel ────────────────────────────────────────────
