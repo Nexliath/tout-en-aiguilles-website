@@ -348,9 +348,48 @@
 
 <footer class="site-footer">
   <div class="container">
-    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
-      <span>© <span id="footer-year"></span> Tout en Aiguilles</span>
-      <a href="/boutique.html" style="color:rgba(255,255,255,.6)">← Retour boutique</a>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo">🧶 Tout en Aiguilles</div>
+        <p>Créations crochet et couture artisanales, faites main avec amour dans notre atelier familial en France.</p>
+        <div class="social-links">
+          <a href="https://www.instagram.com/tout.en.aiguilles/" target="_blank" class="social-link" title="Instagram">📸</a>
+          <a href="https://www.etsy.com/fr/shop/ToutEnAiguilles" target="_blank" class="social-link" title="Etsy">🛍️</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4 class="footer-toggle" onclick="toggleFooterCol(this)">Boutique <span class="footer-arrow">▾</span></h4>
+        <div class="footer-links">
+          <a href="/boutique.html?type=crochet">Univers Crochet</a>
+          <a href="/boutique.html?type=couture">Univers Couture</a>
+          <a href="/boutique.html">Tous les produits</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4 class="footer-toggle" onclick="toggleFooterCol(this)">Mon compte <span class="footer-arrow">▾</span></h4>
+        <div class="footer-links">
+          <a href="/compte.html">Mon espace</a>
+          <a href="/compte.html?tab=orders">Mes commandes</a>
+          <a href="/suivi-commande.html">Suivre ma commande</a>
+          <a href="/compte.html?tab=favorites">Mes favoris</a>
+          <a href="/panier.html">Mon panier</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4 class="footer-toggle" onclick="toggleFooterCol(this)">Infos <span class="footer-arrow">▾</span></h4>
+        <div class="footer-links">
+          <a href="/actualites.html">Actualités</a>
+          <a href="/boutique.html">Idées cadeaux</a>
+          <a href="/index.html#contact">Contact</a>
+          <a href="/livraison.html">Livraison</a>
+          <a href="/cgv.html">CGV</a>
+          <a href="/mentions-legales.html">Mentions légales</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="footer-year"></span> Tout en Aiguilles — Tous droits réservés</span>
+      <span>Fait avec ❤️ par Victorine</span>
     </div>
   </div>
 </footer>
