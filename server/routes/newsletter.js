@@ -1,8 +1,25 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 const BASE = () => process.env.BASE_URL || 'https://tout-en-aiguilles.com';
+
+// Upload d'images pour le contenu de newsletter
+const nlStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../../client/assets/images/newsletter');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `nl_${Date.now()}${ext}`);
+  }
+});
+const nlUpload = multer({ storage: nlStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 // S'assurer que la table existe (sécurité si migration pas encore jouée)
 try {
@@ -57,6 +74,55 @@ router.get('/subscribers', requireAdmin, (req, res) => {
   }
 });
 
+const senderEmail = () => process.env.SMTP_FROM?.match(/<(.+)>/)?.[1] || process.env.SMTP_USER || 'noreply@toutenaiguilles.fr';
+
+async function sendOne(toEmail, toName, subject, html_content) {
+  const unsubUrl = `${BASE()}/api/newsletter/unsubscribe?email=${encodeURIComponent(toEmail)}`;
+  const fullHtml = `${html_content}
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #f0e8e0;text-align:center;font-size:11px;color:#b8a090">
+      Vous recevez cet email car vous êtes abonné(e) aux actualités de Tout en Aiguilles.<br>
+      <a href="${unsubUrl}" style="color:#b8a090;text-decoration:underline">Se désabonner</a>
+    </div>`;
+  if (!process.env.BREVO_API_KEY) return true; // pas de clé configurée → simulé succès (dev)
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': process.env.BREVO_API_KEY },
+    body: JSON.stringify({
+      sender: { name: 'Tout en Aiguilles', email: senderEmail() },
+      to: [{ email: toEmail, name: toName || toEmail }],
+      subject,
+      htmlContent: fullHtml,
+      textContent: `${subject}\n\nPour vous désabonner : ${unsubUrl}`,
+      headers: { 'List-Unsubscribe': `<${unsubUrl}>` },
+    }),
+  });
+  return response.ok;
+}
+
+// ─── Upload d'image pour le contenu newsletter (admin) ──────
+router.post('/upload-image', requireAdmin, nlUpload.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Image requise' });
+  res.json({ url: `/assets/images/newsletter/${req.file.filename}` });
+});
+
+// ─── Envoi d'un test à soi-même (admin) ─────────────────────
+router.post('/send-test', requireAdmin, async (req, res) => {
+  const { subject, html_content } = req.body;
+  if (!subject || !html_content) return res.status(400).json({ error: 'Sujet et contenu requis' });
+  try {
+    const ok = await sendOne(req.user.email, req.user.first_name || 'Test', `[TEST] ${subject}`, html_content);
+    res.json({ success: ok });
+  } catch (e) { res.status(500).json({ error: 'Erreur lors de l\'envoi du test' }); }
+});
+
+// ─── Historique des campagnes (admin) ───────────────────────
+router.get('/campaigns', requireAdmin, (req, res) => {
+  try {
+    const campaigns = db.prepare('SELECT id, subject, recipients, errors, sent_at FROM newsletter_campaigns ORDER BY sent_at DESC LIMIT 50').all();
+    res.json(campaigns);
+  } catch (e) { res.json([]); }
+});
+
 // ─── Envoi newsletter (admin) ───────────────────────────────
 router.post('/send', requireAdmin, async (req, res) => {
   const { subject, html_content } = req.body;
@@ -66,35 +132,18 @@ router.post('/send', requireAdmin, async (req, res) => {
   try { subs = db.prepare('SELECT * FROM newsletter_subscribers WHERE is_active = 1').all(); } catch(e) {}
   if (!subs.length) return res.json({ success: true, sent: 0, errors: 0, total: 0 });
 
-  const senderEmail = process.env.SMTP_FROM?.match(/<(.+)>/)?.[1] || process.env.SMTP_USER || 'noreply@toutenaiguilles.fr';
   let sent = 0, errors = 0;
-
   for (const sub of subs) {
     try {
-      if (!process.env.BREVO_API_KEY) { sent++; continue; }
-      const unsubUrl = `${BASE()}/api/newsletter/unsubscribe?email=${encodeURIComponent(sub.email)}`;
-      // Ajouter footer discret de désabonnement
-      const fullHtml = `${html_content}
-        <div style="margin-top:32px;padding-top:16px;border-top:1px solid #f0e8e0;text-align:center;font-size:11px;color:#b8a090">
-          Vous recevez cet email car vous êtes abonné(e) aux actualités de Tout en Aiguilles.<br>
-          <a href="${unsubUrl}" style="color:#b8a090;text-decoration:underline">Se désabonner</a>
-        </div>`;
-      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-key': process.env.BREVO_API_KEY },
-        body: JSON.stringify({
-          sender: { name: 'Tout en Aiguilles', email: senderEmail },
-          to: [{ email: sub.email, name: sub.first_name || sub.email }],
-          subject,
-          htmlContent: fullHtml,
-          textContent: `${subject}\n\nPour vous désabonner : ${unsubUrl}`,
-          headers: { 'List-Unsubscribe': `<${unsubUrl}>` },
-        }),
-      });
-      if (response.ok) sent++; else errors++;
+      const ok = await sendOne(sub.email, sub.first_name, subject, html_content);
+      if (ok) sent++; else errors++;
     } catch(e) { errors++; }
   }
   console.log(`📧 Newsletter envoyée : ${sent} succès, ${errors} erreurs`);
+  try {
+    db.prepare('INSERT INTO newsletter_campaigns (subject, html_content, recipients, errors) VALUES (?, ?, ?, ?)')
+      .run(subject, html_content, sent, errors);
+  } catch (e) {}
   res.json({ success: true, sent, errors, total: subs.length });
 });
 
