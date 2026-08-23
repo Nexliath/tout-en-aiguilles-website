@@ -183,7 +183,7 @@
       </div>
       <div id="art-form-error" class="form-error" style="display:none;margin-bottom:12px"></div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="saveArticle()">Publier l'article</button>
+        <button class="btn btn-primary" id="save-article-btn" onclick="saveArticle()">Publier l'article</button>
         <button class="btn btn-ghost" onclick="hideForm()">Annuler</button>
       </div>
     </div>
@@ -521,6 +521,14 @@ async function saveArticle() {
   const cover = document.getElementById('f-cover').files[0];
   if (cover) formData.append('cover_image', cover);
 
+  // Empêche un double-clic pendant l'appel réseau de créer/modifier
+  // l'article deux fois (contrairement à sendNewsletter/sendTestNewsletter
+  // qui désactivaient déjà leur bouton, ce formulaire ne le faisait pas).
+  const btn = document.getElementById('save-article-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = id ? 'Enregistrement…' : 'Publication…';
+
   try {
     if (id) {
       await apiFetchForm(`/news/${id}`, formData, 'PUT');
@@ -532,7 +540,12 @@ async function saveArticle() {
     clearAutosave();
     hideForm();
     loadArticles();
-  } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+  } catch (e) {
+    errEl.textContent = e.message; errEl.style.display = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 // ─── Brouillon automatique (autosave) ──────────────────────────
@@ -578,7 +591,7 @@ function checkGlobalDraft() {
   const ageMin = Math.round((Date.now() - draft.savedAt) / 60000);
   if (ageMin > 24 * 60) { clearAutosave(); return; } // brouillon trop ancien (>1 jour), on l'ignore
   const label = draft.id ? `de l'article "${draft.title || '(sans titre)'}"` : `d'un nouvel article "${draft.title || '(sans titre)'}"`;
-  if (confirm(`Un brouillon non enregistré ${label} a été trouvé (il y a ${ageMin < 1 ? 'moins d\'1 min' : ageMin + ' min'}). Voulez-vous le restaurer ?`)) {
+  if (confirm(`Un brouillon non enregistré ${label} a été trouvé (il y a ${ageMin < 1 ? 'moins d\'1 min' : ageMin + ' min'}). Voulez-vous le restaurer ?\n\n(Si vous cliquez sur Annuler, ce brouillon sera définitivement supprimé.)`)) {
     restoreDraft(draft);
   } else {
     clearAutosave();
