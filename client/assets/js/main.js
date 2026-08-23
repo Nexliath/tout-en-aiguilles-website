@@ -251,6 +251,10 @@ const Auth = {
   isAdmin:  () => { const u = Auth.getUser(); return u && u.role === 'admin'; },
   save: (token, user) => { localStorage.setItem('tea_token', token); localStorage.setItem('tea_user', JSON.stringify(user)); },
   logout: () => { localStorage.removeItem('tea_token'); localStorage.removeItem('tea_user'); window.location.href = '/'; },
+  // Comme logout(), mais sans redirection — utilisé quand on veut juste
+  // effacer une session expirée sans interrompre la page en cours (ex. un
+  // panier en cours de remplissage sur panier.html).
+  logoutSilent: () => { localStorage.removeItem('tea_token'); localStorage.removeItem('tea_user'); },
   headers: () => {
     const h = { 'Content-Type': 'application/json' };
     const t = Auth.getToken();
@@ -288,6 +292,23 @@ function apiError(data, status) {
   }
   return err;
 }
+
+// Gestion par défaut d'une session expirée sur les pages client (compte,
+// panier, etc.) — auparavant un token expiré/invalide faisait juste échouer
+// chaque appel API avec un message d'erreur générique, sans jamais déconnecter
+// l'utilisateur ni lui proposer de se reconnecter. Les pages admin définissent
+// leur propre window.onApiUnauthorized (admin-guard.js, chargé après main.js)
+// qui remplace celui-ci — ce handler ne s'applique donc qu'aux pages client.
+let _clientSessionExpiredNotified = false;
+window.onApiUnauthorized = function() {
+  if (!Auth.isLoggedIn()) return; // déjà déconnecté, rien à faire
+  Auth.logoutSilent();
+  if (!_clientSessionExpiredNotified) {
+    _clientSessionExpiredNotified = true;
+    Toast.show('Votre session a expiré — reconnectez-vous.', 'error');
+  }
+  if (typeof initHeader === 'function') initHeader();
+};
 
 async function apiFetchForm(path, formData, method = 'POST') {
   const headers = {};
@@ -1158,6 +1179,15 @@ function initBackToTop() {
 // hoisting JS et ne chargeait jamais réellement GTM (pas d'appel à
 // loadGTM()) — supprimé pour ne garder qu'une seule implémentation.
 
+// ─── Pied de page — plié/déplié sur mobile ─────────────────────
+// Partagée ici (plutôt que dupliquée dans chaque page) depuis que le pied de
+// page complet (colonnes Boutique/Mon compte/Infos) a été étendu à toutes
+// les pages publiques et non plus seulement à l'accueil.
+function toggleFooterCol(h4) {
+  if (window.innerWidth > 768) return;
+  h4.closest('.footer-col').classList.toggle('open');
+}
+
 // ─── Init on load ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   Toast.init();
@@ -1170,4 +1200,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // donc initialiser le JS partout. La fonction se protège déjà si le
   // markup est absent (ex: pages admin).
   initHeaderSearch();
+  // Année du pied de page — partagé pour toutes les pages utilisant le
+  // pied de page complet (id="footer-year").
+  const fy = document.getElementById('footer-year');
+  if (fy) fy.textContent = new Date().getFullYear();
 });
