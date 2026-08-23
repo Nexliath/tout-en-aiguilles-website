@@ -72,6 +72,12 @@ router.delete('/users/:id', requireAdmin, (req, res) => {
   db.prepare('UPDATE orders SET user_id = NULL WHERE user_id = ?').run(id);
   db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(id);
   db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(id);
+  // Même nettoyage RGPD que la suppression self-service (auth.js) — ces deux
+  // tables sont indexées par email, pas par user_id, et survivaient sinon.
+  if (user.email) {
+    db.prepare('DELETE FROM newsletter_subscribers WHERE email = ?').run(user.email);
+    db.prepare('DELETE FROM stock_alerts WHERE email = ?').run(user.email);
+  }
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
   logActivity(req.user, 'Utilisateur supprimé', `#${id} (${user.email || ''})`);
   res.json({ success: true });
