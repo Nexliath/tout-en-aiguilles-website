@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suivre ma commande — Tout en Aiguilles</title>
+  <meta name="description" content="Suivez l'état de votre commande Tout en Aiguilles avec votre numéro de commande et votre email.">
+  <link rel="canonical" href="https://tout-en-aiguilles.com/suivi-commande.html">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
+    <nav class="nav">
+      <a href="/">Accueil</a>
+      <a href="/boutique.html">Boutique</a>
+      <a href="/actualites.html">Actualités</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="user-btn">👤</button>
+      <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
+      <button class="hamburger icon-btn" onclick="openMobileNav()" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav-overlay" id="mobile-nav" onclick="closeMobileNav()">
+  <div class="mobile-nav-panel" onclick="event.stopPropagation()">
+    <button class="mobile-nav-close" onclick="closeMobileNav()">✕</button>
+    <nav class="mobile-nav-links">
+      <a href="/">🏠 Accueil</a>
+      <a href="/boutique.html">🛍️ Boutique</a>
+      <a href="/actualites.html">📰 Actualités</a>
+      <a href="/#contact">✉️ Contact</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page-hero">
+  <div class="container">
+    <h1>Suivre ma commande 📦</h1>
+    <p>Retrouvez l'état de votre commande avec son numéro et l'email utilisé lors de l'achat</p>
+  </div>
+</div>
+
+<main class="section">
+  <div class="container">
+    <div style="max-width:560px;margin:0 auto">
+
+      <div class="card" style="padding:32px;margin-bottom:24px">
+        <div class="form-group">
+          <label class="form-label">Numéro de commande</label>
+          <input type="text" class="form-input" id="track-order-id" placeholder="Ex : 42">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email utilisé lors de la commande</label>
+          <input type="email" class="form-input" id="track-email" placeholder="marie@email.fr">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="trackOrder()">🔍 Suivre ma commande</button>
+        <p style="font-size:.8rem;color:var(--text-light);margin-top:12px">Le numéro de commande figure dans l'email de confirmation que vous avez reçu à l'achat.</p>
+      </div>
+
+      <div id="track-result" style="display:none"></div>
+
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6);flex-wrap:wrap;gap:8px">
+      <span>© <span id="footer-year"></span> Tout en Aiguilles</span>
+      <span>
+        <a href="/livraison.html" style="color:rgba(255,255,255,.6);margin-right:16px">Livraison & Retours</a>
+        <a href="/cgv.html" style="color:rgba(255,255,255,.6);margin-right:16px">CGV</a>
+        <a href="/mentions-legales.html" style="color:rgba(255,255,255,.6)">Mentions légales</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/main.js"></script>
+<script>
+function openMobileNav()  { document.getElementById('mobile-nav').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeMobileNav() { document.getElementById('mobile-nav').classList.remove('open'); document.body.style.overflow=''; }
+const fyEl = document.getElementById('footer-year');
+if (fyEl) fyEl.textContent = new Date().getFullYear();
+
+const STATUS_INFO = {
+  pending:   { label: '⏳ En attente de paiement', color: 'var(--text-light)' },
+  paid:      { label: '✅ Paiement reçu — en préparation', color: 'var(--sage-dark)' },
+  shipped:   { label: '📦 Expédiée', color: 'var(--rose-dark)' },
+  delivered: { label: '🎉 Livrée', color: 'var(--sage-dark)' },
+  cancelled: { label: '❌ Annulée', color: '#d9534f' },
+};
+const STEPS_ORDER = ['paid', 'shipped', 'delivered'];
+const DELIVERY_LABELS = { home: '🏠 Livraison à domicile', relay: '📦 Point Relais', handover: '🤝 Remise en main propre' };
+
+async function trackOrder() {
+  const orderId = document.getElementById('track-order-id').value.trim();
+  const email = document.getElementById('track-email').value.trim();
+  const resultEl = document.getElementById('track-result');
+  const btn = document.querySelector('[onclick="trackOrder()"]');
+
+  if (!orderId || !email) { Toast.show('Renseignez le numéro de commande et l\'email', 'error'); return; }
+
+  const originalText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Recherche…';
+
+  try {
+    const o = await apiFetch(`/orders/track?order_id=${encodeURIComponent(orderId)}&email=${encodeURIComponent(email)}`);
+    const info = STATUS_INFO[o.status] || { label: o.status, color: 'var(--text)' };
+    const isCancelled = o.status === 'cancelled';
+
+    let timelineHtml = '';
+    if (!isCancelled) {
+      timelineHtml = `
+        <div style="display:flex;justify-content:space-between;margin:24px 0 8px;position:relative">
+          ${STEPS_ORDER.map((s, i) => {
+            const reached = STEPS_ORDER.indexOf(o.status) >= i;
+            const labels = { paid: 'Confirmée', shipped: 'Expédiée', delivered: 'Livrée' };
+            return `<div style="text-align:center;flex:1">
+              <div style="width:28px;height:28px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;
+                background:${reached ? 'var(--sage-dark)' : 'var(--cream-dark)'};color:${reached ? 'white' : 'var(--text-light)'}">${reached ? '✓' : i + 1}</div>
+              <div style="font-size:.75rem;color:${reached ? 'var(--text)' : 'var(--text-light)'}">${labels[s]}</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    resultEl.innerHTML = `
+      <div class="card" style="padding:32px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="font-family:var(--font-title);margin:0">Commande #${o.id}</h3>
+          <span style="font-size:.85rem;color:var(--text-light)">${new Date(o.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' })}</span>
+        </div>
+        <p style="font-weight:700;color:${info.color};margin-bottom:8px">${info.label}</p>
+        ${timelineHtml}
+        ${o.tracking_number ? `<div style="background:var(--sage-pale);border-radius:var(--radius);padding:12px 16px;margin:16px 0"><span style="font-size:.8rem;color:var(--text-light)">Numéro de suivi transporteur</span><p style="font-weight:700;margin:2px 0 0">${o.tracking_number}</p></div>` : ''}
+        <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
+          <div style="margin-bottom:12px">
+            ${(o.items || []).map(i => `<div style="display:flex;justify-content:space-between;font-size:.88rem;padding:4px 0;color:var(--text-light)"><span>${i.name} × ${i.qty}</span><span>${(i.price * i.qty).toFixed(2)} €</span></div>`).join('')}
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:700"><span>Total</span><span style="color:var(--rose-dark)">${Number(o.total).toFixed(2)} €</span></div>
+          <p style="font-size:.85rem;color:var(--text-light);margin-top:8px">${DELIVERY_LABELS[o.delivery_type] || 'Livraison'}${o.relay_point ? ` — ${o.relay_point}` : ''}${o.city ? ` — ${o.postal_code || ''} ${o.city}` : ''}</p>
+        </div>
+      </div>`;
+    resultEl.style.display = '';
+  } catch (e) {
+    resultEl.innerHTML = `<div class="card" style="padding:24px;text-align:center;color:var(--text-light)">${e.message || 'Aucune commande trouvée avec ce numéro et cet email.'}</div>`;
+    resultEl.style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = originalText;
+  }
+}
+</script>
+</body>
+</html>
