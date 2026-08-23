@@ -162,6 +162,18 @@ const migrations = [
   "ALTER TABLE order_items ADD COLUMN variant_label TEXT DEFAULT NULL",
   // Compteur de lecture des articles (actualités)
   "ALTER TABLE news ADD COLUMN views INTEGER NOT NULL DEFAULT 0",
+  // Réponse publique de l'admin à un avis client
+  "ALTER TABLE reviews ADD COLUMN admin_reply TEXT DEFAULT NULL",
+  "ALTER TABLE reviews ADD COLUMN admin_reply_at DATETIME DEFAULT NULL",
+  // Historique des envois de newsletter
+  `CREATE TABLE IF NOT EXISTS newsletter_campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL,
+    html_content TEXT NOT NULL,
+    recipients INTEGER DEFAULT 0,
+    errors INTEGER DEFAULT 0,
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
