@@ -238,6 +238,15 @@ function closeDeleteModal() {
   document.getElementById('delete-modal').style.display = 'none';
 }
 
+// Fermeture au clic sur le fond semi-transparent ou à la touche Échap —
+// avant cette correction, seul le bouton "Annuler" fermait la modale.
+document.getElementById('delete-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'delete-modal') closeDeleteModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('delete-modal').style.display !== 'none') closeDeleteModal();
+});
+
 document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
   if (!deleteTarget) return;
   if (hasUnsavedReplyEdits() && !confirm('Une réponse non publiée est en cours de rédaction — elle sera perdue si vous continuez. Continuer quand même ?')) return;
