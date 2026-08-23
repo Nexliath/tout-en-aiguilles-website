@@ -5,6 +5,17 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const db = require('../db/database');
+
+// Valide/plafonne limit & offset venant de la query string (même garde-fou
+// que /news/admin/all, /products/admin/all et /newsletter/subscribers).
+function clampPagination(limitRaw, offsetRaw, { defaultLimit = 50, maxLimit = 200 } = {}) {
+  let limit = parseInt(limitRaw, 10);
+  if (!Number.isFinite(limit) || limit <= 0) limit = defaultLimit;
+  limit = Math.min(limit, maxLimit);
+  let offset = parseInt(offsetRaw, 10);
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
+  return { limit, offset };
+}
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
 const { processAndSaveImage } = require('../utils/imageProcess');
@@ -132,7 +143,10 @@ router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), as
 // ─── GET /api/reviews/admin ─────────────────────────────────
 // Admin : tous les avis avec photos
 router.get('/admin', requireAdmin, (req, res) => {
-  const reviews = db.prepare(`
+  // Pagination optionnelle : sans ?limit, on renvoie la liste complète comme
+  // avant (la modération admin s'appuie sur le tri/recherche/colspan côté
+  // client) ; un futur appelant peut opter pour la pagination via ?limit.
+  let query = `
     SELECT r.id, r.rating, r.comment, r.is_approved, r.created_at, r.admin_reply, r.admin_reply_at,
            COALESCE(u.first_name, 'Client') AS first_name,
            COALESCE(u.last_name, 'supprimé') AS last_name,
@@ -145,7 +159,14 @@ router.get('/admin', requireAdmin, (req, res) => {
     LEFT JOIN review_photos rp ON rp.review_id = r.id
     GROUP BY r.id
     ORDER BY r.is_approved ASC, r.created_at DESC
-  `).all();
+  `;
+  const params = [];
+  if (req.query.limit !== undefined) {
+    const { limit, offset } = clampPagination(req.query.limit, req.query.offset);
+    query += ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  }
+  const reviews = db.prepare(query).all(...params);
 
   const parsed = reviews.map(r => ({
     ...r,
