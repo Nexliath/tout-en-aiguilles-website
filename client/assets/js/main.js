@@ -4,6 +4,19 @@
 
 const API = '/api';
 
+// Échappement HTML générique — utilisé partout où une valeur venant du
+// serveur/utilisateur est injectée via innerHTML/template string (Toast,
+// widgets admin, etc.) pour éviter le XSS stocké.
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ─── Consentement cookies (RGPD/CNIL) ───────────────────────
 // Google Tag Manager ne doit être chargé qu'après consentement explicite
 // du visiteur (mesure d'audience = cookie non essentiel). Ce bloc remplace
@@ -461,13 +474,29 @@ const Toast = {
     const t = document.createElement('div');
     t.className = `toast ${type}`;
     const icons = { success: '✓', error: '✗', info: '🌸' };
-    t.innerHTML = `<span>${icons[type] || '🌸'}</span><span>${msg}</span>`;
+    // msg vient souvent d'un message d'erreur serveur (ex. "Email déjà
+    // utilisé") qui peut refléter une valeur saisie par l'utilisateur —
+    // échappé pour éviter tout XSS stocké/réfléchi via ce point d'entrée
+    // central utilisé par toutes les pages admin et client.
+    t.innerHTML = `<span>${icons[type] || '🌸'}</span><span>${escapeHtml(msg)}</span>`;
     Toast.container.appendChild(t);
     setTimeout(() => t.remove(), 3200);
   }
 };
 
 // ─── Auth modal ──────────────────────────────────────────────
+let _authModalPreviousFocus = null;
+
+function closeAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  if (_authModalPreviousFocus) {
+    try { _authModalPreviousFocus.focus(); } catch (e) { /* élément non focusable / retiré du DOM */ }
+    _authModalPreviousFocus = null;
+  }
+}
+
 function openAuthModal() {
   let modal = document.getElementById('auth-modal');
   if (!modal) {
@@ -577,10 +606,33 @@ function openAuthModal() {
       </div>`;
     document.body.appendChild(modal);
 
-    // Bouton fermeture
-    document.getElementById('modal-close-btn').addEventListener('click', function() {
-      modal.classList.remove('open');
+    // Accessibilité : dialogue modal standard (role, focus trap, fermeture Escape)
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'modal-title');
+    modal.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeAuthModal();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusables = Array.from(modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+          .filter(function(el) { return el.offsetParent !== null && !el.disabled; });
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     });
+
+    // Bouton fermeture
+    document.getElementById('modal-close-btn').addEventListener('click', closeAuthModal);
 
     // Bouton connexion
     document.getElementById('modal-login-btn').addEventListener('click', doLogin);
@@ -682,7 +734,7 @@ function openAuthModal() {
 
     // Clic hors du modal
     modal.addEventListener('click', function(e) {
-      if (e.target === modal) modal.classList.remove('open');
+      if (e.target === modal) closeAuthModal();
     });
   }
   // Réinitialise l'état par défaut (onglet connexion) à chaque ouverture —
@@ -697,7 +749,12 @@ function openAuthModal() {
     document.getElementById(id).style.display = id === 'tab-login' ? '' : 'none';
   });
   modal.querySelectorAll('.modal-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.tab === 'login'); });
-  requestAnimationFrame(function() { modal.classList.add('open'); });
+  _authModalPreviousFocus = document.activeElement;
+  requestAnimationFrame(function() {
+    modal.classList.add('open');
+    const firstField = document.getElementById('login-email');
+    if (firstField) firstField.focus();
+  });
 }
 
 async function doLogin() {
