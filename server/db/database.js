@@ -213,6 +213,11 @@ const migrations = [
   "ALTER TABLE users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE users ADD COLUMN mfa_secret TEXT DEFAULT NULL",
   "ALTER TABLE users ADD COLUMN mfa_recovery_codes TEXT DEFAULT NULL",
+  // Statut d'une campagne newsletter — l'envoi se fait maintenant en
+  // arrière-plan par lots (voir server/routes/newsletter.js) pour ne pas
+  // risquer un timeout HTTP sur une grosse liste ; 'completed' par défaut
+  // pour les campagnes historiques (déjà terminées avant cette migration).
+  "ALTER TABLE newsletter_campaigns ADD COLUMN status TEXT DEFAULT 'completed'",
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
