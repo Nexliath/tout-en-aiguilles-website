@@ -289,7 +289,7 @@ function statusLabel(s) {
 function invoiceRows(items) {
   return (items || []).map(i => `
     <tr>
-      <td style="padding:10px 12px;color:#5a3e2b;border-bottom:1px solid #f0e8e0;">${i.name}</td>
+      <td style="padding:10px 12px;color:#5a3e2b;border-bottom:1px solid #f0e8e0;">${i.name}${i.variant_label ? `<br><span style="font-size:12px;color:#9e8070;">${i.variant_label}</span>` : ''}</td>
       <td style="padding:10px 12px;text-align:center;color:#6b5547;border-bottom:1px solid #f0e8e0;">${i.qty}</td>
       <td style="padding:10px 12px;text-align:right;color:#5a3e2b;border-bottom:1px solid #f0e8e0;">${Number(i.price).toFixed(2)} €</td>
       <td style="padding:10px 12px;text-align:right;font-weight:700;color:#c0718a;border-bottom:1px solid #f0e8e0;">${(i.price * i.qty).toFixed(2)} €</td>
