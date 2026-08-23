@@ -29,6 +29,19 @@ function slugify(str) {
 // publication programmée, ou cette date est déjà passée).
 const PUBLIC_WHERE = "published = 1 AND (publish_at IS NULL OR publish_at = '' OR datetime(publish_at) <= datetime('now'))";
 
+// Valide/plafonne limit & offset venant de la query string — avant cette
+// correction, un ?limit=abc devenait NaN (lié tel quel en paramètre SQL,
+// risque d'erreur) et rien n'empêchait un ?limit=100000 de dumper toute la
+// table en un seul appel.
+function clampPagination(limitRaw, offsetRaw, { defaultLimit = 10, maxLimit = 100 } = {}) {
+  let limit = parseInt(limitRaw, 10);
+  if (!Number.isFinite(limit) || limit <= 0) limit = defaultLimit;
+  limit = Math.min(limit, maxLimit);
+  let offset = parseInt(offsetRaw, 10);
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
+  return { limit, offset };
+}
+
 function attachRelatedProducts(article) {
   const rows = db.prepare(`
     SELECT p.*, c.name as category_name, c.slug as category_slug,
@@ -52,13 +65,14 @@ function attachRelatedProducts(article) {
 
 // GET /api/news — liste des articles publiés (?limit=&offset=&category=&search=&featured=1)
 router.get('/', (req, res) => {
-  const { limit = 10, offset = 0, category, search, featured } = req.query;
+  const { limit: limitRaw, offset: offsetRaw, category, search, featured } = req.query;
+  const { limit, offset } = clampPagination(limitRaw, offsetRaw, { defaultLimit: 10, maxLimit: 50 });
   const where = [PUBLIC_WHERE];
   const params = [];
   if (category) { where.push('category = ?'); params.push(category); }
   if (search) { where.push('(title LIKE ? OR excerpt LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
   if (featured === '1' || featured === 'true') { where.push('is_featured = 1'); }
-  params.push(Number(limit), Number(offset));
+  params.push(limit, offset);
   const articles = db.prepare(
     `SELECT * FROM news WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT ? OFFSET ?`
   ).all(...params);
@@ -77,9 +91,16 @@ router.get('/categories', (req, res) => {
 
 // ─── Admin ─── déclarée AVANT /:slug pour ne pas être masquée ─
 
-// GET /api/news/admin/all
+// GET /api/news/admin/all — limit/offset optionnels (par défaut : tout
+// renvoyer, pour ne pas casser l'admin actuel qui affiche la liste complète
+// côté client ; un appelant peut explicitement paginer via ?limit=&offset=).
 router.get('/admin/all', requireAdmin, (req, res) => {
-  const articles = db.prepare('SELECT * FROM news ORDER BY created_at DESC').all();
+  const { limit: limitRaw, offset: offsetRaw } = req.query;
+  if (limitRaw === undefined) {
+    return res.json(db.prepare('SELECT * FROM news ORDER BY created_at DESC').all());
+  }
+  const { limit, offset } = clampPagination(limitRaw, offsetRaw, { defaultLimit: 50, maxLimit: 200 });
+  const articles = db.prepare('SELECT * FROM news ORDER BY created_at DESC LIMIT ? OFFSET ?').all(limit, offset);
   res.json(articles);
 });
 
