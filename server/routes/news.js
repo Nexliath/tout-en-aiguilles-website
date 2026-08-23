@@ -30,11 +30,8 @@ function slugify(str) {
 // GET /api/news — liste des articles publiés
 router.get('/', (req, res) => {
   const { limit = 10, offset = 0 } = req.query;
-  const articles = db.prepare(`
-    SELECT * FROM news WHERE published = 1
-    ORDER BY CASE WHEN slug = 'bienvenue-tout-en-aiguilles' THEN 0 ELSE 1 END, created_at DESC
-    LIMIT ? OFFSET ?
-  `).all(Number(limit), Number(offset));
+  const articles = db.prepare('SELECT * FROM news WHERE published = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?')
+    .all(Number(limit), Number(offset));
   res.json(articles);
 });
 
@@ -42,10 +39,7 @@ router.get('/', (req, res) => {
 
 // GET /api/news/admin/all
 router.get('/admin/all', requireAdmin, (req, res) => {
-  const articles = db.prepare(`
-    SELECT * FROM news
-    ORDER BY CASE WHEN slug = 'bienvenue-tout-en-aiguilles' THEN 0 ELSE 1 END, created_at DESC
-  `).all();
+  const articles = db.prepare('SELECT * FROM news ORDER BY created_at DESC').all();
   res.json(articles);
 });
 
@@ -54,6 +48,12 @@ router.get('/:slug', (req, res) => {
   const article = db.prepare('SELECT * FROM news WHERE slug = ? AND published = 1').get(req.params.slug);
   if (!article) return res.status(404).json({ error: 'Article introuvable' });
   res.json(article);
+});
+
+// POST /api/news/upload-image — upload d'une image à insérer dans le corps d'un article (admin)
+router.post('/upload-image', requireAdmin, upload.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Image requise' });
+  res.json({ url: `/assets/images/news/${req.file.filename}` });
 });
 
 // POST /api/news — créer un article
