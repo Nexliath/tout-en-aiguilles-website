@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
-const { sendVerificationEmail, sendEmailChangeConfirmation } = require('../utils/email');
+const { sendVerificationEmail, sendEmailChangeConfirmation, sendPasswordResetEmail } = require('../utils/email');
 
 // ─── Config upload avatar — stockage mémoire → base64 en DB ──
 // (évite la perte des fichiers à chaque redéploiement Railway)
@@ -35,6 +35,13 @@ function tokenExpiresAt() {
 function sendEmailAsync(email, firstName, token) {
   sendVerificationEmail(email, firstName, token, BASE_URL)
     .catch(err => console.error('Erreur envoi email:', err.message));
+}
+function resetTokenExpiresAt() {
+  // Durée plus courte que la vérification d'email (24h) : une demande de
+  // réinitialisation de mot de passe est plus sensible, le lien doit expirer vite.
+  const d = new Date();
+  d.setHours(d.getHours() + 1);
+  return d.toISOString();
 }
 
 // ─── POST /api/auth/register ────────────────────────────────
@@ -154,6 +161,71 @@ router.post('/login', (req, res) => {
   }
 
   res.json({ token, user: safe });
+});
+
+// ─── POST /api/auth/forgot-password ─────────────────────────
+// Toujours une réponse générique (que l'email existe ou non) pour ne pas
+// permettre d'énumérer les comptes existants.
+const forgotPasswordAttempts = new Map(); // email → [timestamps] — anti-abus simple, en mémoire
+router.post('/forgot-password', (req, res) => {
+  const { email } = req.body;
+  const generic = { message: 'Si un compte existe avec cet email, un lien de réinitialisation vient de lui être envoyé.' };
+  if (!email) return res.json(generic);
+
+  // Anti-abus léger : max 3 demandes / 15 min pour un même email
+  const now = Date.now();
+  const key = email.toLowerCase().trim();
+  const attempts = (forgotPasswordAttempts.get(key) || []).filter(t => now - t < 15 * 60 * 1000);
+  if (attempts.length >= 3) return res.json(generic);
+  attempts.push(now);
+  forgotPasswordAttempts.set(key, attempts);
+
+  const user = db.prepare('SELECT * FROM users WHERE lower(email) = lower(?)').get(email);
+  if (!user) return res.json(generic);
+
+  db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
+  const token = generateToken();
+  db.prepare('INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)').run(user.id, token, resetTokenExpiresAt());
+
+  res.json(generic);
+  sendPasswordResetEmail(user.email, user.first_name, token, BASE_URL)
+    .catch(err => console.error('Erreur envoi email réinitialisation:', err.message));
+});
+
+// ─── GET /api/auth/reset-password/verify?token=xxx ──────────
+// Vérifie la validité d'un lien avant d'afficher le formulaire (évite de
+// laisser l'utilisateur saisir un mot de passe pour un lien déjà expiré).
+router.get('/reset-password/verify', (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ valid: false, error: 'Lien invalide' });
+  const row = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ?').get(token);
+  if (!row || new Date(row.expires_at) < new Date()) {
+    return res.status(400).json({ valid: false, error: 'Ce lien est invalide ou a expiré.' });
+  }
+  res.json({ valid: true });
+});
+
+// ─── POST /api/auth/reset-password ───────────────────────────
+router.post('/reset-password', (req, res) => {
+  const { token, new_password } = req.body;
+  if (!token || !new_password) return res.status(400).json({ error: 'Token et nouveau mot de passe requis' });
+  if (new_password.length < 8)
+    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères' });
+  if (!/[A-Z]/.test(new_password) || !/[0-9]/.test(new_password) || !/[^A-Za-z0-9]/.test(new_password))
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins une majuscule, un chiffre et un caractère spécial' });
+
+  const row = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ?').get(token);
+  if (!row) return res.status(400).json({ error: 'Lien invalide ou déjà utilisé' });
+  if (new Date(row.expires_at) < new Date()) {
+    db.prepare('DELETE FROM password_reset_tokens WHERE id = ?').run(row.id);
+    return res.status(400).json({ error: 'Ce lien a expiré. Refaites une demande de réinitialisation.' });
+  }
+
+  const hash = bcrypt.hashSync(new_password, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, row.user_id);
+  db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(row.user_id);
+
+  res.json({ success: true, message: 'Votre mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter.' });
 });
 
 // ─── POST /api/auth/admin-cookie — pose le cookie depuis un token existant ──
