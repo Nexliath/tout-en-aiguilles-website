@@ -1,17 +1,15 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Livraison — Tout en Aiguilles</title>
-  <meta name="description" content="Informations de livraison de la boutique Tout en Aiguilles — délais, modes et frais.">
+  <title>Livraison & Retours — Tout en Aiguilles</title>
+  <meta name="description" content="Informations de livraison et politique de retour de la boutique Tout en Aiguilles.">
   <link rel="canonical" href="https://tout-en-aiguilles.com/livraison.html">
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 <header class="site-header">
   <div class="header-inner">
@@ -19,16 +17,9 @@
     <nav class="nav">
       <a href="/">Accueil</a>
       <a href="/boutique.html">Boutique</a>
-      <a href="/cadeaux.html">🎁 Cadeaux</a>
       <a href="/actualites.html">Actualités</a>
       <a href="/#contact">Contact</a>
     </nav>
-    
-        <div class="header-search-wrap">
-          <input type="text" class="header-search-input" placeholder="Rechercher une création…" autocomplete="off" aria-label="Rechercher un produit">
-          <span class="header-search-icon">🔍</span>
-          <div class="header-search-dropdown" id="header-search-dropdown"></div>
-        </div>
     <div class="header-actions">
       <button class="icon-btn" id="user-btn">👤</button>
       <a href="/panier.html" class="icon-btn">🛒<span class="cart-badge" style="display:none">0</span></a>
@@ -51,7 +42,7 @@
 
 <div class="page-hero">
   <div class="container">
-    <h1>Livraison 🚚</h1>
+    <h1>Livraison & Retours 🚚</h1>
     <p>Tout ce que vous devez savoir pour recevoir votre commande</p>
   </div>
 </div>
@@ -112,7 +103,7 @@
     <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6);flex-wrap:wrap;gap:8px">
       <span>© <span id="footer-year"></span> Tout en Aiguilles</span>
       <span>
-        <a href="/livraison.html" style="color:rgba(255,255,255,.6);margin-right:16px">Livraison</a>
+        <a href="/livraison.html" style="color:rgba(255,255,255,.6);margin-right:16px">Livraison & Retours</a>
         <a href="/cgv.html" style="color:rgba(255,255,255,.6);margin-right:16px">CGV</a>
         <a href="/mentions-legales.html" style="color:rgba(255,255,255,.6)">Mentions légales</a>
       </span>
@@ -126,7 +117,6 @@ function openMobileNav()  { document.getElementById('mobile-nav').classList.add(
 function closeMobileNav() { document.getElementById('mobile-nav').classList.remove('open'); document.body.style.overflow=''; }
 const fyEl = document.getElementById('footer-year');
 if (fyEl) fyEl.textContent = new Date().getFullYear();
-initHeaderSearch();
 </script>
 </body>
 </html>
