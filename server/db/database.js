@@ -208,6 +208,11 @@ const migrations = [
     expires_at DATETIME NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  // Double authentification (MFA / TOTP) — secret non confirmé tant que
+  // mfa_enabled = 0 ; codes de récupération stockés hashés (JSON, bcrypt).
+  "ALTER TABLE users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE users ADD COLUMN mfa_secret TEXT DEFAULT NULL",
+  "ALTER TABLE users ADD COLUMN mfa_recovery_codes TEXT DEFAULT NULL",
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
