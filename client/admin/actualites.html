@@ -36,28 +36,23 @@
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
-<div class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:3rem;margin-bottom:12px">🔐</div>
+      <h2 style="margin-bottom:8px">Espace admin</h2>
+      <p style="font-size:.875rem;color:var(--text-light)">Connectez-vous avec votre compte administrateur.</p>
+    </div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" id="guard-email" class="form-input" placeholder="victorine@..."></div>
+    <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" id="guard-password" class="form-input" placeholder="••••••••"></div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
   </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html">📊 Tableau de bord</a>
-      <a href="produits.html">🧶 Produits</a>
-      <a href="commandes.html">📦 Commandes</a>
-      <a href="actualites.html" class="active">📝 Actualités</a>
-      <a href="utilisateurs.html">👥 Utilisateurs</a>
-      <a href="avis.html">⭐ Avis</a>
-      <a href="promo.html">🏷️ Codes promo</a>
-      <a href="newsletter.html">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <main class="admin-main">
     <div class="admin-header">
@@ -205,8 +200,43 @@
 <script>
 let allArticles = [];
 
+function checkAdmin() {
+  const guard   = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) {
+    content.style.display = 'none';
+    guard.style.display   = 'flex';
+  } else {
+    guard.style.display   = 'none';
+    content.style.display = '';
+    init();
+  }
+}
+
+document.getElementById('guard-btn').addEventListener('click', function() {
+  const email = document.getElementById('guard-email').value.trim();
+  const password = document.getElementById('guard-password').value;
+  const errEl = document.getElementById('guard-error');
+  const btn = document.getElementById('guard-btn');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis'; errEl.style.display = ''; return; }
+  btn.disabled = true; btn.textContent = '…';
+  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
+    .then(data => {
+      if (data.user.role !== 'admin') throw new Error('Ce compte n\'est pas administrateur.');
+      Auth.save(data.token, data.user);
+      checkAdmin();
+    })
+    .catch(e => {
+      errEl.textContent = e.message; errEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Se connecter →';
+    });
+});
+document.getElementById('guard-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('guard-btn').click();
+});
+
 async function init() {
-  if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
   loadArticles();
 }
 
@@ -516,7 +546,7 @@ function setPreviewWidth(mode) {
   document.getElementById('preview-btn-mobile').classList.toggle('btn-primary', mode === 'mobile');
 }
 
-init();
+checkAdmin();
 </script>
 </body>
 </html>
