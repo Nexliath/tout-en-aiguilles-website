@@ -488,7 +488,11 @@ p  { color: var(--text-light); }
 
 /* ─── Modals ─────────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; z-index: 1000;
+  /* z-index > #admin-guard (9999 inline, voir client/admin/*.html) : le
+     modal de connexion/MFA doit pouvoir s'afficher par-dessus la garde
+     admin quand il est déclenché depuis l'espace admin (voir
+     client/assets/js/admin-guard.js). */
+  position: fixed; inset: 0; z-index: 10000;
   background: rgba(58, 46, 40, 0.5); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
   padding: 20px; opacity: 0; pointer-events: none; transition: opacity var(--transition);
@@ -1121,7 +1125,34 @@ p  { color: var(--text-light); }
 
 /* ─── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 1024px) {
-  .header-search-wrap { display: none; }
+  /* Repliée en icône plutôt que masquée : la recherche restait auparavant
+     invisible sur mobile/tablette (>50% du trafic) sans aucune alternative.
+     Un tap sur l'icône ouvre la barre en overlay sous le header. */
+  .header-search-wrap {
+    flex: 0 0 auto; width: 40px; min-width: 0;
+  }
+  .header-search-wrap .header-search-input { display: none; }
+  .header-search-wrap .header-search-icon {
+    position: static; pointer-events: auto; cursor: pointer;
+    width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-size: 1.1rem; color: var(--text);
+    transition: background var(--transition);
+  }
+  .header-search-wrap .header-search-icon:hover { background: var(--rose-pale); }
+  .header-search-wrap.mobile-open {
+    position: absolute; left: 12px; right: 12px; top: calc(100% + 8px);
+    width: auto; z-index: 60;
+    background: white; border-radius: var(--radius-lg); border: 1px solid var(--border);
+    box-shadow: 0 16px 40px rgba(0,0,0,.14); padding: 10px;
+  }
+  .header-search-wrap.mobile-open .header-search-input {
+    display: block; padding-right: 38px;
+  }
+  .header-search-wrap.mobile-open .header-search-icon {
+    position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
+    width: auto; height: auto; pointer-events: none; background: none;
+  }
+  .header-search-wrap.mobile-open .header-search-dropdown { left: 0; right: 0; width: auto; }
   .grid-4    { grid-template-columns: repeat(3, 1fr); }
   .recently-viewed-grid { grid-template-columns: repeat(3, 1fr); }
   .news-grid { grid-template-columns: repeat(2, 1fr); }
