@@ -13,6 +13,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Produits — Admin Tout en Aiguilles</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -20,33 +21,29 @@
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
-<div class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
+<div id="admin-guard" style="display:none;position:fixed;inset:0;background:var(--cream);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:24px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(122,92,72,.15)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:3rem;margin-bottom:12px">🔐</div>
+      <h2 style="margin-bottom:8px">Espace admin</h2>
+      <p style="font-size:.875rem;color:var(--text-light)">Connectez-vous avec votre compte administrateur.</p>
+    </div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" id="guard-email" class="form-input" placeholder="victorine@..."></div>
+    <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" id="guard-password" class="form-input" placeholder="••••••••"></div>
+    <div id="guard-error" style="display:none;color:#d9534f;font-size:.85rem;margin-bottom:12px;padding:8px 12px;background:#f8d7da;border-radius:8px"></div>
+    <button id="guard-btn" class="btn btn-primary btn-block">Se connecter →</button>
   </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html">📊 Tableau de bord</a>
-      <a href="produits.html" class="active">🧶 Produits</a>
-      <a href="commandes.html">📦 Commandes</a>
-      <a href="actualites.html">📝 Actualités</a>
-      <a href="utilisateurs.html">👥 Utilisateurs</a>
-      <a href="avis.html">⭐ Avis</a>
-      <a href="promo.html">🏷️ Codes promo</a>
-      <a href="newsletter.html">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+</div>
+
+<div id="admin-content" class="admin-layout">
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <main class="admin-main">
     <div class="admin-header">
       <h1>Gestion des produits</h1>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="exportXLS()">📤 Exporter Excel</button>
         <button class="btn btn-secondary btn-sm" onclick="showImport()">📥 Importer Excel</button>
         <button class="btn btn-primary btn-sm" onclick="showForm()">+ Ajouter un produit</button>
       </div>
@@ -188,16 +185,27 @@
 
     <!-- ── Products table ── -->
     <div class="admin-table-wrap">
-      <div style="padding:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
-        <input type="text" id="search-products" class="form-input" style="max-width:280px" placeholder="Rechercher un produit…" oninput="filterTable()">
+      <div style="padding:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="search-products" class="form-input" style="max-width:280px" placeholder="Rechercher un produit…" oninput="filterTable()">
+          <button type="button" class="cat-chip" id="low-stock-chip" onclick="toggleLowStockFilter()">⚠️ Stock faible / épuisé</button>
+        </div>
         <span id="prod-count" style="font-size:.8rem;color:var(--text-light)"></span>
+      </div>
+      <!-- Barre d'actions groupées -->
+      <div id="bulk-bar" style="display:none;padding:10px 16px;background:var(--rose-pale);border-bottom:1px solid var(--border);align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="bulk-count" style="font-size:.82rem;font-weight:700;color:var(--rose-dark)"></span>
+        <button class="btn btn-secondary btn-sm" onclick="bulkSetActive(1)">✓ Activer</button>
+        <button class="btn btn-secondary btn-sm" onclick="bulkSetActive(0)">⏸ Désactiver</button>
+        <button class="btn btn-sm" style="background:#f8d7da;color:#d9534f;border:none" onclick="bulkDelete()">🗑️ Supprimer</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSelection()" style="margin-left:auto">Annuler la sélection</button>
       </div>
       <table class="admin-table">
         <thead>
-          <tr><th>Photo</th><th>Nom</th><th>Catégorie</th><th>Prix</th><th>Stock</th><th>Statut</th><th>Actions</th></tr>
+          <tr><th style="width:36px"><input type="checkbox" id="select-all-products" onchange="toggleSelectAll(this)"></th><th>Photo</th><th>Nom</th><th>Catégorie</th><th>Prix</th><th>Stock</th><th>Statut</th><th>Actions</th></tr>
         </thead>
         <tbody id="products-tbody">
-          <tr><td colspan="7" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -208,12 +216,50 @@
 <script>
 let allProducts = [];
 let categories  = [];
+let selectedIds = new Set();
+let lowStockOnly = false;
+const LOW_STOCK_THRESHOLD = 3;
 // Variantes : tableau local synchronisé avec l'API lors du save
 // { id, label, price, stock, is_active, imageFile, imagePreview, imageUrl, _delete }
 let _variantRows = [];
 
+function checkAdmin() {
+  const guard   = document.getElementById('admin-guard');
+  const content = document.getElementById('admin-content');
+  if (!Auth.isLoggedIn() || !Auth.isAdmin()) {
+    content.style.display = 'none';
+    guard.style.display   = 'flex';
+  } else {
+    guard.style.display   = 'none';
+    content.style.display = '';
+    init();
+  }
+}
+
+document.getElementById('guard-btn').addEventListener('click', function() {
+  const email = document.getElementById('guard-email').value.trim();
+  const password = document.getElementById('guard-password').value;
+  const errEl = document.getElementById('guard-error');
+  const btn = document.getElementById('guard-btn');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis'; errEl.style.display = ''; return; }
+  btn.disabled = true; btn.textContent = '…';
+  apiFetch('/auth/login', { method: 'POST', body: { email, password } })
+    .then(data => {
+      if (data.user.role !== 'admin') throw new Error('Ce compte n\'est pas administrateur.');
+      Auth.save(data.token, data.user);
+      checkAdmin();
+    })
+    .catch(e => {
+      errEl.textContent = e.message; errEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Se connecter →';
+    });
+});
+document.getElementById('guard-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('guard-btn').click();
+});
+
 async function init() {
-  if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
   await Promise.all([loadCategories(), loadProducts()]);
 }
 
@@ -264,14 +310,14 @@ async function loadProducts() {
     renderTable(allProducts);
     document.getElementById('prod-count').textContent = `${allProducts.length} produit${allProducts.length > 1 ? 's' : ''}`;
   } catch (e) {
-    document.getElementById('products-tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+    document.getElementById('products-tbody').innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
 }
 
 function renderTable(products) {
   const tbody = document.getElementById('products-tbody');
   if (!products.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-light)">Aucun produit. <a href="#" onclick="showForm()" style="color:var(--rose-dark)">Ajouter le premier →</a></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-light)">Aucun produit. <a href="#" onclick="showForm()" style="color:var(--rose-dark)">Ajouter le premier →</a></td></tr>';
     return;
   }
   tbody.innerHTML = products.map(p => {
@@ -279,6 +325,7 @@ function renderTable(products) {
       ? `<img src="${p.images[0]}" style="width:48px;height:48px;border-radius:8px;object-fit:cover" onerror="this.innerHTML='🧶'">`
       : '<div style="width:48px;height:48px;border-radius:8px;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🧶</div>';
     return `<tr data-name="${p.name.toLowerCase()}">
+      <td><input type="checkbox" class="product-select" data-id="${p.id}" ${selectedIds.has(p.id) ? 'checked' : ''} onchange="toggleSelect(${p.id}, this.checked)"></td>
       <td>${img}</td>
       <td>
         <div style="font-weight:700">${p.name}</div>
@@ -287,7 +334,7 @@ function renderTable(products) {
       <td style="font-size:.8rem;color:var(--text-light)">${p.category_name || '—'}</td>
       <td style="font-weight:700;color:var(--rose-dark)">${Number(p.price).toFixed(2)} €</td>
       <td>
-        <span style="font-weight:700;color:${p.stock === 0 ? '#d9534f' : p.stock < 3 ? '#856404' : 'var(--sage-dark)'}">${p.stock}</span>
+        <span style="font-weight:700;color:${p.stock === 0 ? '#d9534f' : p.stock < LOW_STOCK_THRESHOLD ? '#856404' : 'var(--sage-dark)'}">${p.stock}${p.stock === 0 ? ' — épuisé' : p.stock < LOW_STOCK_THRESHOLD ? ' — faible' : ''}</span>
       </td>
       <td>
         <span class="order-status ${p.is_active ? 'status-delivered' : 'status-cancelled'}">${p.is_active ? 'Actif' : 'Inactif'}</span>
@@ -300,12 +347,101 @@ function renderTable(products) {
       </td>
     </tr>`;
   }).join('');
+  updateBulkBar();
 }
 
 function filterTable() {
   const q = document.getElementById('search-products').value.toLowerCase();
-  const filtered = allProducts.filter(p => p.name.toLowerCase().includes(q) || (p.category_name || '').toLowerCase().includes(q));
+  let filtered = allProducts.filter(p => p.name.toLowerCase().includes(q) || (p.category_name || '').toLowerCase().includes(q));
+  if (lowStockOnly) filtered = filtered.filter(p => p.stock < LOW_STOCK_THRESHOLD);
   renderTable(filtered);
+}
+
+function toggleLowStockFilter() {
+  lowStockOnly = !lowStockOnly;
+  document.getElementById('low-stock-chip').classList.toggle('active', lowStockOnly);
+  filterTable();
+}
+
+// ── Sélection multiple / actions groupées ─────────────────────
+function toggleSelect(id, checked) {
+  if (checked) selectedIds.add(id); else selectedIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleSelectAll(checkbox) {
+  document.querySelectorAll('.product-select').forEach(cb => {
+    cb.checked = checkbox.checked;
+    const id = Number(cb.dataset.id);
+    if (checkbox.checked) selectedIds.add(id); else selectedIds.delete(id);
+  });
+  updateBulkBar();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.product-select').forEach(cb => cb.checked = false);
+  const selectAll = document.getElementById('select-all-products');
+  if (selectAll) selectAll.checked = false;
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  if (!bar) return;
+  if (selectedIds.size > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('bulk-count').textContent = `${selectedIds.size} produit${selectedIds.size > 1 ? 's' : ''} sélectionné${selectedIds.size > 1 ? 's' : ''}`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function bulkSetActive(active) {
+  if (!selectedIds.size) return;
+  const ids = [...selectedIds];
+  try {
+    for (const id of ids) {
+      const fd = new FormData();
+      fd.append('is_active', active ? '1' : '0');
+      await apiFetchForm(`/products/${id}`, fd, 'PUT');
+    }
+    Toast.show(`${ids.length} produit(s) ${active ? 'activé(s)' : 'désactivé(s)'} ✓`, 'success');
+    clearSelection();
+    loadProducts();
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+async function bulkDelete() {
+  if (!selectedIds.size) return;
+  if (!confirm(`Supprimer définitivement ${selectedIds.size} produit(s) ? Cette action est irréversible.`)) return;
+  const ids = [...selectedIds];
+  try {
+    for (const id of ids) {
+      await apiFetch(`/products/${id}`, { method: 'DELETE' });
+    }
+    Toast.show(`${ids.length} produit(s) supprimé(s) ✓`, 'success');
+    clearSelection();
+    loadProducts();
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+// ── Export Excel ────────────────────────────────────────────
+function exportXLS() {
+  if (!allProducts.length) { Toast.show('Aucun produit à exporter', 'info'); return; }
+  const rows = allProducts.map(p => ({
+    'ID': p.id, 'Nom': p.name, 'Catégorie': p.category_name || '',
+    'Prix (€)': Number(p.price), 'Stock': p.stock,
+    'Statut': p.is_active ? 'Actif' : 'Inactif',
+    'Mis en avant': p.is_featured ? 'Oui' : 'Non',
+    'Description': p.description || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:6},{wch:28},{wch:16},{wch:10},{wch:8},{wch:10},{wch:12},{wch:40}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Produits');
+  XLSX.writeFile(wb, `produits_${new Date().toISOString().split('T')[0]}.xlsx`);
+  Toast.show(`📤 ${allProducts.length} produit(s) exporté(s)`, 'success');
 }
 
 function showForm(title = 'Ajouter un produit') {
@@ -612,7 +748,7 @@ async function syncVariants(productId) {
   }
 }
 
-init();
+checkAdmin();
 </script>
 </body>
 </html>
