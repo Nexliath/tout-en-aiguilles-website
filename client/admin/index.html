@@ -178,42 +178,7 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
-function checkAdmin() {
-  const guard   = document.getElementById('admin-guard');
-  const content = document.getElementById('admin-content');
-  if (!Auth.isLoggedIn() || !Auth.isAdmin()) {
-    content.style.display = 'none';
-    guard.style.display   = 'flex';
-  } else {
-    guard.style.display   = 'none';
-    content.style.display = '';
-    loadDashboard();
-  }
-}
-
-// Login depuis la garde admin
-document.getElementById('guard-btn').addEventListener('click', function() {
-  var email    = document.getElementById('guard-email').value.trim();
-  var password = document.getElementById('guard-password').value;
-  var errEl    = document.getElementById('guard-error');
-  var btn      = document.getElementById('guard-btn');
-  errEl.style.display = 'none';
-  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis'; errEl.style.display = ''; return; }
-  btn.disabled = true; btn.textContent = '…';
-  apiFetch('/auth/login', { method: 'POST', body: { email: email, password: password } })
-    .then(function(data) {
-      if (data.user.role !== 'admin') throw new Error('Ce compte n\'est pas administrateur.');
-      Auth.save(data.token, data.user);
-      checkAdmin();
-    })
-    .catch(function(e) {
-      errEl.textContent = e.message; errEl.style.display = '';
-      btn.disabled = false; btn.textContent = 'Se connecter →';
-    });
-});
-document.getElementById('guard-password').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') document.getElementById('guard-btn').click();
-});
+window.ADMIN_ON_READY = function() { loadDashboard(); };
 
 // ─── Gestion de la période ────────────────────────────────────
 let _allOrders  = [];
@@ -415,8 +380,7 @@ async function loadActivityLog() {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
 }
-
-checkAdmin();
 </script>
+<script src="/assets/js/admin-guard.js"></script>
 </body>
 </html>
