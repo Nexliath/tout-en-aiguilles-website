@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { authenticator } = require('otplib');
+const qrcode = require('qrcode');
 const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
 const { sendVerificationEmail, sendEmailChangeConfirmation, sendPasswordResetEmail } = require('../utils/email');
@@ -42,6 +44,53 @@ function resetTokenExpiresAt() {
   const d = new Date();
   d.setHours(d.getHours() + 1);
   return d.toISOString();
+}
+
+// ─── MFA (TOTP) — helpers ──────────────────────────────────────
+// Deux types de tokens temporaires, distincts d'un token de session normal
+// (voir champ "purpose", rejeté explicitement par requireAuth) :
+//  - mfa_challenge : émis après mot de passe correct quand le MFA est déjà
+//    actif, doit être échangé contre un vrai token via /mfa/verify.
+//  - mfa_setup : émis après mot de passe correct pour un compte admin SANS
+//    MFA actif — force l'activation avant de délivrer un token de session.
+function signPurposeToken(userId, purpose, expiresIn) {
+  return jwt.sign({ id: userId, purpose }, JWT_SECRET, { expiresIn });
+}
+function verifyPurposeToken(token, expectedPurpose) {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.purpose !== expectedPurpose) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+function generateRecoveryCodes() {
+  const plain = [];
+  const hashed = [];
+  for (let i = 0; i < 10; i++) {
+    const code = crypto.randomBytes(5).toString('hex'); // 10 caractères hex
+    plain.push(code);
+    hashed.push(bcrypt.hashSync(code, 10));
+  }
+  return { plain, hashed };
+}
+// Émet le vrai token de session (utilisé après login direct, après
+// vérification MFA réussie, ou après activation forcée du MFA admin).
+function issueSession(user, res) {
+  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+  const { password_hash, mfa_secret, mfa_recovery_codes, ...safe } = user;
+  safe.mfa_enabled = !!user.mfa_enabled;
+
+  if (user.role === 'admin') {
+    res.cookie('tea_admin_sess', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours
+    });
+  }
+  return { token, user: safe };
 }
 
 // ─── POST /api/auth/register ────────────────────────────────
@@ -147,20 +196,137 @@ router.post('/login', (req, res) => {
     });
   }
 
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-  const { password_hash, ...safe } = user;
-
-  // Cookie httpOnly pour l'accès au backoffice (admin uniquement)
-  if (user.role === 'admin') {
-    res.cookie('tea_admin_sess', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours
-    });
+  // MFA déjà actif → mot de passe correct mais pas de token final tant que
+  // le code à 6 chiffres n'est pas vérifié (voir /mfa/verify).
+  if (user.mfa_enabled) {
+    const mfaToken = signPurposeToken(user.id, 'mfa_challenge', '5m');
+    return res.json({ mfa_required: true, mfa_token: mfaToken });
   }
 
+  // MFA non actif mais compte admin → activation obligatoire avant tout
+  // accès. Impossible d'obtenir un token de session admin sans être passé
+  // par l'écran d'activation (voir /mfa/setup/init puis /mfa/setup/confirm).
+  if (user.role === 'admin') {
+    const setupToken = signPurposeToken(user.id, 'mfa_setup', '15m');
+    return res.json({ mfa_setup_required: true, setup_token: setupToken });
+  }
+
+  const { token, user: safe } = issueSession(user, res);
   res.json({ token, user: safe });
+});
+
+// ─── MFA (TOTP) ──────────────────────────────────────────────
+
+// Résout l'utilisateur ciblé par une requête MFA : soit via un token de
+// finalité limitée (setup en cours / défi de connexion), soit via un
+// Authorization Bearer classique (auto-activation volontaire depuis "Mon
+// compte" pour un utilisateur déjà connecté).
+function resolveMfaUser(req, expectedPurpose) {
+  const { setup_token, mfa_token } = req.body;
+  const purposeToken = expectedPurpose === 'mfa_setup' ? setup_token : mfa_token;
+  if (purposeToken) {
+    const payload = verifyPurposeToken(purposeToken, expectedPurpose);
+    if (!payload) return null;
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+  }
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(auth.slice(7), JWT_SECRET);
+      if (payload.purpose) return null; // pas un vrai token de session
+      return db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+    } catch { return null; }
+  }
+  return null;
+}
+
+// POST /api/auth/mfa/setup/init — génère (ou régénère) un secret TOTP en
+// attente de confirmation. Accessible via setup_token (activation forcée
+// admin) ou via un token de session classique (auto-activation volontaire).
+router.post('/mfa/setup/init', async (req, res) => {
+  const user = resolveMfaUser(req, 'mfa_setup');
+  if (!user) return res.status(401).json({ error: 'Session invalide ou expirée, reconnectez-vous.' });
+
+  const secret = authenticator.generateSecret();
+  db.prepare('UPDATE users SET mfa_secret = ? WHERE id = ?').run(secret, user.id);
+
+  const uri = authenticator.keyuri(user.email, 'Tout en Aiguilles', secret);
+  try {
+    const qr = await qrcode.toDataURL(uri);
+    res.json({ secret, qr, otpauth_uri: uri });
+  } catch (e) {
+    console.error('Erreur génération QR MFA:', e.message);
+    res.status(500).json({ error: 'Erreur lors de la génération du QR code' });
+  }
+});
+
+// POST /api/auth/mfa/setup/confirm — vérifie le premier code et active le
+// MFA. Renvoie le token de session final + les codes de récupération
+// (affichés une seule fois, à noter par l'utilisateur).
+router.post('/mfa/setup/confirm', (req, res) => {
+  const user = resolveMfaUser(req, 'mfa_setup');
+  if (!user) return res.status(401).json({ error: 'Session invalide ou expirée, reconnectez-vous.' });
+
+  const { code } = req.body;
+  if (!user.mfa_secret) return res.status(400).json({ error: "Aucune activation en cours — relancez la configuration." });
+  if (!code || !authenticator.check(String(code).trim(), user.mfa_secret)) {
+    return res.status(400).json({ error: 'Code invalide. Vérifiez l\'heure de votre téléphone et réessayez.' });
+  }
+
+  const { plain, hashed } = generateRecoveryCodes();
+  db.prepare('UPDATE users SET mfa_enabled = 1, mfa_recovery_codes = ? WHERE id = ?').run(JSON.stringify(hashed), user.id);
+
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  const { token, user: safe } = issueSession(updated, res);
+  res.json({ token, user: safe, recovery_codes: plain });
+});
+
+// POST /api/auth/mfa/verify — défi de connexion pour un compte ayant déjà
+// le MFA actif. Accepte un code TOTP à 6 chiffres OU un code de récupération.
+router.post('/mfa/verify', (req, res) => {
+  const { mfa_token, code, recovery_code } = req.body;
+  const payload = verifyPurposeToken(mfa_token, 'mfa_challenge');
+  if (!payload) return res.status(401).json({ error: 'Session de connexion expirée, reconnectez-vous.' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+  if (!user || !user.mfa_enabled) return res.status(401).json({ error: 'Session invalide.' });
+
+  if (code) {
+    if (!authenticator.check(String(code).trim(), user.mfa_secret)) {
+      return res.status(400).json({ error: 'Code invalide.' });
+    }
+  } else if (recovery_code) {
+    const hashed = JSON.parse(user.mfa_recovery_codes || '[]');
+    const idx = hashed.findIndex(h => bcrypt.compareSync(String(recovery_code).trim(), h));
+    if (idx === -1) return res.status(400).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
+    hashed.splice(idx, 1); // usage unique
+    db.prepare('UPDATE users SET mfa_recovery_codes = ? WHERE id = ?').run(JSON.stringify(hashed), user.id);
+  } else {
+    return res.status(400).json({ error: 'Code requis.' });
+  }
+
+  const { token, user: safe } = issueSession(user, res);
+  res.json({ token, user: safe });
+});
+
+// POST /api/auth/mfa/disable — désactivation volontaire (mot de passe +
+// code requis). Pour un compte admin, le MFA sera simplement redemandé à
+// la prochaine connexion (voir /login) — pas de contournement possible.
+router.post('/mfa/disable', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+  if (!user.mfa_enabled) return res.status(400).json({ error: 'Le MFA n\'est pas activé sur ce compte.' });
+
+  const { password, code } = req.body;
+  if (!password || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Mot de passe incorrect.' });
+  }
+  if (!code || !authenticator.check(String(code).trim(), user.mfa_secret)) {
+    return res.status(400).json({ error: 'Code de vérification invalide.' });
+  }
+
+  db.prepare('UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_recovery_codes = NULL WHERE id = ?').run(user.id);
+  res.json({ message: 'Double authentification désactivée.' });
 });
 
 // ─── POST /api/auth/forgot-password ─────────────────────────
@@ -250,8 +416,9 @@ router.post('/admin-cookie', (req, res) => {
 
 // ─── GET /api/auth/me ───────────────────────────────────────
 router.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT id, email, first_name, last_name, username, role, email_verified, created_at, avatar_url, newsletter_opt_out FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, email, first_name, last_name, username, role, email_verified, created_at, avatar_url, newsletter_opt_out, mfa_enabled FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+  user.mfa_enabled = !!user.mfa_enabled;
   res.json(user);
 });
 
