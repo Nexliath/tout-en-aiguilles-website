@@ -218,6 +218,12 @@ const migrations = [
   // risquer un timeout HTTP sur une grosse liste ; 'completed' par défaut
   // pour les campagnes historiques (déjà terminées avant cette migration).
   "ALTER TABLE newsletter_campaigns ADD COLUMN status TEXT DEFAULT 'completed'",
+  // Index manquants sur des colonnes filtrées/jointes fréquemment (historique
+  // de commandes client, recherche de commande invité par email, filtre par
+  // statut admin) — sans eux chaque requête fait un scan complet de la table.
+  "CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)",
+  "CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(email)",
+  "CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)",
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
