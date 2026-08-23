@@ -353,7 +353,8 @@
           </div>
           <div class="form-group">
             <label class="form-label">Photo d'inspiration <span style="color:var(--text-light);font-weight:400">(optionnel)</span></label>
-            <input type="file" class="form-input" id="co-photo" accept="image/*">
+            <input type="file" class="form-input" id="co-photo" accept="image/*" onchange="checkCustomOrderPhotoSize(this)">
+            <div style="font-size:.75rem;color:var(--text-light);margin-top:4px">8 Mo maximum</div>
           </div>
         </div>
         <div class="form-group"><label class="form-label">Message</label><textarea class="form-textarea" id="contact-msg" placeholder="Bonjour, je souhaiterais commander un doudou personnalisé…"></textarea></div>
@@ -521,12 +522,31 @@ function toggleCustomOrderFields() {
     : 'Bonjour, je souhaiterais commander un doudou personnalisé…';
 }
 
+const CUSTOM_ORDER_MAX_PHOTO_SIZE = 8 * 1024 * 1024; // doit rester aligné avec la limite multer côté serveur (server/index.js)
+
+// Avertit immédiatement si la photo choisie dépasse la limite serveur, au
+// lieu de laisser l'utilisateur attendre la fin de l'upload (potentiellement
+// long sur mobile) pour découvrir que ça a échoué côté serveur.
+function checkCustomOrderPhotoSize(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > CUSTOM_ORDER_MAX_PHOTO_SIZE) {
+    Toast.show(`Photo trop lourde (${(file.size / 1024 / 1024).toFixed(1)} Mo) — 8 Mo maximum. Choisissez une image plus légère.`, 'error');
+    input.value = '';
+  }
+}
+
 async function sendContact() {
   const name = document.getElementById('contact-name').value.trim();
   const email = document.getElementById('contact-email').value.trim();
   const msg = document.getElementById('contact-msg').value.trim();
   const isCustomOrder = document.getElementById('contact-is-custom-order').checked;
   if (!name || !email || (!isCustomOrder && !msg)) { Toast.show('Veuillez remplir tous les champs', 'error'); return; }
+  const co = document.getElementById('co-photo');
+  if (isCustomOrder && co && co.files[0] && co.files[0].size > CUSTOM_ORDER_MAX_PHOTO_SIZE) {
+    Toast.show('Photo trop lourde (8 Mo maximum) — choisissez une image plus légère.', 'error');
+    return;
+  }
   // Anti-bot: honeypot check
   const hp = document.querySelector('input[name="website"]');
   if (hp && hp.value) return;
