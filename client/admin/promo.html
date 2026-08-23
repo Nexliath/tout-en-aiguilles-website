@@ -28,9 +28,9 @@
       <div id="promo-count" style="font-size:.85rem;color:var(--text-light)"></div>
     </div>
 
-    <!-- Formulaire création -->
+    <!-- Formulaire création / édition -->
     <div class="admin-panel" style="margin-bottom:24px">
-      <div class="admin-panel-title">➕ Nouveau code promo</div>
+      <div class="admin-panel-title" id="form-title">➕ Nouveau code promo</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
         <div class="form-group" style="margin:0">
           <label class="form-label">Code *</label>
@@ -38,14 +38,15 @@
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label">Type</label>
-          <select id="f-type" class="form-select">
+          <select id="f-type" class="form-select" onchange="onTypeChange()">
             <option value="percent">Pourcentage (%)</option>
             <option value="amount">Montant fixe (€)</option>
           </select>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label">Valeur *</label>
-          <input type="number" id="f-value" class="form-input" placeholder="10" min="0" step="0.01">
+          <input type="number" id="f-value" class="form-input" placeholder="10" min="0" step="0.01" max="100">
+          <p class="form-hint" id="f-value-hint" style="display:none">Un pourcentage ne peut pas dépasser 100</p>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label">Commande min (€)</label>
@@ -65,7 +66,10 @@
         <input type="text" id="f-desc" class="form-input" placeholder="Ex: -10% pour les nouveaux clients">
       </div>
       <div id="promo-error" class="form-error" style="display:none;margin-bottom:12px"></div>
-      <button class="btn btn-primary" onclick="createPromo()">Créer le code promo</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" id="save-promo-btn" onclick="savePromo()">Créer le code promo</button>
+        <button class="btn btn-ghost" id="cancel-edit-btn" style="display:none" onclick="cancelEditPromo()">Annuler la modification</button>
+      </div>
     </div>
 
     <!-- Panneau utilisation -->
@@ -143,6 +147,7 @@ function renderPromos() {
       </td>
       <td>
         <button class="btn btn-ghost btn-sm" onclick="showUsage(${p.id}, '${p.code}')" style="font-size:.75rem">📊 Utilisation</button>
+        <button class="btn btn-ghost btn-sm" onclick="editPromo(${p.id})" style="font-size:.75rem">✏️ Modifier</button>
         <button class="btn btn-ghost btn-sm" onclick="togglePromo(${p.id}, ${p.is_active})" style="font-size:.75rem">${p.is_active ? 'Désactiver' : 'Activer'}</button>
         <button class="btn btn-ghost btn-sm" onclick="deletePromo(${p.id})" style="font-size:.75rem;color:#d9534f">Supprimer</button>
       </td>
@@ -150,23 +155,71 @@ function renderPromos() {
   }).join('');
 }
 
-async function createPromo() {
+// ─── Création / édition (formulaire partagé) ────────────────
+let editingPromoId = null;
+
+function onTypeChange() {
+  const isPercent = document.getElementById('f-type').value === 'percent';
+  document.getElementById('f-value').max = isPercent ? '100' : '';
+  document.getElementById('f-value-hint').style.display = isPercent ? '' : 'none';
+}
+
+function editPromo(id) {
+  const p = allPromos.find(x => x.id === id);
+  if (!p) return;
+  editingPromoId = id;
+  document.getElementById('form-title').textContent = `✏️ Modifier le code ${p.code}`;
+  document.getElementById('f-code').value = p.code;
+  document.getElementById('f-code').disabled = true; // le code n'est pas modifiable une fois créé (historique d'usage lié)
+  document.getElementById('f-type').value = p.discount_type;
+  document.getElementById('f-value').value = p.value;
+  document.getElementById('f-min').value = p.min_order || '';
+  document.getElementById('f-max').value = p.max_uses || '';
+  document.getElementById('f-expires').value = p.expires_at ? p.expires_at.slice(0, 10) : '';
+  document.getElementById('f-desc').value = p.description || '';
+  onTypeChange();
+  document.getElementById('save-promo-btn').textContent = 'Enregistrer les modifications';
+  document.getElementById('cancel-edit-btn').style.display = '';
+  document.getElementById('form-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEditPromo() {
+  editingPromoId = null;
+  document.getElementById('form-title').textContent = '➕ Nouveau code promo';
+  document.getElementById('f-code').disabled = false;
+  ['f-code','f-value','f-min','f-max','f-expires','f-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-type').value = 'percent';
+  onTypeChange();
+  document.getElementById('save-promo-btn').textContent = 'Créer le code promo';
+  document.getElementById('cancel-edit-btn').style.display = 'none';
+  document.getElementById('promo-error').style.display = 'none';
+}
+
+async function savePromo() {
   const code = document.getElementById('f-code').value.trim().toUpperCase();
   const value = parseFloat(document.getElementById('f-value').value);
+  const discount_type = document.getElementById('f-type').value;
   const errEl = document.getElementById('promo-error');
   errEl.style.display = 'none';
   if (!code || !value) { errEl.textContent = 'Code et valeur requis'; errEl.style.display = ''; return; }
+  if (discount_type === 'percent' && value > 100) { errEl.textContent = 'Un pourcentage ne peut pas dépasser 100'; errEl.style.display = ''; return; }
+  const body = {
+    code, value, discount_type,
+    min_order: parseFloat(document.getElementById('f-min').value) || 0,
+    max_uses: document.getElementById('f-max').value || null,
+    expires_at: document.getElementById('f-expires').value || null,
+    description: document.getElementById('f-desc').value.trim(),
+  };
   try {
-    await apiFetch('/promo', { method: 'POST', body: {
-      code, value,
-      discount_type: document.getElementById('f-type').value,
-      min_order: parseFloat(document.getElementById('f-min').value) || 0,
-      max_uses: document.getElementById('f-max').value || null,
-      expires_at: document.getElementById('f-expires').value || null,
-      description: document.getElementById('f-desc').value.trim(),
-    }});
-    Toast.show('✅ Code promo créé !', 'success');
-    ['f-code','f-value','f-min','f-max','f-expires','f-desc'].forEach(id => document.getElementById(id).value = '');
+    if (editingPromoId) {
+      await apiFetch(`/promo/${editingPromoId}`, { method: 'PUT', body });
+      Toast.show('✅ Code promo modifié !', 'success');
+      cancelEditPromo();
+    } else {
+      await apiFetch('/promo', { method: 'POST', body });
+      Toast.show('✅ Code promo créé !', 'success');
+      ['f-code','f-value','f-min','f-max','f-expires','f-desc'].forEach(id => document.getElementById(id).value = '');
+    }
     await loadPromos();
   } catch(e) { errEl.textContent = e.message; errEl.style.display = ''; }
 }
@@ -199,15 +252,19 @@ async function showUsage(id, code) {
 }
 
 async function togglePromo(id, isActive) {
-  await apiFetch(`/promo/${id}`, { method: 'PUT', body: { is_active: !isActive } });
-  await loadPromos();
+  try {
+    await apiFetch(`/promo/${id}`, { method: 'PUT', body: { is_active: !isActive } });
+    await loadPromos();
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 async function deletePromo(id) {
   if (!confirm('Supprimer ce code promo ?')) return;
-  await apiFetch(`/promo/${id}`, { method: 'DELETE', body: {} });
-  Toast.show('Code supprimé', 'success');
-  await loadPromos();
+  try {
+    await apiFetch(`/promo/${id}`, { method: 'DELETE', body: {} });
+    Toast.show('Code supprimé', 'success');
+    await loadPromos();
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 checkAdmin();
