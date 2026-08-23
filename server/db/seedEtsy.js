@@ -8,6 +8,13 @@ function slugify(str) {
 }
 
 function seedEtsyProducts(db) {
+  // ── Guard : ne seeder qu'une seule fois ──────────────────────
+  // Sans ce guard, chaque redéploiement Railway réinsère les produits
+  // supprimés par l'admin (le check par nom ne suffit pas si le produit a été effacé).
+  db.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)`).run();
+  const alreadySeeded = db.prepare(`SELECT value FROM app_settings WHERE key = 'etsy_seed_done'`).get();
+  if (alreadySeeded) return;
+
   // ── Catégories ────────────────────────────────────────────────
   const cats = [
     { name: 'Doudous & Peluches', slug: 'doudous-peluches', type: 'crochet' },
@@ -344,12 +351,10 @@ Offrez un cadeau de naissance à la fois chaleureux, utile et responsable avec c
   ];
 
   // ── Insertion des produits ────────────────────────────────────
-  // seeded_keys : une fois seedé, jamais réinséré même si l'admin supprime le produit
   let inserted = 0;
   for (const p of products) {
-    const seedKey = 'product:' + p.name;
-    const alreadySeeded = db.prepare('SELECT key FROM seeded_keys WHERE key = ?').get(seedKey);
-    if (alreadySeeded) continue; // déjà seedé une fois, même si supprimé depuis
+    const exists = db.prepare('SELECT id FROM products WHERE name = ?').get(p.name);
+    if (exists) continue; // ne pas dupliquer
 
     const catId = getCatId(p.category_slug);
     const slug = slugify(p.name) + '-etsy-' + Date.now() + Math.random().toString(36).slice(2,5);
@@ -366,8 +371,6 @@ Offrez un cadeau de naissance à la fois chaleureux, utile et responsable avec c
         p.variant_group_id || null,
         p.variant_label || null
       );
-      // Marquer comme seedé pour ne jamais réinsérer
-      try { db.prepare('INSERT OR IGNORE INTO seeded_keys (key) VALUES (?)').run(seedKey); } catch {}
       inserted++;
     } catch(e) { console.error(`Seed product error (${p.name}):`, e.message); }
   }
@@ -375,6 +378,10 @@ Offrez un cadeau de naissance à la fois chaleureux, utile et responsable avec c
 
   // ── Migration des avis Etsy ────────────────────────────────────
   seedEtsyReviews(db);
+
+  // ── Marquer le seed comme effectué (ne plus rejouer au prochain démarrage) ──
+  db.prepare(`INSERT OR REPLACE INTO app_settings (key, value) VALUES ('etsy_seed_done', '1')`).run();
+  console.log('✅ Seed Etsy terminé — flag posé, ne sera plus rejoué');
 }
 
 function seedEtsyReviews(db) {
@@ -433,10 +440,11 @@ function seedEtsyReviews(db) {
     const product = db.prepare('SELECT id FROM products WHERE name = ?').get(r.product_name);
     if (!product) continue;
 
-    // Vérifier via seeded_keys (résistant aux suppressions)
-    const reviewKey = 'review:' + r.product_name + ':' + r.comment.slice(0, 30);
-    const alreadySeeded = db.prepare('SELECT key FROM seeded_keys WHERE key = ?').get(reviewKey);
-    if (alreadySeeded) continue;
+    // Vérifier si un avis identique existe déjà
+    const existingReview = db.prepare(
+      'SELECT id FROM reviews WHERE product_id = ? AND comment = ?'
+    ).get(product.id, r.comment);
+    if (existingReview) continue;
 
     try {
       // Insérer avec un user_id fictif différent pour chaque avis (évite la contrainte UNIQUE product_id+user_id)
@@ -445,7 +453,6 @@ function seedEtsyReviews(db) {
         INSERT INTO reviews (product_id, user_id, rating, comment, is_approved, created_at)
         VALUES (?, ?, ?, ?, 1, ?)
       `).run(product.id, -(reviewsInserted + 1), r.rating, r.comment, r.created_at + ' 10:00:00');
-      try { db.prepare('INSERT OR IGNORE INTO seeded_keys (key) VALUES (?)').run(reviewKey); } catch {}
       reviewsInserted++;
     } catch(e) {
       // Si contrainte unique, essayer avec un autre user_id
@@ -454,7 +461,6 @@ function seedEtsyReviews(db) {
           INSERT OR IGNORE INTO reviews (product_id, user_id, rating, comment, is_approved, created_at)
           VALUES (?, ?, ?, ?, 1, ?)
         `).run(product.id, -(Date.now() + reviewsInserted), r.rating, r.comment, r.created_at + ' 10:00:00');
-        try { db.prepare('INSERT OR IGNORE INTO seeded_keys (key) VALUES (?)').run(reviewKey); } catch {}
         reviewsInserted++;
       } catch(e2) {}
     }
