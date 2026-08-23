@@ -89,6 +89,7 @@
   </div>
 </footer>
 
+<script src="/assets/js/main.js"></script>
 <script>
 (async () => {
   const params = new URLSearchParams(window.location.search);
@@ -108,10 +109,13 @@
       return;
     }
 
-    // Connecter l'utilisateur automatiquement
+    // Connecter l'utilisateur automatiquement — avant cette correction, les
+    // clés localStorage utilisées ici ('auth_token'/'auth_user') ne
+    // correspondaient pas à celles lues par Auth dans main.js ('tea_token'/
+    // 'tea_user') : la page affichait "connecté(e)" mais Auth.isLoggedIn()
+    // restait faux, laissant le client dans un état incohérent.
     if (data.token) {
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
+      Auth.save(data.token, data.user);
     }
 
     document.getElementById('state-loading').style.display = 'none';
