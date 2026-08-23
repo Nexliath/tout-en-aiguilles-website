@@ -83,7 +83,7 @@ async function loadOrder() {
         <div style="width:44px;height:44px;border-radius:8px;background:var(--cream-dark);overflow:hidden;flex-shrink:0">
           ${i.image ? `<img src="${i.image}" style="width:100%;height:100%;object-fit:cover" alt="${i.name}">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">🧶</div>'}
         </div>
-        <div style="flex:1"><div style="font-weight:700;font-size:.9rem">${i.name}</div><div style="font-size:.8rem;color:var(--text-light)">× ${i.qty} — ${Number(i.price).toFixed(2)} €/unité</div></div>
+        <div style="flex:1"><div style="font-weight:700;font-size:.9rem">${i.name}${i.variant_label ? ` <span style="font-weight:400;color:var(--text-light)">— ${i.variant_label}</span>` : ''}</div><div style="font-size:.8rem;color:var(--text-light)">× ${i.qty} — ${Number(i.price).toFixed(2)} €/unité</div></div>
         <div style="font-weight:700;color:var(--rose-dark)">${(i.qty * i.price).toFixed(2)} €</div>
       </div>`).join('');
 
