@@ -29,6 +29,8 @@
     #f-content .img-row img { width:100%;height:140px;object-fit:cover;border-radius:8px }
     #f-content blockquote { border-left:3px solid var(--rose);padding:12px 16px;margin:16px 0;background:var(--rose-pale);border-radius:0 8px 8px 0;font-style:italic;color:var(--rose-dark) }
     .editor-counter { font-size:.75rem;color:var(--text-light);margin-left:auto;padding:0 6px;white-space:nowrap }
+    #f-content img { cursor:pointer; transition:outline .15s ease }
+    #f-content img.editor-img-selected { outline:3px solid var(--rose-dark); outline-offset:2px; border-radius:4px }
   </style>
 </head>
 <body>
@@ -145,16 +147,26 @@
           <div class="editor-sep"></div>
           <button class="editor-btn" onclick="insertLink()" title="Lien">🔗</button>
           <div class="editor-sep"></div>
-          <button class="editor-btn" onclick="openImageInserter('full')" title="Image pleine largeur">🖼️ Pleine</button>
+          <button class="editor-btn" onclick="openImageInserter('small')" title="Image petite, centrée">🖼️ Petite</button>
           <button class="editor-btn" onclick="openImageInserter('medium')" title="Image moyenne centrée">🖼️ Moyenne</button>
+          <button class="editor-btn" onclick="openImageInserter('full')" title="Image pleine largeur">🖼️ Pleine</button>
           <button class="editor-btn" onclick="openImageInserter('row')" title="Deux images côte à côte">🖼️🖼️ Côte à côte</button>
           <div class="editor-sep"></div>
           <button class="editor-btn" onclick="fmt('removeFormat')" title="Supprimer la mise en forme" style="font-size:.72rem;color:var(--text-light)">Ø</button>
           <span class="editor-counter" id="word-count">0 mots</span>
         </div>
         <div id="f-content" contenteditable="true" oninput="updateWordCount()"></div>
-        <div style="margin-top:10px">
+        <div id="img-select-toolbar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding:8px 12px;background:var(--rose-pale);border-radius:8px;font-size:.82rem">
+          <span style="font-weight:700">🖼️ Image sélectionnée :</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setSelectedImageSize('small')">Petite</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setSelectedImageSize('medium')">Moyenne</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setSelectedImageSize('full')">Pleine largeur</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="deleteSelectedImage()" style="color:#d9534f">🗑 Supprimer</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="deselectImage()">Fermer</button>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" class="btn btn-secondary btn-sm" onclick="openFullPreview()">👁 Aperçu complet côté client</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="cleanupArticleImages()" title="Range proprement les images collées sans mise en forme (utile pour les anciens articles)">🧹 Réorganiser les images</button>
         </div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:20px">
@@ -414,6 +426,7 @@ function showForm(title = 'Écrire un article') {
 }
 
 function hideForm() {
+  deselectImage();
   document.getElementById('article-form-panel').style.display = 'none';
   document.getElementById('edit-art-id').value = '';
   document.getElementById('f-title').value = '';
@@ -684,7 +697,8 @@ async function handleImageInsertFile(input) {
       _rowImages = [];
     } else {
       const caption = prompt('Légende de l\'image (optionnel) :', '') || '';
-      const cls = _pendingImageLayout === 'medium' ? ' class="img-medium"' : '';
+      const cls = _pendingImageLayout === 'medium' ? ' class="img-medium"'
+                : _pendingImageLayout === 'small' ? ' class="img-small"' : '';
       restoreSelection();
       document.execCommand('insertHTML', false,
         `<figure${cls}><img src="${url}" alt="${caption}">${caption ? `<figcaption>${caption}</figcaption>` : ''}</figure><p><br></p>`);
@@ -693,6 +707,93 @@ async function handleImageInsertFile(input) {
   } catch (e) {
     Toast.show('Erreur upload image : ' + e.message, 'error');
   }
+}
+
+// ─── Sélection et redimensionnement d'une image déjà insérée ─────
+// Clic sur une image du contenu → petite barre d'outils pour changer sa
+// taille après coup (Petite / Moyenne / Pleine) ou la supprimer, sans
+// avoir à la supprimer et la réinsérer — comme sur Medium/Substack.
+let _selectedImg = null;
+
+document.getElementById('f-content').addEventListener('click', function(e) {
+  const img = e.target.closest('img');
+  if (img && this.contains(img)) {
+    selectImage(img);
+  } else {
+    deselectImage();
+  }
+});
+
+function selectImage(img) {
+  if (_selectedImg) _selectedImg.classList.remove('editor-img-selected');
+  _selectedImg = img;
+  img.classList.add('editor-img-selected');
+  document.getElementById('img-select-toolbar').style.display = 'flex';
+}
+
+function deselectImage() {
+  if (_selectedImg) _selectedImg.classList.remove('editor-img-selected');
+  _selectedImg = null;
+  const toolbar = document.getElementById('img-select-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
+}
+
+function setSelectedImageSize(size) {
+  if (!_selectedImg) return;
+  let figure = _selectedImg.closest('figure');
+  const inRow = figure && figure.parentElement && figure.parentElement.classList.contains('img-row');
+  if (!figure || inRow) {
+    // Image "côte à côte" ou collée sans figure : on l'extrait dans sa propre figure
+    const newFigure = document.createElement('figure');
+    _selectedImg.parentNode.insertBefore(newFigure, _selectedImg);
+    newFigure.appendChild(_selectedImg);
+    if (inRow) {
+      const row = figure.parentElement;
+      row.parentNode.insertBefore(newFigure, row);
+      if (!figure.querySelector('img')) figure.remove();
+      if (!row.querySelector('img')) row.remove();
+    }
+    figure = newFigure;
+  }
+  figure.classList.remove('img-medium', 'img-small');
+  if (size === 'medium') figure.classList.add('img-medium');
+  if (size === 'small') figure.classList.add('img-small');
+  updateWordCount();
+  Toast.show('Taille mise à jour ✓', 'success');
+}
+
+function deleteSelectedImage() {
+  if (!_selectedImg) return;
+  if (!confirm('Supprimer cette image de l\'article ?')) return;
+  const figure = _selectedImg.closest('figure');
+  const row = figure ? figure.closest('.img-row') : null;
+  (figure || _selectedImg).remove();
+  if (row && !row.querySelector('img')) row.remove();
+  deselectImage();
+  updateWordCount();
+}
+
+// ─── Nettoyage automatique des images mal disposées ───────────────
+// Utile pour les anciens articles : range en un clic les images collées
+// sans mise en forme (balise <img> nue) en mise en page "Moyenne".
+function cleanupArticleImages() {
+  deselectImage();
+  const box = document.getElementById('f-content');
+  const imgs = Array.from(box.querySelectorAll('img'));
+  let fixed = 0;
+  imgs.forEach(img => {
+    if (!img.closest('figure')) {
+      const figure = document.createElement('figure');
+      figure.className = 'img-medium';
+      img.parentNode.insertBefore(figure, img);
+      figure.appendChild(img);
+      fixed++;
+    }
+  });
+  updateWordCount();
+  Toast.show(fixed
+    ? `${fixed} image(s) réorganisée(s) en taille "Moyenne" ✓ — pensez à enregistrer l'article`
+    : 'Toutes les images sont déjà bien mises en page ✓', fixed ? 'success' : 'info');
 }
 
 function insertBlockquote() {
