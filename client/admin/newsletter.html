@@ -144,7 +144,14 @@ async function loadSubscribers() {
         <td style="font-size:.85rem">${s.first_name || '—'}</td>
         <td style="font-size:.78rem;color:var(--text-light)">${new Date(s.subscribed_at).toLocaleDateString('fr-FR')}</td>
       </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-light)">Aucun subscriber</td></tr>';
-  } catch(e) { Toast.show(e.message, 'error'); }
+  } catch(e) {
+    // Avant cette correction, une erreur ici laissait le tableau bloqué sur
+    // son spinner indéfiniment (contrairement à loadCampaigns() plus bas,
+    // qui affiche bien un message dans son tableau en cas d'échec).
+    Toast.show(e.message, 'error');
+    const tbody = document.getElementById('subs-tbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#d9534f;padding:24px">Erreur de chargement — ${e.message}</td></tr>`;
+  }
 }
 
 let _nlArticles = [];
