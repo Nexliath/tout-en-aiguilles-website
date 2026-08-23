@@ -28,6 +28,67 @@ function closeAdminSidebar() {
   document.body.style.overflow = '';
 }
 
+// ─── Recherche header (autocomplete produits) ──────────────────
+function initHeaderSearch() {
+  const input = document.querySelector('.header-search-input');
+  const dropdown = document.getElementById('header-search-dropdown');
+  if (!input || !dropdown) return;
+
+  let debounceTimer = null;
+
+  function closeDropdown() {
+    dropdown.classList.remove('open');
+    dropdown.innerHTML = '';
+  }
+
+  async function runSearch(q) {
+    const term = q.trim();
+    if (term.length < 2) { closeDropdown(); return; }
+    dropdown.innerHTML = '<div class="hs-loading">Recherche…</div>';
+    dropdown.classList.add('open');
+    try {
+      const products = await apiFetch(`/products?search=${encodeURIComponent(term)}&limit=6`);
+      if (!products.length) {
+        dropdown.innerHTML = `<div class="hs-empty">Aucun résultat pour « ${term} »</div>`;
+        return;
+      }
+      dropdown.innerHTML = products.map(p => `
+        <a class="hs-result" href="/produit.html?slug=${p.slug}">
+          ${p.images && p.images[0] ? `<img src="${p.images[0]}" alt="">` : '<div class="hs-result-ph">🧶</div>'}
+          <div>
+            <div class="hs-result-name">${p.name}</div>
+            <div class="hs-result-price">${Number(p.price).toFixed(2)} €</div>
+          </div>
+        </a>`).join('') +
+        `<a class="hs-seeall" href="/boutique.html?search=${encodeURIComponent(term)}">Voir tous les résultats →</a>`;
+    } catch {
+      dropdown.innerHTML = '<div class="hs-empty">Erreur de recherche</div>';
+    }
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = input.value;
+    debounceTimer = setTimeout(() => runSearch(q), 300);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 2) dropdown.classList.add('open');
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const term = input.value.trim();
+      if (term) window.location.href = `/boutique.html?search=${encodeURIComponent(term)}`;
+    } else if (e.key === 'Escape') {
+      closeDropdown();
+      input.blur();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.header-search-wrap')) closeDropdown();
+  });
+}
+
 // ─── Auth ────────────────────────────────────────────────────
 const Auth = {
   getToken: () => localStorage.getItem('tea_token'),
