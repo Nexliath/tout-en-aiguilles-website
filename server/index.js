@@ -337,6 +337,16 @@ app.listen(PORT, async () => {
     const { seedEtsyProducts } = require('./db/seedEtsy');
     seedEtsyProducts(db);
   }
+
+  // ─── Avis de lancement (générés) — opt-in explicite ──────────
+  // Même principe que RUN_SEED : ne tourne que si la variable d'env
+  // RUN_FAKE_REVIEWS_SEED=true est définie sur Railway. Protégé par un flag
+  // en base pour ne s'exécuter qu'une seule fois.
+  if (process.env.RUN_FAKE_REVIEWS_SEED === 'true') {
+    console.log('🌱 RUN_FAKE_REVIEWS_SEED=true détecté — génération des avis de lancement…');
+    const { seedFakeReviews } = require('./db/seedFakeReviews');
+    seedFakeReviews(db);
+  }
   setInterval(checkAbandonedCarts, 60 * 60 * 1000);
   setInterval(checkStockAlerts, 60 * 60 * 1000);
 });
@@ -444,7 +454,3 @@ function seedNews(db) {
   }
   db.prepare(`INSERT OR REPLACE INTO app_settings (key, value) VALUES ('news_seed_done', '1')`).run();
 }
-
-// deploy-test-3: 2026-08-23T13:05:51.862813Z — verif finale seed desactive (RUN_SEED)
-
-// deploy-test-4: 2026-08-23T13:10:56.717164Z — verif finale apres fix schema.sql (root cause)
