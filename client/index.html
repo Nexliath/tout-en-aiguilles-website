@@ -305,10 +305,57 @@
         </div>
       </div>
       <div style="background:white;border-radius:var(--radius-xl);border:1px solid var(--border);padding:32px">
-        <h3 style="margin-bottom:24px">Envoyer un message</h3>
+        <h3 style="margin-bottom:8px">Envoyer un message</h3>
+        <label style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:24px;font-size:.88rem;color:var(--text-light);cursor:pointer">
+          <input type="checkbox" id="contact-is-custom-order" onchange="toggleCustomOrderFields()" style="width:16px;height:16px">
+          🧵 C'est une demande de commande personnalisée
+        </label>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Prénom</label><input type="text" class="form-input" id="contact-name" placeholder="Marie" onfocus="if(!document.getElementById('contact-time').value)document.getElementById('contact-time').value=Date.now()"></div>
           <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="contact-email" placeholder="marie@email.fr"></div>
+        </div>
+        <div id="custom-order-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Type de création</label>
+              <select class="form-input" id="co-type">
+                <option value="">Choisir…</option>
+                <option>Doudou / peluche</option>
+                <option>Vêtement</option>
+                <option>Accessoire</option>
+                <option>Décoration</option>
+                <option>Autre</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Couleur / motif souhaité</label><input type="text" class="form-input" id="co-color" placeholder="Vert sauge, à pois…"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Taille souhaitée</label><input type="text" class="form-input" id="co-size" placeholder="Ex : 40 cm, taille 2 ans…"></div>
+            <div class="form-group">
+              <label class="form-label">Délai souhaité</label>
+              <select class="form-input" id="co-timeline">
+                <option value="">Choisir…</option>
+                <option>Pas pressé(e)</option>
+                <option>D'ici un mois</option>
+                <option>Date précise (voir message)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Budget indicatif</label>
+            <select class="form-input" id="co-budget">
+              <option value="">Choisir…</option>
+              <option>Moins de 30 €</option>
+              <option>30 – 60 €</option>
+              <option>60 – 100 €</option>
+              <option>100 € et plus</option>
+              <option>Je ne sais pas encore</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Photo d'inspiration <span style="color:var(--text-light);font-weight:400">(optionnel)</span></label>
+            <input type="file" class="form-input" id="co-photo" accept="image/*">
+          </div>
         </div>
         <div class="form-group"><label class="form-label">Message</label><textarea class="form-textarea" id="contact-msg" placeholder="Bonjour, je souhaiterais commander un doudou personnalisé…"></textarea></div>
         <!-- Anti-bot -->
@@ -356,6 +403,7 @@
         <div class="footer-links">
           <a href="/compte.html">Mon espace</a>
           <a href="/compte.html?tab=orders">Mes commandes</a>
+          <a href="/suivi-commande.html">Suivre ma commande</a>
           <a href="/compte.html?tab=favorites">Mes favoris</a>
           <a href="/panier.html">Mon panier</a>
         </div>
@@ -467,11 +515,20 @@ async function loadNews() {
   } catch {}
 }
 
+function toggleCustomOrderFields() {
+  const isCustom = document.getElementById('contact-is-custom-order').checked;
+  document.getElementById('custom-order-fields').style.display = isCustom ? '' : 'none';
+  document.getElementById('contact-msg').placeholder = isCustom
+    ? 'Précisez ici tout détail utile (date précise si besoin, inspiration, contraintes…)'
+    : 'Bonjour, je souhaiterais commander un doudou personnalisé…';
+}
+
 async function sendContact() {
   const name = document.getElementById('contact-name').value.trim();
   const email = document.getElementById('contact-email').value.trim();
   const msg = document.getElementById('contact-msg').value.trim();
-  if (!name || !email || !msg) { Toast.show('Veuillez remplir tous les champs', 'error'); return; }
+  const isCustomOrder = document.getElementById('contact-is-custom-order').checked;
+  if (!name || !email || (!isCustomOrder && !msg)) { Toast.show('Veuillez remplir tous les champs', 'error'); return; }
   // Anti-bot: honeypot check
   const hp = document.querySelector('input[name="website"]');
   if (hp && hp.value) return;
@@ -484,21 +541,41 @@ async function sendContact() {
   if (btn) { btn.disabled = true; btn.textContent = 'Envoi en cours…'; }
 
   try {
-    const res = await apiFetch('/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, message: msg })
-    });
+    let res;
+    if (isCustomOrder) {
+      const fd = new FormData();
+      fd.append('name', name);
+      fd.append('email', email);
+      fd.append('message', msg);
+      fd.append('creationType', document.getElementById('co-type').value);
+      fd.append('color', document.getElementById('co-color').value);
+      fd.append('size', document.getElementById('co-size').value);
+      fd.append('timeline', document.getElementById('co-timeline').value);
+      fd.append('budget', document.getElementById('co-budget').value);
+      const photoFile = document.getElementById('co-photo').files[0];
+      if (photoFile) fd.append('photo', photoFile);
+      res = await apiFetchForm('/contact/custom-order', fd);
+    } else {
+      res = await apiFetch('/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, message: msg })
+      });
+    }
     if (res.success) {
-      Toast.show('Message envoyé ! Nous vous répondrons vite 🌸', 'success');
+      Toast.show(isCustomOrder ? 'Demande envoyée ! Nous revenons vite vers vous 🧵' : 'Message envoyé ! Nous vous répondrons vite 🌸', 'success');
       document.getElementById('contact-name').value = '';
       document.getElementById('contact-email').value = '';
       document.getElementById('contact-msg').value = '';
+      ['co-type', 'co-color', 'co-size', 'co-timeline', 'co-budget'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('co-photo').value = '';
+      document.getElementById('contact-is-custom-order').checked = false;
+      toggleCustomOrderFields();
     } else {
       Toast.show(res.error || 'Erreur lors de l\'envoi', 'error');
     }
-  } catch {
-    Toast.show('Erreur réseau. Réessayez ou écrivez-nous directement.', 'error');
+  } catch (e) {
+    Toast.show(e.message || 'Erreur réseau. Réessayez ou écrivez-nous directement.', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = originalText; }
   }
