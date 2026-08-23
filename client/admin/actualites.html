@@ -61,7 +61,7 @@
 
     <!-- Toolbar : recherche + tri -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-      <input type="text" id="art-search" class="form-input" placeholder="🔎 Rechercher un article…" style="max-width:280px" oninput="renderTable()">
+      <input type="text" id="art-search" class="form-input" placeholder="🔎 Rechercher un article…" aria-label="Rechercher un article" style="max-width:280px" oninput="renderTable()">
       <select id="art-sort" class="form-input" style="max-width:200px" onchange="renderTable()">
         <option value="date_desc">Plus récents</option>
         <option value="date_asc">Plus anciens</option>
