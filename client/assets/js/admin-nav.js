@@ -28,7 +28,10 @@ function renderAdminSidebar() {
     </div>
     <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
     <aside class="admin-sidebar">
-      <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
+      <div class="admin-logo">
+        <span style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--rose) 0%,var(--rose-dark) 100%);font-size:1.15rem;flex-shrink:0">🧶</span>
+        <span style="line-height:1.3">Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></span>
+      </div>
       <nav class="admin-nav">
         ${ADMIN_NAV_ITEMS.map(item => `<a href="${item.href}"${item.href === current ? ' class="active"' : ''}>${item.icon} ${item.label}</a>`).join('\n        ')}
         <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
