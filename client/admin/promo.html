@@ -22,27 +22,8 @@
 </div>
 
 <div id="admin-content" class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
-  </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html">📊 Tableau de bord</a>
-      <a href="produits.html">🧶 Produits</a>
-      <a href="commandes.html">📦 Commandes</a>
-      <a href="actualites.html">📝 Actualités</a>
-      <a href="utilisateurs.html">👥 Utilisateurs</a>
-      <a href="avis.html">⭐ Avis</a>
-      <a href="promo.html" class="active">🏷️ Codes promo</a>
-      <a href="newsletter.html">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <main class="admin-main">
     <div class="admin-header">
@@ -88,6 +69,20 @@
       </div>
       <div id="promo-error" class="form-error" style="display:none;margin-bottom:12px"></div>
       <button class="btn btn-primary" onclick="createPromo()">Créer le code promo</button>
+    </div>
+
+    <!-- Panneau utilisation -->
+    <div id="usage-panel" style="display:none" class="admin-panel mb-lg">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="admin-panel-title" id="usage-title" style="margin:0;padding:0;border:none">Utilisation du code</div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('usage-panel').style.display='none'">✕ Fermer</button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Commande</th><th>Client</th><th>Total</th><th>Remise</th><th>Statut</th><th>Date</th></tr></thead>
+          <tbody id="usage-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Liste des codes -->
@@ -150,6 +145,7 @@ function renderPromos() {
         ${expired ? '<span style="color:#d9534f;font-size:.8rem">Expiré</span>' : p.is_active ? '<span style="color:var(--sage-dark);font-size:.8rem">✅ Actif</span>' : '<span style="color:var(--text-light);font-size:.8rem">⏸ Inactif</span>'}
       </td>
       <td>
+        <button class="btn btn-ghost btn-sm" onclick="showUsage(${p.id}, '${p.code}')" style="font-size:.75rem">📊 Utilisation</button>
         <button class="btn btn-ghost btn-sm" onclick="togglePromo(${p.id}, ${p.is_active})" style="font-size:.75rem">${p.is_active ? 'Désactiver' : 'Activer'}</button>
         <button class="btn btn-ghost btn-sm" onclick="deletePromo(${p.id})" style="font-size:.75rem;color:#d9534f">Supprimer</button>
       </td>
@@ -176,6 +172,33 @@ async function createPromo() {
     ['f-code','f-value','f-min','f-max','f-expires','f-desc'].forEach(id => document.getElementById(id).value = '');
     await loadPromos();
   } catch(e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+const ORDER_STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
+
+async function showUsage(id, code) {
+  const panel = document.getElementById('usage-panel');
+  const tbody = document.getElementById('usage-tbody');
+  document.getElementById('usage-title').textContent = `Utilisation du code ${code}`;
+  panel.style.display = '';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></td></tr>';
+  panel.scrollIntoView({ behavior: 'smooth' });
+  try {
+    const data = await apiFetch(`/promo/${id}/usage`);
+    tbody.innerHTML = data.orders.length
+      ? data.orders.map(o => `
+        <tr>
+          <td style="font-weight:700">#${o.id}</td>
+          <td>${o.first_name} ${o.last_name}</td>
+          <td>${Number(o.total).toFixed(2)} €</td>
+          <td style="color:var(--sage-dark)">-${Number(o.promo_discount || 0).toFixed(2)} €</td>
+          <td><span class="order-status status-${o.status}">${ORDER_STATUS[o.status] || o.status}</span></td>
+          <td style="font-size:.8rem;color:var(--text-light)">${formatDate(o.created_at)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-light)">Ce code n\'a jamais été utilisé</td></tr>';
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#d9534f">${e.message}</td></tr>`;
+  }
 }
 
 async function togglePromo(id, isActive) {
