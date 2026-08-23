@@ -560,6 +560,12 @@ function changeQty(delta) {
 
 function addToCartFromPage() {
   if (!currentProduct) return;
+  // Si le produit a des options, en imposer le choix avant l'ajout au panier
+  if (window._variants && window._variants.length > 0 && !window._selectedVariant) {
+    Toast.show('Merci de choisir une option avant d\'ajouter au panier', 'error');
+    document.getElementById('variants-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   const v = window._selectedVariant;
   if (v) {
     Cart.add({
@@ -874,9 +880,8 @@ async function loadVariants(product) {
         </button>`;
     }).join('');
 
-    // Sélectionner la première variante disponible
-    const first = variants.find(v => v.stock > 0) || variants[0];
-    if (first) selectVariant(first.id);
+    // Pas de sélection auto : l'image de base reste affichée tant que
+    // le client n'a pas cliqué sur une option.
   } catch(e) {
     document.getElementById('variants-section').style.display = 'none';
   }
