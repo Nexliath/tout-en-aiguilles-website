@@ -13,6 +13,13 @@ const { asyncRoute } = require('../middleware/asyncRoute');
 const { sendVerificationEmail, sendEmailChangeConfirmation, sendPasswordResetEmail } = require('../utils/email');
 const { processImageToBuffer } = require('../utils/imageProcess');
 
+// Railway ne définit pas NODE_ENV automatiquement — s'y fier seul pour le
+// flag Secure du cookie de session admin le désactiverait silencieusement
+// en production (cookie envoyable en clair). RAILWAY_ENVIRONMENT est lui
+// bien défini par la plateforme (même logique déjà utilisée dans index.js
+// pour l'avertissement JWT_SECRET/ADMIN_PATH par défaut).
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+
 // ─── Config upload avatar — stockage mémoire → base64 en DB ──
 // (évite la perte des fichiers à chaque redéploiement Railway)
 const uploadAvatar = multer({
@@ -132,7 +139,7 @@ function issueSession(user, res) {
   if (user.role === 'admin') {
     res.cookie('tea_admin_sess', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: IS_PRODUCTION,
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours
     });
@@ -551,7 +558,7 @@ router.post('/admin-cookie', (req, res) => {
     if (decoded.role !== 'admin') return res.status(403).json({ error: 'Accès refusé' });
     res.cookie('tea_admin_sess', auth.slice(7), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: IS_PRODUCTION,
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -739,6 +746,12 @@ router.delete('/account', requireAuth, (req, res) => {
   db.prepare('UPDATE orders SET user_id = NULL WHERE user_id = ?').run(user.id);
   db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(user.id);
   db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
+  // Droit à l'oubli : avant cette correction, la newsletter et les alertes
+  // de retour en stock (tables indépendantes, indexées par email et non par
+  // user_id) survivaient à la suppression du compte — l'ex-utilisateur
+  // continuait de recevoir des emails après avoir "supprimé" ses données.
+  db.prepare('DELETE FROM newsletter_subscribers WHERE email = ?').run(user.email);
+  db.prepare('DELETE FROM stock_alerts WHERE email = ?').run(user.email);
   db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
 
   res.json({ success: true, message: 'Votre compte a été supprimé.' });
