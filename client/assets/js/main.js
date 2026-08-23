@@ -870,4 +870,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeader();
   Favorites.loadFromServer();
   initBackToTop();
+  // Appelé globalement ici (et non plus seulement sur index.html) car la
+  // recherche du header n'existait que sur la page d'accueil : le markup
+  // .header-search-wrap a été étendu à toutes les pages publiques, il faut
+  // donc initialiser le JS partout. La fonction se protège déjà si le
+  // markup est absent (ex: pages admin).
+  initHeaderSearch();
 });
