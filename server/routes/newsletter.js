@@ -5,22 +5,19 @@ const fs = require('fs');
 const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { processAndSaveImage } = require('../utils/imageProcess');
+const { asyncRoute } = require('../middleware/asyncRoute');
 const router = express.Router();
 const BASE = () => process.env.BASE_URL || 'https://tout-en-aiguilles.com';
 
-// Upload d'images pour le contenu de newsletter
-const nlStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../client/assets/images/newsletter');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `nl_${Date.now()}${ext}`);
-  }
-});
-const nlUpload = multer({ storage: nlStorage, limits: { fileSize: 5 * 1024 * 1024 } });
+// Upload d'images pour le contenu de newsletter — en mémoire : redimensionnées
+// et compressées (sharp) avant écriture sur disque, voir saveNewsletterImage().
+const NL_IMG_DIR = path.join(__dirname, '../../client/assets/images/newsletter');
+const nlUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+async function saveNewsletterImage(file) {
+  const name = await processAndSaveImage(file.buffer, NL_IMG_DIR, `nl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  return `/assets/images/newsletter/${name}`;
+}
 
 // S'assurer que la table existe (sécurité si migration pas encore jouée)
 try {
@@ -101,10 +98,10 @@ async function sendOne(toEmail, toName, subject, html_content) {
 }
 
 // ─── Upload d'image pour le contenu newsletter (admin) ──────
-router.post('/upload-image', requireAdmin, nlUpload.single('image'), (req, res) => {
+router.post('/upload-image', requireAdmin, nlUpload.single('image'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Image requise' });
-  res.json({ url: `/assets/images/newsletter/${req.file.filename}` });
-});
+  res.json({ url: await saveNewsletterImage(req.file) });
+}));
 
 // ─── Envoi d'un test à soi-même (admin) ─────────────────────
 router.post('/send-test', requireAdmin, async (req, res) => {
