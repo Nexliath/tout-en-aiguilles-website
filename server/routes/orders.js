@@ -579,6 +579,26 @@ router.post('/paypal/capture', asyncRoute(async (req, res) => {
   const { paypal_order_id, order_id } = req.body;
   if (!paypal_order_id || !order_id) return res.status(400).json({ error: 'Données manquantes' });
 
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
+  if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+
+  // Le lien commande ↔ ordre PayPal est enregistré à la création (voir
+  // /paypal/create, stripe_session_id = "paypal:<id>"). Sans cette
+  // vérification, n'importe qui pourrait payer une commande, récupérer un
+  // paypal_order_id capturé valide, puis le réutiliser ici avec l'order_id
+  // d'une AUTRE commande (la sienne ou celle d'un invité) pour la faire
+  // passer en "payée" sans jamais la payer.
+  if (order.stripe_session_id !== `paypal:${paypal_order_id}`) {
+    return res.status(400).json({ error: 'Cet identifiant PayPal ne correspond pas à cette commande.' });
+  }
+
+  // Idempotence : évite de re-décrémenter le stock ou de ré-incrémenter
+  // l'usage du code promo si la capture est rejouée (double-clic, requête
+  // renvoyée après une coupure réseau côté client).
+  if (['paid', 'shipped', 'delivered'].includes(order.status)) {
+    return res.json({ success: true, order_id, already_processed: true });
+  }
+
   const token = await getPayPalToken();
   if (!token) return res.status(500).json({ error: 'PayPal non configuré' });
 
@@ -587,14 +607,20 @@ router.post('/paypal/capture', asyncRoute(async (req, res) => {
     return res.status(400).json({ error: `Paiement non complété : ${capture.status || 'erreur'}` });
   }
 
-  db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('paid', order_id);
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
-  if (order) {
-    const parsedItems = JSON.parse(order.items || '[]');
-    decrementStockForItems(parsedItems);
-    incrementPromoUsage(order.promo_code);
-    sendOrderStatusEmail({ ...order, items: parsedItems }).catch(console.error);
+  // Vérifie que le montant réellement capturé par PayPal correspond au total
+  // de la commande enregistrée en base — empêche toute divergence entre ce
+  // qui a été payé et ce qui est marqué payé.
+  const capturedAmount = Number(capture.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value);
+  if (!capturedAmount || Math.abs(capturedAmount - Number(order.total)) > 0.01) {
+    console.error(`PayPal : montant capturé (${capturedAmount}) ≠ total commande #${order_id} (${order.total})`);
+    return res.status(400).json({ error: 'Le montant payé ne correspond pas au total de la commande.' });
   }
+
+  db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('paid', order_id);
+  const parsedItems = JSON.parse(order.items || '[]');
+  decrementStockForItems(parsedItems);
+  incrementPromoUsage(order.promo_code);
+  sendOrderStatusEmail({ ...order, status: 'paid', items: parsedItems }).catch(console.error);
   res.json({ success: true, order_id });
 }));
 
