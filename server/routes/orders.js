@@ -1,8 +1,19 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail } = require('../utils/email');
 const { logActivity } = require('../utils/activityLog');
+
+// Anti-bruteforce : suivi de commande invité (numéro + email requis) —
+// limite les tentatives d'énumération d'ID de commande.
+const trackOrderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: { error: 'Trop de tentatives. Réessayez dans 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ─── Migrations colonnes supplémentaires ─────────────────────
 try { db.exec('ALTER TABLE orders ADD COLUMN review_requested_at TEXT'); } catch(e) {}
@@ -192,6 +203,34 @@ router.get('/my', requireAuth, (req, res) => {
   const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id)
     .map(o => ({ ...o, items: JSON.parse(o.items || '[]') }));
   res.json(orders);
+});
+
+// GET /api/orders/track?order_id=X&email=Y — suivi de commande invité
+// Aucun compte requis : le numéro de commande + l'email associé suffisent
+// (comme sur la plupart des sites e-commerce). Ne renvoie que les infos
+// utiles au suivi, pas les données de compte.
+router.get('/track', trackOrderLimiter, (req, res) => {
+  const { order_id, email } = req.query;
+  if (!order_id || !email) return res.status(400).json({ error: 'Numéro de commande et email requis' });
+
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
+  if (!order || !order.email || order.email.toLowerCase() !== String(email).trim().toLowerCase()) {
+    return res.status(404).json({ error: 'Aucune commande trouvée avec ce numéro et cet email' });
+  }
+
+  res.json({
+    id: order.id,
+    status: order.status,
+    tracking_number: order.tracking_number || null,
+    created_at: order.created_at,
+    updated_at: order.updated_at,
+    total: order.total,
+    items: JSON.parse(order.items || '[]'),
+    delivery_type: order.delivery_type,
+    relay_point: order.relay_point || null,
+    city: order.city || null,
+    postal_code: order.postal_code || null,
+  });
 });
 
 // GET /api/orders/:id — détail commande
