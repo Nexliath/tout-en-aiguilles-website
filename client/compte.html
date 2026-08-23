@@ -238,10 +238,11 @@
                     <input type="password" id="mfa-disable-password" class="form-input">
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Code de vérification</label>
+                    <label class="form-label" id="mfa-disable-code-label">Code de vérification</label>
                     <input type="text" id="mfa-disable-code" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456">
                   </div>
-                  <div id="mfa-disable-error" class="form-error" style="display:none;margin-bottom:12px"></div>
+                  <p style="text-align:right;margin:-8px 0 12px"><a href="#" id="mfa-disable-use-recovery-link" style="font-size:.8rem;color:var(--text-light)">Appareil perdu ? Utiliser un code de secours</a></p>
+                  <div id="mfa-disable-error" class="form-error" role="alert" aria-live="polite" style="display:none;margin-bottom:12px"></div>
                   <button class="btn btn-ghost" style="border-color:#d9534f;color:#d9534f" onclick="disableMfa()">Désactiver la double authentification</button>
                 </div>
               </div>
@@ -576,23 +577,51 @@ function startMfaSelfEnroll() {
 
 async function disableMfa() {
   const password = document.getElementById('mfa-disable-password').value;
-  const code = document.getElementById('mfa-disable-code').value.trim();
+  const codeInput = document.getElementById('mfa-disable-code');
+  const usingRecovery = codeInput.dataset.recovery === '1';
   const errEl = document.getElementById('mfa-disable-error');
   errEl.style.display = 'none';
+  const body = { password };
+  if (usingRecovery) body.recovery_code = codeInput.value.trim();
+  else body.code = codeInput.value.trim();
   try {
-    await apiFetch('/auth/mfa/disable', { method: 'POST', body: { password, code } });
+    await apiFetch('/auth/mfa/disable', { method: 'POST', body });
     Toast.show('Double authentification désactivée.', 'success');
     // Rafraîchir l'utilisateur en cache localement (mfa_enabled: false)
     const user = Auth.getUser();
     if (user) { user.mfa_enabled = false; localStorage.setItem('tea_user', JSON.stringify(user)); }
     document.getElementById('mfa-disable-password').value = '';
-    document.getElementById('mfa-disable-code').value = '';
+    codeInput.value = '';
     initAccount();
   } catch (e) {
     errEl.textContent = e.message;
     errEl.style.display = '';
   }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  const link = document.getElementById('mfa-disable-use-recovery-link');
+  if (!link) return;
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    const input = document.getElementById('mfa-disable-code');
+    const label = document.getElementById('mfa-disable-code-label');
+    const usingRecovery = input.dataset.recovery === '1';
+    input.dataset.recovery = usingRecovery ? '' : '1';
+    input.value = '';
+    if (usingRecovery) {
+      input.setAttribute('maxlength', '6');
+      input.setAttribute('placeholder', '123456');
+      label.textContent = 'Code de vérification';
+      link.textContent = 'Appareil perdu ? Utiliser un code de secours';
+    } else {
+      input.removeAttribute('maxlength');
+      input.setAttribute('placeholder', 'Code de secours');
+      label.textContent = 'Code de secours';
+      link.textContent = '← Revenir au code à 6 chiffres';
+    }
+  });
+});
 
 // ─── Confidentialité / RGPD ─────────────────────────────────────
 async function exportMyData() {
