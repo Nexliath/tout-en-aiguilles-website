@@ -14,7 +14,19 @@ function closeMobileNav() {
   if (nav) { nav.classList.remove('open'); document.body.style.overflow = ''; }
 }
 // Fermer avec la touche Escape
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileNav(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMobileNav(); closeAdminSidebar(); } });
+
+// ─── Admin sidebar (mobile) ────────────────────────────────────
+function toggleAdminSidebar() {
+  document.querySelector('.admin-sidebar')?.classList.toggle('open');
+  document.querySelector('.admin-sidebar-backdrop')?.classList.toggle('open');
+  document.body.style.overflow = document.querySelector('.admin-sidebar')?.classList.contains('open') ? 'hidden' : '';
+}
+function closeAdminSidebar() {
+  document.querySelector('.admin-sidebar')?.classList.remove('open');
+  document.querySelector('.admin-sidebar-backdrop')?.classList.remove('open');
+  document.body.style.overflow = '';
+}
 
 // ─── Auth ────────────────────────────────────────────────────
 const Auth = {
