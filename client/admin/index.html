@@ -126,6 +126,45 @@
       <div style="position:relative;height:260px"><canvas id="revenue-chart"></canvas></div>
     </div>
 
+    <!-- Meilleures ventes -->
+    <div class="admin-panel" style="margin-top:24px">
+      <div class="admin-panel-title">🏆 Meilleures ventes — 30 derniers jours</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Produit</th><th>Quantité vendue</th><th>CA généré</th></tr></thead>
+          <tbody id="top-sellers-body">
+            <tr><td colspan="3" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Paniers abandonnés -->
+    <div class="admin-panel" style="margin-top:24px">
+      <div class="admin-panel-title">🛒 Paniers abandonnés récents</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Email</th><th>Articles</th><th>Relances</th><th>Statut</th><th>Dernière activité</th></tr></thead>
+          <tbody id="abandoned-carts-body">
+            <tr><td colspan="5" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Journal d'activité -->
+    <div class="admin-panel" style="margin-top:24px">
+      <div class="admin-panel-title">🕓 Journal d'activité récent</div>
+      <div class="admin-table-wrap" style="max-height:340px;overflow-y:auto">
+        <table class="admin-table">
+          <thead><tr><th>Action</th><th>Détail</th><th>Par</th><th>Date</th></tr></thead>
+          <tbody id="activity-log-body">
+            <tr><td colspan="4" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Quick actions -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px">
       <div class="admin-panel">
@@ -309,8 +348,76 @@ async function loadDashboard() {
           <td><a href="commandes.html" class="btn btn-ghost btn-sm">Voir →</a></td>
         </tr>`).join('')
       : '<tr><td colspan="7" style="text-align:center;color:var(--text-light);padding:24px">Aucune commande pour l\'instant</td></tr>';
+    // Meilleures ventes — 30 derniers jours
+    renderTopSellers(orders);
   } catch (e) {
     console.error(e);
+  }
+
+  // Panneaux indépendants (n'empêchent pas le reste de charger en cas d'erreur)
+  loadAbandonedCarts();
+  loadActivityLog();
+}
+
+function renderTopSellers(orders) {
+  const since = new Date(); since.setDate(since.getDate() - 30);
+  const relevant = orders.filter(o => new Date(o.created_at) >= since && ['paid', 'shipped', 'delivered'].includes(o.status));
+  const tally = {}; // name -> { qty, revenue }
+  for (const o of relevant) {
+    for (const item of (o.items || [])) {
+      const key = item.name;
+      if (!tally[key]) tally[key] = { qty: 0, revenue: 0 };
+      tally[key].qty += Number(item.qty) || 0;
+      tally[key].revenue += (Number(item.qty) || 0) * (Number(item.price) || 0);
+    }
+  }
+  const ranked = Object.entries(tally).sort((a, b) => b[1].qty - a[1].qty).slice(0, 10);
+  const tbody = document.getElementById('top-sellers-body');
+  tbody.innerHTML = ranked.length
+    ? ranked.map(([name, d], i) => `
+      <tr>
+        <td style="font-weight:700">${i < 3 ? ['🥇','🥈','🥉'][i] : ''} ${name}</td>
+        <td>${d.qty}</td>
+        <td style="color:var(--rose-dark);font-weight:700">${d.revenue.toFixed(2)} €</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-light)">Aucune vente sur les 30 derniers jours</td></tr>';
+}
+
+async function loadAbandonedCarts() {
+  const tbody = document.getElementById('abandoned-carts-body');
+  try {
+    const carts = await apiFetch('/admin/cart-sessions');
+    const notConverted = carts.filter(c => !c.converted).slice(0, 15);
+    tbody.innerHTML = notConverted.length
+      ? notConverted.map(c => `
+        <tr>
+          <td style="font-size:.85rem">${c.email || '<span style="color:var(--text-light)">Anonyme</span>'}</td>
+          <td>${(c.items || []).length} article${(c.items || []).length > 1 ? 's' : ''}</td>
+          <td style="font-size:.78rem">${c.email_1h_sent ? '✓ 1h ' : ''}${c.email_24h_sent ? '✓ 24h' : ''}${!c.email_1h_sent && !c.email_24h_sent ? '<span style="color:var(--text-light)">Aucune</span>' : ''}</td>
+          <td><span style="font-size:.78rem;color:var(--text-light)">Non converti</span></td>
+          <td style="font-size:.78rem;color:var(--text-light)">${formatDate(c.updated_at)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)">Aucun panier abandonné</td></tr>';
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+  }
+}
+
+async function loadActivityLog() {
+  const tbody = document.getElementById('activity-log-body');
+  try {
+    const logs = await apiFetch('/admin/activity-log');
+    tbody.innerHTML = logs.length
+      ? logs.slice(0, 30).map(l => `
+        <tr>
+          <td style="font-weight:700;font-size:.85rem">${l.action}</td>
+          <td style="font-size:.82rem;color:var(--text-light)">${l.details || '—'}</td>
+          <td style="font-size:.8rem">${l.admin_name || '—'}</td>
+          <td style="font-size:.78rem;color:var(--text-light)">${formatDate(l.created_at)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)">Aucune activité enregistrée</td></tr>';
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
 }
 
