@@ -26,6 +26,10 @@ router.get('/', requireAdmin, (req, res) => res.json(db.prepare('SELECT * FROM p
 router.post('/', requireAdmin, (req, res) => {
   const { code, discount_type, value, min_order, max_uses, expires_at, description } = req.body;
   if (!code || !value) return res.status(400).json({ error: 'Code et valeur requis' });
+  if (Number(value) <= 0) return res.status(400).json({ error: 'La valeur doit être supérieure à 0' });
+  if ((discount_type || 'percent') === 'percent' && Number(value) > 100) {
+    return res.status(400).json({ error: 'Un pourcentage de réduction ne peut pas dépasser 100%' });
+  }
   try {
     const r = db.prepare('INSERT INTO promo_codes (code, discount_type, value, min_order, max_uses, expires_at, description) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(code.trim().toUpperCase(), discount_type || 'percent', parseFloat(value), parseFloat(min_order) || 0, max_uses ? parseInt(max_uses) : null, expires_at || null, description || '');
@@ -35,9 +39,27 @@ router.post('/', requireAdmin, (req, res) => {
 });
 
 router.put('/:id', requireAdmin, (req, res) => {
-  const { is_active, description, max_uses, expires_at } = req.body;
-  db.prepare('UPDATE promo_codes SET is_active=?, description=?, max_uses=?, expires_at=? WHERE id=?')
-    .run(is_active !== undefined ? (is_active ? 1 : 0) : undefined, description, max_uses || null, expires_at || null, req.params.id);
+  const existing = db.prepare('SELECT * FROM promo_codes WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Code promo introuvable' });
+  const { is_active, description, value, discount_type, min_order, max_uses, expires_at } = req.body;
+  // node:sqlite n'accepte pas `undefined` comme valeur liée : un appel qui ne
+  // renvoie qu'un sous-ensemble des champs (ex. juste is_active depuis le
+  // bouton Activer/Désactiver) faisait échouer toute la requête avant cette
+  // correction. On retombe sur la valeur existante pour chaque champ omis.
+  if (value !== undefined && discount_type === 'percent' && Number(value) > 100) {
+    return res.status(400).json({ error: 'Un pourcentage de réduction ne peut pas dépasser 100%' });
+  }
+  db.prepare('UPDATE promo_codes SET is_active=?, description=?, value=?, discount_type=?, min_order=?, max_uses=?, expires_at=? WHERE id=?')
+    .run(
+      is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active,
+      description !== undefined ? description : existing.description,
+      value !== undefined ? Number(value) : existing.value,
+      discount_type !== undefined ? discount_type : existing.discount_type,
+      min_order !== undefined ? Number(min_order) || 0 : existing.min_order,
+      max_uses !== undefined ? (max_uses || null) : existing.max_uses,
+      expires_at !== undefined ? (expires_at || null) : existing.expires_at,
+      req.params.id
+    );
   res.json({ success: true });
 });
 
