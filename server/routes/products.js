@@ -115,17 +115,30 @@ router.get('/favorites/list', requireAuth, (req, res) => {
 });
 
 // GET /api/products/admin/all — tous les produits (admin)
+// Note : auparavant, une requête SELECT variantes était exécutée par produit
+// à l'intérieur du .map() (N+1) — avec plusieurs centaines de produits cela
+// représentait autant de requêtes SQL synchrones. On récupère maintenant
+// toutes les variantes en une seule requête et on les regroupe en mémoire.
 router.get('/admin/all', requireAdmin, (req, res) => {
   const products = db.prepare(`
     SELECT p.*, c.name as category_name FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     ORDER BY p.created_at DESC
-  `).all().map(p => {
-    const variants = db.prepare('SELECT * FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC').all(p.id)
-      .map(v => ({ ...v, images: JSON.parse(v.images || '[]') }));
-    return { ...p, images: JSON.parse(p.images || '[]'), tags: JSON.parse(p.tags || '[]'), variants };
-  });
-  res.json(products);
+  `).all();
+  const allVariants = db.prepare('SELECT * FROM product_variants ORDER BY sort_order ASC, id ASC').all();
+  const variantsByProduct = {};
+  for (const v of allVariants) {
+    const variant = { ...v, images: JSON.parse(v.images || '[]') };
+    if (!variantsByProduct[v.product_id]) variantsByProduct[v.product_id] = [];
+    variantsByProduct[v.product_id].push(variant);
+  }
+  const result = products.map(p => ({
+    ...p,
+    images: JSON.parse(p.images || '[]'),
+    tags: JSON.parse(p.tags || '[]'),
+    variants: variantsByProduct[p.id] || [],
+  }));
+  res.json(result);
 });
 
 // GET /api/products/:id/related-articles — articles du blog présentant ce produit
