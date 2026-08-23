@@ -1,13 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <!-- Google Tag Manager -->
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','GTM-5M8NK6RH');</script>
-  <!-- End Google Tag Manager -->
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -169,10 +162,6 @@
   </style>
 </head>
 <body>
-  <!-- Google Tag Manager (noscript) -->
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager (noscript) -->
 
 <header class="site-header">
   <div class="header-inner">
@@ -331,6 +320,12 @@
         <h2 style="margin-bottom:32px;text-align:center">Vous aimerez aussi ✨</h2>
         <div id="related-grid" class="grid-4"></div>
       </div>
+
+      <!-- Related articles -->
+      <div id="related-articles-section" style="display:none;margin-top:80px">
+        <h2 style="margin-bottom:32px;text-align:center">Cet article pourrait vous intéresser 📝</h2>
+        <div id="related-articles-grid" class="news-grid"></div>
+      </div>
     </div>
 
     <!-- Not found -->
@@ -377,6 +372,7 @@ async function loadProduct() {
     renderProduct(product);
     loadVariants(product);
     loadRelated(product);
+    loadRelatedArticles(product);
     loadReviews(product.id);
     // Recommandations par catégorie
     if (product.category_slug) {
@@ -593,6 +589,28 @@ async function loadRelated(product) {
       ? related.map(renderProductCard).join('')
       : '<p class="text-muted text-center" style="grid-column:1/-1">Pas d\'articles similaires pour l\'instant.</p>';
   } catch {}
+}
+
+async function loadRelatedArticles(product) {
+  try {
+    const articles = await apiFetch(`/products/${product.id}/related-articles`);
+    const box = document.getElementById('related-articles-section');
+    const grid = document.getElementById('related-articles-grid');
+    if (!articles.length) { box.style.display = 'none'; return; }
+    grid.innerHTML = articles.map(a => `
+      <div class="card news-card" onclick="window.location='/actualites.html?slug=${a.slug}'">
+        <div class="news-card-img">
+          ${a.cover_image ? `<img src="${a.cover_image}" alt="${a.title}" loading="lazy" onerror="this.parentElement.innerHTML='🌸'">` : '🌸'}
+        </div>
+        <div class="news-card-body">
+          <div class="news-card-date">${formatDate(a.created_at)}</div>
+          <div class="news-card-title">${a.title}</div>
+          <p class="news-card-excerpt">${a.excerpt || ''}</p>
+          <span class="btn btn-secondary btn-sm" style="margin-top:12px">Lire l'article →</span>
+        </div>
+      </div>`).join('');
+    box.style.display = '';
+  } catch { /* pas bloquant */ }
 }
 
 function showNotFound() {
