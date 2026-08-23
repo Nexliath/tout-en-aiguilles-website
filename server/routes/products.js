@@ -11,6 +11,18 @@ const { asyncRoute } = require('../middleware/asyncRoute');
 
 const router = express.Router();
 
+// Valide/plafonne limit & offset venant de la query string (même garde-fou
+// que /news/admin/all et /newsletter/subscribers) — un ?limit=abc devient NaN
+// si non protégé, et rien n'empêche sinon un ?limit=100000 de tout renvoyer.
+function clampPagination(limitRaw, offsetRaw, { defaultLimit = 50, maxLimit = 200 } = {}) {
+  let limit = parseInt(limitRaw, 10);
+  if (!Number.isFinite(limit) || limit <= 0) limit = defaultLimit;
+  limit = Math.min(limit, maxLimit);
+  let offset = parseInt(offsetRaw, 10);
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
+  return { limit, offset };
+}
+
 // Config upload images — en mémoire : les fichiers sont redimensionnés et
 // compressés (via sharp) avant d'être écrits sur disque, voir processAndSaveImage.
 const PRODUCTS_IMG_DIR = path.join(__dirname, '../../client/assets/images/products');
@@ -30,31 +42,64 @@ function slugify(str) {
 // ─── Routes publiques ───────────────────────────────────────
 
 // GET /api/products — liste avec filtres
+// Avant cette correction, boutique.html chargeait TOUJOURS limit=100 puis
+// filtrait le prix / triait / paginait entièrement côté JS sur ce
+// sous-ensemble — au-delà de 100 produits actifs, les suivants disparaissaient
+// silencieusement et le tri prix pouvait être faux. La pagination, le tri et
+// le filtre de prix sont désormais gérés ici, côté serveur ; le total exact
+// (avant LIMIT) est renvoyé via l'en-tête X-Total-Count plutôt que de changer
+// la forme de la réponse (un tableau brut), pour ne pas casser les autres
+// appelants de cette route (produit.html, la recherche du header dans
+// main.js) qui attendent un simple tableau.
+const PRODUCTS_SORTS = {
+  newest: 'p.created_at DESC',
+  price_asc: 'p.price ASC',
+  price_desc: 'p.price DESC',
+  best_rated: 'avg_rating DESC',
+};
+
 router.get('/', (req, res) => {
-  const { category, type, search, featured, limit = 50, offset = 0 } = req.query;
-  let query = `
+  const { category, type, search, featured, min_price, max_price, sort } = req.query;
+  let limit = parseInt(req.query.limit, 10);
+  if (!Number.isFinite(limit) || limit <= 0) limit = 50;
+  limit = Math.min(limit, 100);
+  let offset = parseInt(req.query.offset, 10);
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
+
+  let where = 'WHERE p.is_active = 1';
+  const params = [];
+  if (category) { where += ' AND c.slug = ?'; params.push(category); }
+  if (type)     { where += ' AND c.type = ?'; params.push(type); }
+  if (search)   { where += ' AND (p.name LIKE ? OR p.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+  if (featured) { where += ' AND p.is_featured = 1'; }
+  if (min_price !== undefined && min_price !== '') { where += ' AND p.price >= ?'; params.push(Number(min_price) || 0); }
+  if (max_price !== undefined && max_price !== '') { where += ' AND p.price <= ?'; params.push(Number(max_price) || 0); }
+
+  const { total } = db.prepare(
+    `SELECT COUNT(*) as total FROM products p LEFT JOIN categories c ON p.category_id = c.id ${where}`
+  ).get(...params);
+
+  const orderBy = PRODUCTS_SORTS[sort] || PRODUCTS_SORTS.newest;
+  const query = `
     SELECT p.*, c.name as category_name, c.slug as category_slug, c.type as category_type,
       ROUND(AVG(CASE WHEN r.is_approved = 1 THEN r.rating END), 1) as avg_rating,
       COUNT(CASE WHEN r.is_approved = 1 THEN r.id END) as review_count
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN reviews r ON r.product_id = p.id
-    WHERE p.is_active = 1
+    ${where}
+    GROUP BY p.id
+    ORDER BY ${orderBy}
+    LIMIT ? OFFSET ?
   `;
-  const params = [];
-  if (category) { query += ' AND c.slug = ?'; params.push(category); }
-  if (type)     { query += ' AND c.type = ?'; params.push(type); }
-  if (search)   { query += ' AND (p.name LIKE ? OR p.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
-  if (featured) { query += ' AND p.is_featured = 1'; }
-  query += ' GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
-  params.push(Number(limit), Number(offset));
 
   // cost_price (prix de revient) sert au calcul de marge admin — jamais exposé publiquement
-  const products = db.prepare(query).all(...params).map(({ cost_price, ...p }) => ({
+  const products = db.prepare(query).all(...params, limit, offset).map(({ cost_price, ...p }) => ({
     ...p,
     images: JSON.parse(p.images || '[]'),
     tags: JSON.parse(p.tags || '[]')
   }));
+  res.set('X-Total-Count', String(total));
   res.json(products);
 });
 
@@ -98,6 +143,37 @@ router.post('/categories', requireAdmin, (req, res) => {
   res.status(201).json({ id: result.lastInsertRowid, name: name.trim(), slug, type });
 });
 
+// PUT /api/products/categories/:id — renommer / changer le type (admin)
+// Avant cette correction, aucune route n'existait pour corriger une
+// catégorie mal nommée — la seule option était d'en créer une nouvelle.
+router.put('/categories/:id', requireAdmin, (req, res) => {
+  const cat = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
+  if (!cat) return res.status(404).json({ error: 'Catégorie introuvable' });
+  const { name, type } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Nom requis' });
+  if (type && !['crochet', 'couture'].includes(type)) return res.status(400).json({ error: 'Type invalide' });
+  const slug = slugify(name);
+  const existing = db.prepare('SELECT * FROM categories WHERE slug = ? AND id != ?').get(slug, req.params.id);
+  if (existing) return res.status(409).json({ error: 'Une catégorie avec ce nom existe déjà' });
+  db.prepare('UPDATE categories SET name = ?, slug = ?, type = ? WHERE id = ?')
+    .run(name.trim(), slug, type || cat.type, req.params.id);
+  logActivity(req.user, 'Catégorie modifiée', `${cat.name} → ${name.trim()}`);
+  res.json({ success: true, id: cat.id, name: name.trim(), slug, type: type || cat.type });
+});
+
+// DELETE /api/products/categories/:id — supprimer une catégorie (admin)
+// Bloquée si des produits l'utilisent encore, pour ne jamais laisser un
+// produit avec une category_id orpheline.
+router.delete('/categories/:id', requireAdmin, (req, res) => {
+  const cat = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
+  if (!cat) return res.status(404).json({ error: 'Catégorie introuvable' });
+  const { n } = db.prepare('SELECT COUNT(*) as n FROM products WHERE category_id = ?').get(req.params.id);
+  if (n > 0) return res.status(409).json({ error: `Impossible de supprimer : ${n} produit(s) utilisent encore cette catégorie.` });
+  db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
+  logActivity(req.user, 'Catégorie supprimée', cat.name);
+  res.json({ success: true });
+});
+
 // ─── Favoris (authentifié) ──────────────────────────────────
 // IMPORTANT : ces routes doivent être déclarées AVANT /:slug pour ne pas être interceptées
 
@@ -120,11 +196,22 @@ router.get('/favorites/list', requireAuth, (req, res) => {
 // représentait autant de requêtes SQL synchrones. On récupère maintenant
 // toutes les variantes en une seule requête et on les regroupe en mémoire.
 router.get('/admin/all', requireAdmin, (req, res) => {
-  const products = db.prepare(`
+  // Pagination optionnelle : si ?limit n'est pas fourni, on renvoie la liste
+  // complète comme avant (l'UI admin s'appuie dessus pour la recherche/le tri
+  // côté client, l'export XLS et les actions groupées) ; un futur appelant
+  // peut opter pour la pagination en passant ?limit explicitement.
+  let query = `
     SELECT p.*, c.name as category_name FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     ORDER BY p.created_at DESC
-  `).all();
+  `;
+  const params = [];
+  if (req.query.limit !== undefined) {
+    const { limit, offset } = clampPagination(req.query.limit, req.query.offset);
+    query += ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  }
+  const products = db.prepare(query).all(...params);
   const allVariants = db.prepare('SELECT * FROM product_variants ORDER BY sort_order ASC, id ASC').all();
   const variantsByProduct = {};
   for (const v of allVariants) {
@@ -209,12 +296,20 @@ router.delete('/:id/variants/:vid', requireAdmin, (req, res) => {
 });
 
 // GET /api/products/:slug — fiche produit
+// Accepte aussi bien un slug qu'un id numérique — la majorité des liens
+// produit du site (cartes boutique, panier) utilisent ?id=, alors que le
+// sitemap et la recherche header utilisent ?slug= ; avant cette correction,
+// seule la variante slug fonctionnait ici et produit.html devait charger
+// jusqu'à 200 produits côté client pour retrouver le bon par id (en plus
+// d'être cassé par le plafond de pagination introduit sur GET /products).
 router.get('/:slug', (req, res) => {
+  const param = req.params.slug;
+  const asId = /^\d+$/.test(param) ? Number(param) : -1;
   const p = db.prepare(`
     SELECT p.*, c.name as category_name, c.slug as category_slug, c.type as category_type
     FROM products p LEFT JOIN categories c ON p.category_id = c.id
-    WHERE p.slug = ? AND p.is_active = 1
-  `).get(req.params.slug);
+    WHERE (p.slug = ? OR p.id = ?) AND p.is_active = 1
+  `).get(param, asId);
   if (!p) return res.status(404).json({ error: 'Produit introuvable' });
   const variants = db.prepare('SELECT * FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC').all(p.id)
     .map(v => ({ ...v, images: JSON.parse(v.images || '[]') }));
