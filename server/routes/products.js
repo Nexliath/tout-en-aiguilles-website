@@ -258,6 +258,9 @@ router.delete('/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM favorites WHERE product_id = ?').run(id);
   db.prepare('DELETE FROM product_variants WHERE product_id = ?').run(id);
   db.prepare('DELETE FROM stock_alerts WHERE product_id = ?').run(id);
+  // Avis liés : sans le produit, ils n'ont plus de contexte affichable — on les retire proprement
+  db.prepare('DELETE FROM review_photos WHERE review_id IN (SELECT id FROM reviews WHERE product_id = ?)').run(id);
+  db.prepare('DELETE FROM reviews WHERE product_id = ?').run(id);
   db.prepare('DELETE FROM products WHERE id = ?').run(id);
   res.json({ success: true });
 });
