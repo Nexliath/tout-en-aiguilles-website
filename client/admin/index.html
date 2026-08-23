@@ -130,12 +130,15 @@
 
     <!-- Paniers abandonnés -->
     <div class="admin-panel" style="margin-top:24px">
-      <div class="admin-panel-title">🛒 Paniers abandonnés récents</div>
+      <div class="admin-panel-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>🛒 Paniers abandonnés récents</span>
+        <span id="abandoned-carts-count" style="font-size:.75rem;font-weight:400;color:var(--text-light)"></span>
+      </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
-          <thead><tr><th>Email</th><th>Articles</th><th>Relances</th><th>Statut</th><th>Dernière activité</th></tr></thead>
+          <thead><tr><th>Email</th><th>Articles</th><th>Relances</th><th>Statut</th><th>Dernière activité</th><th>Action</th></tr></thead>
           <tbody id="abandoned-carts-body">
-            <tr><td colspan="5" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            <tr><td colspan="6" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -181,7 +184,10 @@
 window.ADMIN_ON_READY = function() { loadDashboard(); };
 
 // ─── Gestion de la période ────────────────────────────────────
-let _allOrders  = [];
+// Les stats de période, le graphique 12 mois et le top des ventes sont
+// désormais calculés côté serveur (agrégations SQL) plutôt que recalculés
+// en JS sur l'historique complet des commandes à chaque chargement/clic —
+// ça reste rapide même quand l'historique grossit.
 let _viewMode   = 'month';   // 'month' | 'year'
 let _periodDate = new Date(); // date représentant le mois/an courant
 
@@ -190,14 +196,6 @@ const MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août'
 function periodLabel() {
   if (_viewMode === 'year')  return String(_periodDate.getFullYear());
   return `${MOIS[_periodDate.getMonth()]} ${_periodDate.getFullYear()}`;
-}
-
-function ordersInPeriod() {
-  return _allOrders.filter(o => {
-    const d = new Date(o.created_at);
-    if (_viewMode === 'year')  return d.getFullYear() === _periodDate.getFullYear();
-    return d.getFullYear() === _periodDate.getFullYear() && d.getMonth() === _periodDate.getMonth();
-  });
 }
 
 function changePeriod(dir) {
@@ -216,7 +214,7 @@ function setViewMode(mode) {
   updatePeriodStats();
 }
 
-function updatePeriodStats() {
+async function updatePeriodStats() {
   const label  = periodLabel();
   const isYear = _viewMode === 'year';
   document.getElementById('period-label').textContent = label;
@@ -231,25 +229,29 @@ function updatePeriodStats() {
   document.getElementById('btn-next-period').disabled = atNow;
   document.getElementById('btn-next-period').style.opacity = atNow ? '.35' : '1';
 
-  const periodOrders = ordersInPeriod();
-  const paidOrders   = periodOrders.filter(o => ['paid','shipped','delivered'].includes(o.status));
-  const revenue      = paidOrders.reduce((s, o) => s + Number(o.total), 0);
-
-  document.getElementById('stat-orders').textContent  = periodOrders.length;
-  document.getElementById('stat-revenue').textContent = revenue.toFixed(0) + ' €';
+  try {
+    const params = new URLSearchParams({ year: _periodDate.getFullYear() });
+    if (!isYear) params.set('month', _periodDate.getMonth());
+    const stats = await apiFetch(`/orders/admin/stats?${params}`);
+    document.getElementById('stat-orders').textContent  = stats.orders_count;
+    document.getElementById('stat-revenue').textContent = stats.revenue.toFixed(0) + ' €';
+  } catch (e) {
+    document.getElementById('stat-orders').textContent  = '—';
+    document.getElementById('stat-revenue').textContent = '—';
+  }
 }
 
 async function loadDashboard() {
   document.getElementById('admin-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
   try {
-    const [products, orders, reviews] = await Promise.all([
+    const [products, orders, reviews, revenueChart, topSellers] = await Promise.all([
       apiFetch('/products/admin/all'),
       apiFetch('/orders'),
-      apiFetch('/reviews/admin').catch(() => [])
+      apiFetch('/reviews/admin').catch(() => []),
+      apiFetch('/orders/admin/revenue-chart?months=12').catch(() => []),
+      apiFetch('/orders/admin/top-sellers?days=30&limit=10').catch(() => [])
     ]);
-
-    _allOrders = orders;
 
     // Stats permanentes
     const active  = products.filter(p => p.is_active);
@@ -266,25 +268,19 @@ async function loadDashboard() {
     document.getElementById('stat-pendingreviews').textContent = pendingReviews.length;
     document.getElementById('stat-pendingreviews').style.color = pendingReviews.length ? '#856404' : 'var(--sage-dark)';
 
-    // Stats de période (mois courant par défaut)
+    // Stats de période (mois courant par défaut) — agrégées côté serveur
     updatePeriodStats();
 
-    // Tableau dernières commandes
-    // Graphique 12 mois
-    const chartMonths = [], chartRevenues = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
-      const y = d.getFullYear(), m = d.getMonth();
-      const mo = orders.filter(o => { const od = new Date(o.created_at); return od.getFullYear()===y && od.getMonth()===m && ['paid','shipped','delivered'].includes(o.status); });
-      chartMonths.push(new Intl.DateTimeFormat('fr-FR',{month:'short',year:'2-digit'}).format(d));
-      chartRevenues.push(Math.round(mo.reduce((s,o)=>s+Number(o.total),0)*100)/100);
-    }
+    // Graphique 12 mois — agrégé côté serveur (GROUP BY SQL)
     if (window._revenueChart) window._revenueChart.destroy();
     const ctx = document.getElementById('revenue-chart')?.getContext('2d');
     if (ctx && typeof Chart !== 'undefined') {
       window._revenueChart = new Chart(ctx, {
         type: 'bar',
-        data: { labels: chartMonths, datasets: [{ label: 'CA (€)', data: chartRevenues, backgroundColor: 'rgba(192,113,138,0.65)', borderColor: 'rgba(192,113,138,1)', borderWidth: 1, borderRadius: 6 }] },
+        data: {
+          labels: revenueChart.map(m => m.label),
+          datasets: [{ label: 'CA (€)', data: revenueChart.map(m => m.revenue), backgroundColor: 'rgba(192,113,138,0.65)', borderColor: 'rgba(192,113,138,1)', borderWidth: 1, borderRadius: 6 }]
+        },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' €' } } } }
       });
     }
@@ -302,8 +298,8 @@ async function loadDashboard() {
           <td><a href="commandes.html" class="btn btn-ghost btn-sm">Voir →</a></td>
         </tr>`).join('')
       : '<tr><td colspan="7" style="text-align:center;color:var(--text-light);padding:24px">Aucune commande pour l\'instant</td></tr>';
-    // Meilleures ventes — 30 derniers jours
-    renderTopSellers(orders);
+    // Meilleures ventes — 30 derniers jours, agrégées côté serveur
+    renderTopSellers(topSellers);
   } catch (e) {
     console.error(e);
     // Avant cette correction, un échec ici (session expirée, erreur serveur)
@@ -319,24 +315,14 @@ async function loadDashboard() {
   loadActivityLog();
 }
 
-function renderTopSellers(orders) {
-  const since = new Date(); since.setDate(since.getDate() - 30);
-  const relevant = orders.filter(o => new Date(o.created_at) >= since && ['paid', 'shipped', 'delivered'].includes(o.status));
-  const tally = {}; // name -> { qty, revenue }
-  for (const o of relevant) {
-    for (const item of (o.items || [])) {
-      const key = item.name;
-      if (!tally[key]) tally[key] = { qty: 0, revenue: 0 };
-      tally[key].qty += Number(item.qty) || 0;
-      tally[key].revenue += (Number(item.qty) || 0) * (Number(item.price) || 0);
-    }
-  }
-  const ranked = Object.entries(tally).sort((a, b) => b[1].qty - a[1].qty).slice(0, 10);
+// Reçoit directement le classement déjà agrégé par /orders/admin/top-sellers
+// (SQL GROUP BY côté serveur) — plus de dépouillement JS des commandes ici.
+function renderTopSellers(ranked) {
   const tbody = document.getElementById('top-sellers-body');
   tbody.innerHTML = ranked.length
-    ? ranked.map(([name, d], i) => `
+    ? ranked.map((d, i) => `
       <tr>
-        <td style="font-weight:700">${i < 3 ? ['🥇','🥈','🥉'][i] : ''} ${name}</td>
+        <td style="font-weight:700">${i < 3 ? ['🥇','🥈','🥉'][i] : ''} ${escapeHtml(d.name)}</td>
         <td>${d.qty}</td>
         <td style="color:var(--rose-dark);font-weight:700">${d.revenue.toFixed(2)} €</td>
       </tr>`).join('')
@@ -345,21 +331,29 @@ function renderTopSellers(orders) {
 
 async function loadAbandonedCarts() {
   const tbody = document.getElementById('abandoned-carts-body');
+  const countEl = document.getElementById('abandoned-carts-count');
   try {
     const carts = await apiFetch('/admin/cart-sessions');
-    const notConverted = carts.filter(c => !c.converted).slice(0, 15);
+    const allNotConverted = carts.filter(c => !c.converted);
+    const notConverted = allNotConverted.slice(0, 15);
+    if (countEl) {
+      countEl.textContent = allNotConverted.length > 15
+        ? `${notConverted.length} affiché(s) sur ${allNotConverted.length}`
+        : `${allNotConverted.length} panier${allNotConverted.length > 1 ? 's' : ''}`;
+    }
     tbody.innerHTML = notConverted.length
       ? notConverted.map(c => `
         <tr>
-          <td style="font-size:.85rem">${c.email || '<span style="color:var(--text-light)">Anonyme</span>'}</td>
+          <td style="font-size:.85rem">${c.email ? escapeHtml(c.email) : '<span style="color:var(--text-light)">Anonyme</span>'}</td>
           <td>${(c.items || []).length} article${(c.items || []).length > 1 ? 's' : ''}</td>
           <td style="font-size:.78rem">${c.email_1h_sent ? '✓ 1h ' : ''}${c.email_24h_sent ? '✓ 24h' : ''}${!c.email_1h_sent && !c.email_24h_sent ? '<span style="color:var(--text-light)">Aucune</span>' : ''}</td>
           <td><span style="font-size:.78rem;color:var(--text-light)">Non converti</span></td>
           <td style="font-size:.78rem;color:var(--text-light)">${formatDate(c.updated_at)}</td>
+          <td>${c.email ? `<a href="mailto:${encodeURIComponent(c.email)}" style="font-size:.78rem;color:var(--rose-dark)">✉️ Relancer</a>` : '—'}</td>
         </tr>`).join('')
-      : '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)">Aucun panier abandonné</td></tr>';
+      : '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-light)">Aucun panier abandonné</td></tr>';
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
 }
 
