@@ -129,34 +129,55 @@ router.post('/send-test', requireAdmin, async (req, res) => {
 // ─── Historique des campagnes (admin) ───────────────────────
 router.get('/campaigns', requireAdmin, (req, res) => {
   try {
-    const campaigns = db.prepare('SELECT id, subject, recipients, errors, sent_at FROM newsletter_campaigns ORDER BY sent_at DESC LIMIT 50').all();
+    const campaigns = db.prepare('SELECT id, subject, recipients, errors, status, sent_at FROM newsletter_campaigns ORDER BY sent_at DESC LIMIT 50').all();
     res.json(campaigns);
   } catch (e) { res.json([]); }
 });
 
+// Nombre d'envois traités en parallèle par lot — assez pour accélérer
+// nettement l'envoi sur une grosse liste, sans risquer de saturer l'API
+// Brevo (pas de garantie de rate-limit documentée côté Brevo, mieux vaut
+// rester prudent).
+const NEWSLETTER_BATCH_SIZE = 5;
+
 // ─── Envoi newsletter (admin) ───────────────────────────────
-router.post('/send', requireAdmin, async (req, res) => {
+// Répond immédiatement à l'admin (statut "en cours" persisté en base) puis
+// poursuit l'envoi par lots en arrière-plan — avant cette correction,
+// l'envoi complet à toute la liste se faisait email par email DANS la
+// requête HTTP : sur une grosse liste de subscribers, ça risquait de
+// dépasser le timeout du proxy/navigateur, laissant l'admin sans aucune
+// visibilité sur l'avancement réel côté serveur (qui continuait pourtant).
+router.post('/send', requireAdmin, asyncRoute(async (req, res) => {
   const { subject, html_content } = req.body;
   if (!subject || !html_content) return res.status(400).json({ error: 'Sujet et contenu requis' });
 
   let subs = [];
   try { subs = db.prepare('SELECT * FROM newsletter_subscribers WHERE is_active = 1').all(); } catch(e) {}
-  if (!subs.length) return res.json({ success: true, sent: 0, errors: 0, total: 0 });
+  if (!subs.length) return res.json({ success: true, sent: 0, errors: 0, total: 0, queued: false });
 
-  let sent = 0, errors = 0;
-  for (const sub of subs) {
+  const campaignResult = db.prepare(
+    "INSERT INTO newsletter_campaigns (subject, html_content, recipients, errors, status) VALUES (?, ?, 0, 0, 'sending')"
+  ).run(subject, html_content);
+  const campaignId = campaignResult.lastInsertRowid;
+
+  res.json({ success: true, queued: true, total: subs.length });
+
+  (async () => {
+    let sent = 0, errors = 0;
+    for (let i = 0; i < subs.length; i += NEWSLETTER_BATCH_SIZE) {
+      const batch = subs.slice(i, i + NEWSLETTER_BATCH_SIZE);
+      const results = await Promise.all(batch.map(sub =>
+        sendOne(sub.email, sub.first_name, subject, html_content).catch(() => false)
+      ));
+      results.forEach(ok => { if (ok) sent++; else errors++; });
+    }
+    console.log(`📧 Newsletter envoyée : ${sent} succès, ${errors} erreurs`);
     try {
-      const ok = await sendOne(sub.email, sub.first_name, subject, html_content);
-      if (ok) sent++; else errors++;
-    } catch(e) { errors++; }
-  }
-  console.log(`📧 Newsletter envoyée : ${sent} succès, ${errors} erreurs`);
-  try {
-    db.prepare('INSERT INTO newsletter_campaigns (subject, html_content, recipients, errors) VALUES (?, ?, ?, ?)')
-      .run(subject, html_content, sent, errors);
-  } catch (e) {}
-  logActivity(req.user, 'Newsletter envoyée', `"${subject}" → ${sent} destinataire(s)`);
-  res.json({ success: true, sent, errors, total: subs.length });
-});
+      db.prepare("UPDATE newsletter_campaigns SET recipients = ?, errors = ?, status = 'completed' WHERE id = ?")
+        .run(sent, errors, campaignId);
+    } catch (e) {}
+    logActivity(req.user, 'Newsletter envoyée', `"${subject}" → ${sent} destinataire(s)`);
+  })().catch(err => console.error('Erreur envoi newsletter (arrière-plan):', err.message));
+}));
 
 module.exports = router;
