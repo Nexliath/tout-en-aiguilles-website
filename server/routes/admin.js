@@ -24,8 +24,9 @@ router.get('/cart-sessions', requireAdmin, (req, res) => {
 // ─── GET /api/admin/users — liste tous les utilisateurs ─────
 router.get('/users', requireAdmin, (req, res) => {
   const users = db.prepare(
-    'SELECT id, email, first_name, last_name, username, role, email_verified, avatar_url, created_at FROM users ORDER BY created_at DESC'
+    'SELECT id, email, first_name, last_name, username, role, email_verified, avatar_url, created_at, mfa_enabled FROM users ORDER BY created_at DESC'
   ).all();
+  users.forEach(u => { u.mfa_enabled = !!u.mfa_enabled; });
   res.json(users);
 });
 
