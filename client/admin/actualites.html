@@ -57,7 +57,6 @@
       <div class="stat-card"><div class="stat-val" id="stat-published">—</div><div class="stat-label">Publiés</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-drafts">—</div><div class="stat-label">Brouillons</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-scheduled">—</div><div class="stat-label">Programmés</div></div>
-      <div class="stat-card"><div class="stat-val" id="stat-views">—</div><div class="stat-label">Vues totales</div></div>
     </div>
 
     <!-- Toolbar : recherche + tri -->
@@ -316,12 +315,10 @@ function renderStats() {
   const total = allArticles.length;
   const published = allArticles.filter(a => a.published).length;
   const scheduled = allArticles.filter(a => isScheduled(a)).length;
-  const totalViews = allArticles.reduce((sum, a) => sum + (a.views || 0), 0);
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-published').textContent = published;
   document.getElementById('stat-drafts').textContent = total - published;
   document.getElementById('stat-scheduled').textContent = scheduled;
-  document.getElementById('stat-views').textContent = totalViews.toLocaleString('fr-FR');
 }
 
 function populateCategoryFilter() {
