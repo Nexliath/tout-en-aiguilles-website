@@ -103,6 +103,13 @@
           <button class="filter-chip" data-filter="email" data-val="1">✅ Vérifiés</button>
           <button class="filter-chip" data-filter="email" data-val="0">⏳ En attente</button>
         </div>
+
+        <!-- Filtres MFA -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="filter-chip active" data-filter="mfa" data-val="">Tout MFA</button>
+          <button class="filter-chip" data-filter="mfa" data-val="1">🔐 Activé</button>
+          <button class="filter-chip" data-filter="mfa" data-val="0">⚠️ Désactivé</button>
+        </div>
       </div>
 
       <!-- ── Tri ── -->
@@ -125,13 +132,14 @@
               <th>Pseudo</th>
               <th>Email</th>
               <th>Statut email</th>
+              <th>MFA</th>
               <th>Rôle</th>
               <th>Inscrit le</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="users-body">
-            <tr><td colspan="8" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            <tr><td colspan="9" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -158,6 +166,7 @@ let deleteTarget = null;
 let sortState = { key: 'date', dir: 'desc' };
 let filterRole = '';
 let filterEmail = '';
+let filterMfa = '';
 
 window.ADMIN_ON_READY = function() { loadUsers(); };
 
@@ -166,10 +175,11 @@ async function loadUsers() {
   try {
     allUsers = await apiFetch('/admin/users');
     document.getElementById('user-count').textContent = `${allUsers.length} compte${allUsers.length > 1 ? 's' : ''}`;
+    allUsers.forEach(u => { u.mfa_enabled = !!u.mfa_enabled; });
     applyFiltersAndSort();
   } catch (e) {
     document.getElementById('users-body').innerHTML =
-      `<tr><td colspan="8" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
+      `<tr><td colspan="9" style="text-align:center;color:#d9534f;padding:24px">Erreur : ${e.message}</td></tr>`;
   }
 }
 
@@ -185,7 +195,8 @@ function applyFiltersAndSort() {
       || (u.username || '').toLowerCase().includes(q);
     const matchRole  = !filterRole  || u.role === filterRole;
     const matchEmail = filterEmail === '' || String(u.email_verified) === filterEmail;
-    return matchSearch && matchRole && matchEmail;
+    const matchMfa   = filterMfa === '' || String(u.mfa_enabled ? 1 : 0) === filterMfa;
+    return matchSearch && matchRole && matchEmail && matchMfa;
   });
 
   // Tri
@@ -209,7 +220,7 @@ function renderUsers(users) {
   const me = Auth.getUser();
   const tbody = document.getElementById('users-body');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:32px">Aucun utilisateur trouvé</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-light);padding:32px">Aucun utilisateur trouvé</td></tr>';
     return;
   }
   tbody.innerHTML = users.map(u => {
@@ -237,6 +248,11 @@ function renderUsers(users) {
         ${u.email_verified
           ? '<span style="color:#5a9e6f;font-size:.8rem;font-weight:600">✅ Vérifié</span>'
           : '<span style="color:#c8937a;font-size:.8rem;font-weight:600">⏳ En attente</span>'}
+      </td>
+      <td>
+        ${u.mfa_enabled
+          ? '<span style="color:#5a9e6f;font-size:.8rem;font-weight:600">🔐 Activé</span>'
+          : `<span style="color:${u.role === 'admin' ? '#d9534f' : 'var(--text-light)'};font-size:.8rem;font-weight:600">${u.role === 'admin' ? '⚠️ Désactivé' : '— Désactivé'}</span>`}
       </td>
       <td>
         <span class="order-status ${u.role === 'admin' ? 'status-paid' : 'status-pending'}" style="font-size:.75rem">
@@ -355,6 +371,7 @@ document.querySelectorAll('.filter-chip').forEach(btn => {
     this.classList.add('active');
     if (group === 'role')  filterRole  = this.dataset.val;
     if (group === 'email') filterEmail = this.dataset.val;
+    if (group === 'mfa')   filterMfa   = this.dataset.val;
     applyFiltersAndSort();
   });
 });
@@ -387,7 +404,8 @@ function exportXLS() {
       || u.email.toLowerCase().includes(q);
     const matchRole  = !filterRole  || u.role === filterRole;
     const matchEmail = filterEmail === '' || String(u.email_verified) === filterEmail;
-    return matchSearch && matchRole && matchEmail;
+    const matchMfa   = filterMfa === '' || String(u.mfa_enabled ? 1 : 0) === filterMfa;
+    return matchSearch && matchRole && matchEmail && matchMfa;
   });
 
   if (!list.length) { Toast.show('Aucun utilisateur à exporter', 'info'); return; }
@@ -400,6 +418,7 @@ function exportXLS() {
     'Email':          u.email,
     'Rôle':           u.role === 'admin' ? 'Administrateur' : 'Utilisateur',
     'Email vérifié':  u.email_verified ? 'Oui' : 'Non',
+    'MFA activé':     u.mfa_enabled ? 'Oui' : 'Non',
     'Date inscription': u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '',
   }));
 
@@ -407,7 +426,7 @@ function exportXLS() {
   // Largeurs colonnes
   ws['!cols'] = [
     {wch:6},{wch:14},{wch:16},{wch:16},{wch:30},
-    {wch:16},{wch:14},{wch:18}
+    {wch:16},{wch:14},{wch:12},{wch:18}
   ];
   const wb   = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Utilisateurs');
