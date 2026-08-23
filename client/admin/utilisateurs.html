@@ -61,28 +61,8 @@
 </div>
 
 <div id="admin-content" class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
-  </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <!-- Sidebar -->
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html">📊 Tableau de bord</a>
-      <a href="produits.html">🧶 Produits</a>
-      <a href="commandes.html">📦 Commandes</a>
-      <a href="actualites.html">📝 Actualités</a>
-      <a href="utilisateurs.html" class="active">👥 Utilisateurs</a>
-      <a href="avis.html">⭐ Avis</a>
-      <a href="promo.html">🏷️ Codes promo</a>
-      <a href="newsletter.html">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <!-- Main -->
   <main class="admin-main">
