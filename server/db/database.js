@@ -158,8 +158,6 @@ const migrations = [
     is_active INTEGER DEFAULT 1,
     sort_order INTEGER DEFAULT 0
   )`,
-  "ALTER TABLE order_items ADD COLUMN variant_id INTEGER DEFAULT NULL",
-  "ALTER TABLE order_items ADD COLUMN variant_label TEXT DEFAULT NULL",
   // Compteur de lecture des articles (actualités)
   "ALTER TABLE news ADD COLUMN views INTEGER NOT NULL DEFAULT 0",
   // Réponse publique de l'admin à un avis client
