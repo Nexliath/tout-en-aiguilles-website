@@ -174,6 +174,22 @@ const migrations = [
     errors INTEGER DEFAULT 0,
     sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
+  // Coût de revient (pour calcul de marge) + champs SEO produits
+  "ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT NULL",
+  "ALTER TABLE products ADD COLUMN meta_title TEXT DEFAULT NULL",
+  "ALTER TABLE products ADD COLUMN meta_description TEXT DEFAULT NULL",
+  // Champs SEO articles
+  "ALTER TABLE news ADD COLUMN meta_title TEXT DEFAULT NULL",
+  "ALTER TABLE news ADD COLUMN meta_description TEXT DEFAULT NULL",
+  // Journal d'activité admin
+  `CREATE TABLE IF NOT EXISTS admin_activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER,
+    admin_name TEXT,
+    action TEXT NOT NULL,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 for (const sql of migrations) {
   try { _db.exec(sql); } catch (e) { /* colonne déjà présente ou migration déjà appliquée */ }
