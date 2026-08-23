@@ -394,14 +394,14 @@ async function loadProduct() {
     renderReviewForm();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('product-detail').style.display = '';
-    document.title = `${product.name} — Création crochet faite main | Tout en Aiguilles`;
+    document.title = product.meta_title?.trim() || `${product.name} — Création crochet faite main | Tout en Aiguilles`;
     // ── SEO dynamique ────────────────────────────────────────
     const BASE = 'https://tout-en-aiguilles.com';
     const slug = new URLSearchParams(location.search).get('slug');
     const pageUrl = `${BASE}/produit.html?slug=${slug}`;
-    const desc = product.description
+    const desc = product.meta_description?.trim() || (product.description
       ? product.description.slice(0, 160).replace(/\n/g, ' ')
-      : `${product.name} — création artisanale crochet faite main par Tout en Aiguilles.`;
+      : `${product.name} — création artisanale crochet faite main par Tout en Aiguilles.`);
     const img = product.images?.[0] ? `${BASE}${product.images[0]}` : '';
 
     // Meta description
@@ -413,13 +413,13 @@ async function loadProduct() {
     document.getElementById('seo-canonical').href = pageUrl;
 
     // Open Graph
-    document.getElementById('og-title').content       = `${product.name} — Tout en Aiguilles`;
+    document.getElementById('og-title').content       = document.title;
     document.getElementById('og-description').content = desc;
     document.getElementById('og-image').content       = img;
     document.getElementById('og-url').content         = pageUrl;
 
     // Twitter
-    document.getElementById('tw-title').content       = `${product.name} — Tout en Aiguilles`;
+    document.getElementById('tw-title').content       = document.title;
     document.getElementById('tw-description').content = desc;
     document.getElementById('tw-image').content       = img;
 
