@@ -98,7 +98,7 @@
     <div class="mobile-filter-bar">
       <div class="mobile-search-wrap">
         <span class="mobile-search-icon">🔍</span>
-        <input type="text" id="mobile-search-input" class="mobile-search-field" placeholder="Rechercher une création…">
+        <input type="text" id="mobile-search-input" class="mobile-search-field" placeholder="Rechercher une création…" aria-label="Rechercher une création">
       </div>
       <button class="mobile-filter-toggle" id="mobile-filter-toggle" onclick="openFilterSheet()">
         ⚙️ Filtres <span id="mobile-filter-count" class="filter-badge" style="display:none">0</span>
@@ -228,15 +228,45 @@
 <script>
 var PAGE_SIZE = 12;        // produits par page
 var state = { type: '', category: '', search: '', sort: 'newest', page: 0 };
-var _allProducts = [];     // cache complet (fetch une seule fois par changement de filtre API)
 var searchTimer;
+var _productsAbortController = null; // annule une requête loadProducts() obsolète encore en vol
 
-// Parse URL params on load
+// Parse URL params on load — tri/prix/page inclus désormais (avant cette
+// correction, seuls type/category/search étaient restaurés : partager un
+// lien filtré+trié ou utiliser le bouton retour du navigateur ne
+// fonctionnait pas).
 function initFromURL() {
   var p = new URLSearchParams(location.search);
   if (p.get('type'))     { state.type     = p.get('type'); }
   if (p.get('category')) { state.category = p.get('category'); }
-  if (p.get('search'))   { state.search   = p.get('search'); document.getElementById('search-input').value = state.search; }
+  if (p.get('search'))   {
+    state.search = p.get('search');
+    document.getElementById('search-input').value = state.search;
+    document.getElementById('mobile-search-input').value = state.search;
+  }
+  if (p.get('sort'))      { document.getElementById('sort-select').value = p.get('sort'); }
+  if (p.get('min_price')) { document.getElementById('price-min').value = p.get('min_price'); }
+  if (p.get('max_price')) { document.getElementById('price-max').value = p.get('max_price'); }
+  if (p.get('page'))      { state.page = Math.max(0, (parseInt(p.get('page'), 10) || 1) - 1); }
+}
+
+// Reflète l'état courant (filtres/tri/page) dans l'URL sans recharger la
+// page ni empiler une entrée d'historique par changement (replaceState) —
+// rend l'URL partageable et cohérente au rechargement.
+function syncStateToURL() {
+  var params = new URLSearchParams();
+  if (state.type)     params.set('type', state.type);
+  if (state.category) params.set('category', state.category);
+  if (state.search)   params.set('search', state.search);
+  var sortVal = document.getElementById('sort-select').value;
+  if (sortVal && sortVal !== 'newest') params.set('sort', sortVal);
+  var pMin = document.getElementById('price-min').value;
+  var pMax = document.getElementById('price-max').value;
+  if (pMin) params.set('min_price', pMin);
+  if (pMax) params.set('max_price', pMax);
+  if (state.page > 0) params.set('page', state.page + 1);
+  var qs = params.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
 }
 
 function selectCat(slug) { state.category = slug; state.page = 0; loadProducts(); }
@@ -282,48 +312,67 @@ async function loadCategories() {
   }
 }
 
-// ─── Chargement depuis l'API (sans pagination — limit=100) ────
+// ─── Chargement depuis l'API — pagination/tri/filtre prix réels côté
+// serveur (voir server/routes/products.js). Avant cette correction, un seul
+// fetch limit=100 était mis en cache puis filtré/trié/paginé entièrement en
+// JS : au-delà de 100 produits actifs, les suivants disparaissaient
+// silencieusement et le tri prix pouvait être faux sur le sous-ensemble.
 async function loadProducts() {
   var grid = document.getElementById('products-grid');
   grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Chargement…</div>';
 
-  var params = new URLSearchParams({ limit: 100 });
+  // Annule une requête précédente encore en vol (ex. frappe rapide dans la
+  // recherche) pour qu'une réponse obsolète n'écrase pas un résultat plus
+  // récent arrivé entre-temps.
+  if (_productsAbortController) _productsAbortController.abort();
+  var controller = new AbortController();
+  _productsAbortController = controller;
+
+  var pMin = document.getElementById('price-min').value;
+  var pMax = document.getElementById('price-max').value;
+  var sort = document.getElementById('sort-select').value;
+
+  var params = new URLSearchParams();
   if (state.type)     params.append('type', state.type);
   if (state.category) params.append('category', state.category);
   if (state.search)   params.append('search', state.search);
+  if (pMin)            params.append('min_price', pMin);
+  if (pMax)            params.append('max_price', pMax);
+  if (sort && sort !== 'newest') params.append('sort', sort);
+  params.append('limit', PAGE_SIZE);
+  params.append('offset', state.page * PAGE_SIZE);
+
+  syncStateToURL();
 
   try {
-    _allProducts = await apiFetch('/products?' + params.toString());
-    state.page = 0; // reset à la page 1 dès qu'on charge
-    renderProducts();
+    var res = await fetch(API + '/products?' + params.toString(), { signal: controller.signal });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+    var total = Number(res.headers.get('X-Total-Count'));
+    if (!Number.isFinite(total)) total = data.length;
+
+    // Si les filtres ont réduit le nombre de résultats sous la page
+    // actuelle (ex. on était en page 3, un filtre ne laisse plus qu'1
+    // page), on se recale sur la dernière page valide et on refait UNE
+    // requête corrigée plutôt que d'afficher une page vide.
+    var pages = Math.ceil(total / PAGE_SIZE) || 1;
+    if (state.page > 0 && state.page >= pages) {
+      state.page = pages - 1;
+      return loadProducts();
+    }
+    renderProducts(data, total, pages);
   } catch (e) {
+    if (e.name === 'AbortError') return; // requête annulée, une plus récente est en vol
     grid.innerHTML = '<p class="text-muted text-center" style="grid-column:1/-1">Erreur de chargement : ' + e.message + '</p>';
   }
 }
 
-// ─── Filtrage / tri / pagination côté client ──────────────────
-function renderProducts() {
+// ─── Rendu de la page reçue du serveur (déjà filtrée/triée/paginée) ────
+function renderProducts(items, total, pages) {
   var grid = document.getElementById('products-grid');
-  var pMin = parseFloat(document.getElementById('price-min').value) || 0;
-  var pMax = parseFloat(document.getElementById('price-max').value) || Infinity;
-
-  // Filtre prix
-  var filtered = _allProducts.filter(function(p) {
-    return (!pMin || p.price >= pMin) && (pMax === Infinity || p.price <= pMax);
-  });
-
-  // Tri
-  var sort = document.getElementById('sort-select').value;
-  if (sort === 'price_asc')  filtered.sort(function(a,b) { return a.price - b.price; });
-  if (sort === 'price_desc') filtered.sort(function(a,b) { return b.price - a.price; });
-  if (sort === 'best_rated') filtered.sort(function(a,b) { return (Number(b.avg_rating)||0) - (Number(a.avg_rating)||0); });
-
-  var total = filtered.length;
-  var pages = Math.ceil(total / PAGE_SIZE) || 1;
-  if (state.page >= pages) state.page = pages - 1;
 
   // Affichage compteur
-  var start = state.page * PAGE_SIZE + 1;
+  var start = total === 0 ? 0 : state.page * PAGE_SIZE + 1;
   var end   = Math.min((state.page + 1) * PAGE_SIZE, total);
   var countEl = document.getElementById('results-count');
   if (total === 0) {
@@ -334,9 +383,7 @@ function renderProducts() {
     countEl.textContent = total + ' création' + (total !== 1 ? 's' : '') + ' trouvée' + (total !== 1 ? 's' : '');
   }
 
-  // Grille
-  var pageItems = filtered.slice(state.page * PAGE_SIZE, (state.page + 1) * PAGE_SIZE);
-  if (!pageItems.length) {
+  if (!items.length) {
     grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🧶</div><h3>Aucune création trouvée</h3><p>Essayez de modifier vos filtres</p><button id="empty-reset-btn" class="btn btn-primary mt-md">Tout voir</button></div>';
     var emptyBtn = document.getElementById('empty-reset-btn');
     if (emptyBtn) emptyBtn.addEventListener('click', resetFilters);
@@ -344,7 +391,7 @@ function renderProducts() {
     return;
   }
 
-  grid.innerHTML = pageItems.map(renderProductCard).join('');
+  grid.innerHTML = items.map(renderProductCard).join('');
   renderPagination(pages, total);
 }
 
@@ -384,7 +431,7 @@ function renderPagination(pages, total) {
   paginEl.querySelectorAll('.page-btn:not(.disabled)').forEach(function(btn) {
     btn.addEventListener('click', function() {
       state.page = Number(this.dataset.page);
-      renderProducts();
+      loadProducts();
       window.scrollTo({ top: 200, behavior: 'smooth' });
     });
   });
@@ -454,12 +501,12 @@ document.getElementById('search-input').addEventListener('input', function() {
   }, 350);
 });
 
-// Prix min/max — filtre client-side, pas d'appel API
-document.getElementById('price-min').addEventListener('change', function() { state.page = 0; renderProducts(); updateFilterBadge(); });
-document.getElementById('price-max').addEventListener('change', function() { state.page = 0; renderProducts(); updateFilterBadge(); });
+// Prix min/max — filtrés côté serveur désormais
+document.getElementById('price-min').addEventListener('change', function() { state.page = 0; loadProducts(); updateFilterBadge(); });
+document.getElementById('price-max').addEventListener('change', function() { state.page = 0; loadProducts(); updateFilterBadge(); });
 
-// Tri — client-side
-document.getElementById('sort-select').addEventListener('change', function() { state.page = 0; renderProducts(); });
+// Tri — côté serveur désormais
+document.getElementById('sort-select').addEventListener('change', function() { state.page = 0; loadProducts(); });
 
 // Reset
 document.getElementById('reset-filters-btn').addEventListener('click', function() {
