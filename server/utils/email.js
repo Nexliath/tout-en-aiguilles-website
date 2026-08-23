@@ -480,6 +480,46 @@ async function sendNewOrderNotification(order) {
     `Nouvelle commande #${order.id} de ${order.first_name} ${order.last_name} (${order.email}) — Total : ${Number(order.total).toFixed(2)} €`);
 }
 
+// ─── Alerte boutique — survente détectée à la finalisation d'une commande ──
+// Le stock est vérifié à la création de la commande, mais seulement
+// décrémenté une fois le paiement confirmé (webhook Stripe / capture
+// PayPal) — un court instant plus tard. Si deux commandes se finalisent
+// "en même temps" pour les derniers exemplaires d'un article, la seconde
+// peut ne plus avoir assez de stock à décrémenter : elle est quand même
+// honorée (le client a déjà payé), mais Victorine doit être prévenue pour
+// gérer le réassort ou contacter le client si besoin.
+async function sendOversellAlert(order, oversoldItems) {
+  const SHOP_EMAIL = process.env.CONTACT_EMAIL || 'tout.en.aiguilles@gmail.com';
+  const list = oversoldItems.map(i => `${i.name}${i.variant_label ? ' (' + i.variant_label + ')' : ''} — ${i.qty} demandé(s)`).join(', ');
+  const text = `⚠️ Survente détectée sur la commande #${order.id} : ${list}. Le client a bien été débité — vérifiez le stock réel et contactez-le si besoin.`;
+
+  if (!process.env.BREVO_API_KEY) {
+    console.log(`\n⚠️ [DEMO] ${text}\n`);
+    return { demo: true };
+  }
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#fdf8f5;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f5;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+        ${emailHeader('⚠️', `Survente — commande #${order.id}`)}
+        <tr><td style="padding:40px;">
+          <p style="color:#6b5547;line-height:1.7;margin:0 0 16px;">${text}</p>
+          <div style="text-align:center;margin-top:8px;">
+            <a href="${process.env.BASE_URL || 'https://tout-en-aiguilles.com'}/admin/commandes.html"
+               style="display:inline-block;background:#c8937a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:15px;">
+              Voir la commande →
+            </a>
+          </div>
+        </td></tr>
+        ${emailFooter()}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+  return sendBrevo(SHOP_EMAIL, 'Tout en Aiguilles', `⚠️ Survente — commande #${order.id}`, html, text);
+}
+
 // ─── Notification boutique — demande de commande personnalisée ──
 async function sendCustomOrderEmail(visitorName, visitorEmail, details, photoUrl) {
   const CONTACT_DEST = process.env.CONTACT_EMAIL || 'tout.en.aiguilles@gmail.com';
@@ -802,4 +842,4 @@ async function sendNewsletterEmail(email, firstName, subject, htmlContent) {
   return sendBrevo(email, firstName || email, subject, htmlContent, subject);
 }
 
-module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendPasswordResetEmail, sendContactEmail, sendCustomOrderEmail, sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail, sendAbandonedCartEmail, sendBackInStockEmail, sendNewsletterEmail };
+module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendPasswordResetEmail, sendContactEmail, sendCustomOrderEmail, sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail, sendAbandonedCartEmail, sendBackInStockEmail, sendNewsletterEmail, sendOversellAlert };
