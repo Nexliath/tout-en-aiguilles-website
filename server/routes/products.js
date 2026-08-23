@@ -6,22 +6,19 @@ const XLSX = require('xlsx');
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { processAndSaveImage } = require('../utils/imageProcess');
+const { asyncRoute } = require('../middleware/asyncRoute');
 
 const router = express.Router();
 
-// Config upload images
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../client/assets/images/products');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `product_${Date.now()}${ext}`);
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+// Config upload images — en mémoire : les fichiers sont redimensionnés et
+// compressés (via sharp) avant d'être écrits sur disque, voir processAndSaveImage.
+const PRODUCTS_IMG_DIR = path.join(__dirname, '../../client/assets/images/products');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+async function saveProductImage(file, prefix = 'product') {
+  const name = await processAndSaveImage(file.buffer, PRODUCTS_IMG_DIR, `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  return `/assets/images/products/${name}`;
+}
 
 // Helper: slugify
 function slugify(str) {
@@ -130,6 +127,21 @@ router.get('/admin/all', requireAdmin, (req, res) => {
   res.json(products);
 });
 
+// GET /api/products/:id/related-articles — articles du blog présentant ce produit
+router.get('/:id/related-articles', (req, res) => {
+  try {
+    const articles = db.prepare(`
+      SELECT n.id, n.title, n.slug, n.excerpt, n.cover_image, n.created_at
+      FROM news_products np
+      JOIN news n ON n.id = np.news_id
+      WHERE np.product_id = ? AND n.published = 1
+        AND (n.publish_at IS NULL OR n.publish_at = '' OR datetime(n.publish_at) <= datetime('now'))
+      ORDER BY np.sort_order ASC, n.created_at DESC
+    `).all(req.params.id);
+    res.json(articles);
+  } catch (e) { res.json([]); } // table pas encore migrée sur une ancienne base : pas bloquant
+});
+
 // ── Variantes inline (Etsy-style) ──────────────────────────────
 // GET /api/products/:id/variants
 router.get('/:id/variants', (req, res) => {
@@ -140,10 +152,10 @@ router.get('/:id/variants', (req, res) => {
 });
 
 // POST /api/products/:id/variants — créer une variante (admin)
-router.post('/:id/variants', requireAdmin, upload.single('image'), (req, res) => {
+router.post('/:id/variants', requireAdmin, upload.single('image'), asyncRoute(async (req, res) => {
   const { label, price, stock, is_active, sort_order } = req.body;
   if (!label) return res.status(400).json({ error: 'Libellé requis' });
-  const images = req.file ? [`/assets/images/products/${req.file.filename}`] : [];
+  const images = req.file ? [await saveProductImage(req.file, 'variant')] : [];
   const result = db.prepare(`
     INSERT INTO product_variants (product_id, label, price, stock, images, is_active, sort_order)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -152,15 +164,15 @@ router.post('/:id/variants', requireAdmin, upload.single('image'), (req, res) =>
          Number(stock) || 0, JSON.stringify(images),
          is_active !== '0' ? 1 : 0, Number(sort_order) || 0);
   res.json({ id: result.lastInsertRowid });
-});
+}));
 
 // PUT /api/products/:id/variants/:vid — modifier une variante (admin)
-router.put('/:id/variants/:vid', requireAdmin, upload.single('image'), (req, res) => {
+router.put('/:id/variants/:vid', requireAdmin, upload.single('image'), asyncRoute(async (req, res) => {
   const { label, price, stock, is_active, keep_image } = req.body;
   const existing = db.prepare('SELECT * FROM product_variants WHERE id = ? AND product_id = ?').get(req.params.vid, req.params.id);
   if (!existing) return res.status(404).json({ error: 'Variante introuvable' });
   let images = (keep_image === '1') ? JSON.parse(existing.images || '[]') : [];
-  if (req.file) images = [`/assets/images/products/${req.file.filename}`];
+  if (req.file) images = [await saveProductImage(req.file, 'variant')];
   db.prepare(`
     UPDATE product_variants SET label=?, price=?, stock=?, images=?, is_active=? WHERE id=?
   `).run(
@@ -172,7 +184,7 @@ router.put('/:id/variants/:vid', requireAdmin, upload.single('image'), (req, res
     req.params.vid
   );
   res.json({ success: true });
-});
+}));
 
 // DELETE /api/products/:id/variants/:vid — supprimer une variante (admin)
 router.delete('/:id/variants/:vid', requireAdmin, (req, res) => {
@@ -210,11 +222,11 @@ router.delete('/:id/favorite', requireAuth, (req, res) => {
 // ─── Admin ──────────────────────────────────────────────────
 
 // POST /api/products — créer un produit
-router.post('/', requireAdmin, upload.array('images', 5), (req, res) => {
+router.post('/', requireAdmin, upload.array('images', 5), asyncRoute(async (req, res) => {
   const { name, description, price, stock, category_id, tags, is_featured, variant_group_id, variant_label, cost_price, meta_title, meta_description } = req.body;
   if (!name || !price) return res.status(400).json({ error: 'Nom et prix requis' });
   const slug = slugify(name) + '-' + Date.now();
-  const images = (req.files || []).map(f => `/assets/images/products/${f.filename}`);
+  const images = await Promise.all((req.files || []).map(f => saveProductImage(f)));
   const result = db.prepare(`
     INSERT INTO products (name, slug, description, price, stock, category_id, images, tags, is_featured, variant_group_id, variant_label, cost_price, meta_title, meta_description)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -225,17 +237,17 @@ router.post('/', requireAdmin, upload.array('images', 5), (req, res) => {
          meta_title?.trim() || null, meta_description?.trim() || null);
   logActivity(req.user, 'Produit créé', name);
   res.status(201).json({ success: true, id: result.lastInsertRowid });
-});
+}));
 
 // PUT /api/products/:id — modifier un produit
-router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
+router.put('/:id', requireAdmin, upload.array('images', 5), asyncRoute(async (req, res) => {
   const { name, description, price, stock, category_id, tags, is_featured, is_active, keep_images, variant_group_id, variant_label, cost_price, meta_title, meta_description } = req.body;
   const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
 
   let images = JSON.parse(keep_images || existing.images || '[]');
   if (req.files && req.files.length > 0) {
-    const newImgs = req.files.map(f => `/assets/images/products/${f.filename}`);
+    const newImgs = await Promise.all(req.files.map(f => saveProductImage(f)));
     images = [...images, ...newImgs];
   }
 
@@ -257,7 +269,7 @@ router.put('/:id', requireAdmin, upload.array('images', 5), (req, res) => {
          req.params.id);
   logActivity(req.user, 'Produit modifié', name || existing.name);
   res.json({ success: true });
-});
+}));
 
 // DELETE /api/products/:id — supprimer définitivement un produit
 router.delete('/:id', requireAdmin, (req, res) => {
