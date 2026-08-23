@@ -130,11 +130,14 @@
     .avg-stars { font-size: 1.2rem; letter-spacing: 2px; }
     .avg-count { font-size: .8rem; color: var(--text-light); }
     .star-selector { display: flex; gap: 4px; }
-    .star-selector span {
+    .star-selector button {
       font-size: 1.8rem; cursor: pointer; transition: transform .1s, filter .1s;
       user-select: none; filter: grayscale(1);
+      background: none; border: none; padding: 2px; margin: 0; line-height: 1;
+      -webkit-appearance: none; appearance: none;
     }
-    .star-selector span.active, .star-selector span.hover { filter: none; transform: scale(1.15); }
+    .star-selector button.active, .star-selector button.hover { filter: none; transform: scale(1.15); }
+    .star-selector button:focus-visible { outline: 2px solid var(--rose-dark); outline-offset: 2px; border-radius: 4px; }
     .review-card {
       background: white; border-radius: 14px; padding: 18px 20px;
       border: 1px solid var(--border); margin-bottom: 12px;
@@ -498,7 +501,7 @@ function renderProduct(p) {
     // Desktop thumbnails
     thumbsEl.innerHTML = images.map((img, i) => `
       <div class="gallery-thumb ${i === 0 ? 'active' : ''}" onclick="setMainImg('${img}', this)">
-        <img src="${img}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🧶'">
+        <img src="${img}" alt="${(p.name || 'Produit').replace(/"/g, '&quot;')} — photo ${i + 1}" loading="lazy" onerror="this.parentElement.innerHTML='🧶'">
       </div>`).join('');
 
     // Carousel slides
@@ -705,8 +708,8 @@ let selectedRating = 0;
 
 function renderStarSelector() {
   return `
-    <div class="star-selector" id="star-selector">
-      ${[1,2,3,4,5].map(n => `<span data-v="${n}" onclick="setRating(${n})" onmouseover="hoverRating(${n})" onmouseout="unhoverRating()">⭐</span>`).join('')}
+    <div class="star-selector" id="star-selector" role="radiogroup" aria-label="Votre note">
+      ${[1,2,3,4,5].map(n => `<button type="button" data-v="${n}" role="radio" aria-checked="false" aria-label="${n} étoile${n > 1 ? 's' : ''}" onclick="setRating(${n})" onmouseover="hoverRating(${n})" onmouseout="unhoverRating()" onfocus="hoverRating(${n})" onblur="unhoverRating()">⭐</button>`).join('')}
     </div>
   `;
 }
@@ -717,7 +720,7 @@ function setRating(n) {
 }
 
 function hoverRating(n) {
-  document.querySelectorAll('#star-selector span').forEach((s, i) => {
+  document.querySelectorAll('#star-selector button').forEach((s, i) => {
     s.classList.toggle('hover', i < n);
     s.classList.toggle('active', false);
   });
@@ -728,13 +731,14 @@ function unhoverRating() {
 }
 
 function updateStarSelector(n) {
-  document.querySelectorAll('#star-selector span').forEach((s, i) => {
+  document.querySelectorAll('#star-selector button').forEach((s, i) => {
     s.classList.toggle('active', i < n);
     s.classList.toggle('hover', false);
+    s.setAttribute('aria-checked', i < n ? 'true' : 'false');
   });
 }
 
-function renderReviewForm() {
+async function renderReviewForm() {
   const user = Auth.getUser();
   const area = document.getElementById('review-form-area');
   if (!area) return;
@@ -747,6 +751,21 @@ function renderReviewForm() {
       </div>`;
     return;
   }
+
+  // Évite d'afficher le formulaire complet (note, commentaire, photos) pour
+  // le laisser rempli en entier avant de découvrir, seulement à l'envoi,
+  // qu'un avis existe déjà sur ce produit (erreur 409 côté serveur — toujours
+  // la garde qui fait foi, celle-ci n'est qu'un confort d'affichage).
+  try {
+    const { has_review } = await apiFetch(`/reviews/mine?product_id=${currentProduct.id}`);
+    if (has_review) {
+      area.innerHTML = `
+        <div class="review-form-wrap" style="text-align:center">
+          <p style="color:var(--text-light)">✅ Vous avez déjà laissé un avis sur ce produit — merci !</p>
+        </div>`;
+      return;
+    }
+  } catch (e) { /* en cas d'erreur réseau, on affiche quand même le formulaire — la garde serveur reste active */ }
 
   area.innerHTML = `
     <div class="review-form-wrap">
@@ -973,7 +992,7 @@ function renderGallery(images, name) {
 
   thumbsEl.innerHTML = images.map((img, i) => `
     <div class="gallery-thumb ${i === 0 ? 'active' : ''}" onclick="setMainImg('${img}', this)">
-      <img src="${img}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='🧶'">
+      <img src="${img}" alt="${(name || 'Produit').replace(/"/g, '&quot;')} — photo ${i + 1}" loading="lazy" onerror="this.parentElement.innerHTML='🧶'">
     </div>`).join('');
 
   const slides = images.map((img, i) => `
