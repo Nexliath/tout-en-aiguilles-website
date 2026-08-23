@@ -341,6 +341,12 @@ async function loadDashboard() {
     renderTopSellers(orders);
   } catch (e) {
     console.error(e);
+    // Avant cette correction, un échec ici (session expirée, erreur serveur)
+    // laissait le tableau de bord bloqué sur ses spinners indéfiniment, sans
+    // aucun indice pour Victorine — page qu'elle voit en premier chaque jour.
+    Toast.show(`Erreur de chargement du tableau de bord : ${e.message}`, 'error');
+    const recentBody = document.getElementById('recent-orders-body');
+    if (recentBody) recentBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#d9534f;padding:24px">Erreur de chargement — ${e.message}</td></tr>`;
   }
 
   // Panneaux indépendants (n'empêchent pas le reste de charger en cas d'erreur)
