@@ -103,6 +103,38 @@ const Cart = {
   }
 };
 
+// ─── Recently Viewed (Vus récemment) ──────────────────────────
+// Stocke uniquement les IDs (léger) ; les données produit sont re-fetchées
+// à l'affichage pour toujours montrer prix/stock à jour.
+const RecentlyViewed = {
+  KEY: 'tea_recently_viewed',
+  get: () => { try { return JSON.parse(localStorage.getItem(RecentlyViewed.KEY) || '[]'); } catch { return []; } },
+  add: (productId) => {
+    if (!productId) return;
+    try {
+      let ids = RecentlyViewed.get().filter(id => id !== productId);
+      ids.unshift(productId);
+      localStorage.setItem(RecentlyViewed.KEY, JSON.stringify(ids.slice(0, 8)));
+    } catch {}
+  }
+};
+
+// Rend une grille de cartes produit pour les IDs "vus récemment"
+async function renderRecentlyViewedHome(containerId) {
+  const ids = RecentlyViewed.get();
+  const el = document.getElementById(containerId);
+  if (!ids.length || !el) return;
+  try {
+    const all = await apiFetch('/products?limit=100');
+    const products = ids.map(id => all.find(p => p.id === id)).filter(Boolean);
+    if (products.length) el.innerHTML = products.map(renderProductCard).join('');
+    else {
+      const section = document.getElementById('rv-home-section');
+      if (section) section.style.display = 'none';
+    }
+  } catch {}
+}
+
 // ─── Favorites ───────────────────────────────────────────────
 const Favorites = {
   get: () => { try { return JSON.parse(localStorage.getItem('tea_favs') || '[]'); } catch { return []; } },
