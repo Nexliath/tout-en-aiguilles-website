@@ -3,12 +3,19 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, '../../data/toutenaiguilles.db');
+// ── Emplacement de la base de données ─────────────────────────
+// Railway injecte RAILWAY_VOLUME_MOUNT_PATH quand un volume persistant est
+// attaché au service — c'est le SEUL dossier qui survit aux redéploiements.
+// Sans ça, la base vivait dans le filesystem éphémère du conteneur et était
+// recréée vide à chaque déploiement (d'où les produits supprimés qui "revenaient").
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '../../data');
+const DB_PATH = path.join(DATA_DIR, 'toutenaiguilles.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
+console.log(`💾 Base de données : ${DB_PATH}${process.env.RAILWAY_VOLUME_MOUNT_PATH ? ' (volume persistant Railway)' : ' (⚠️  filesystem local — non persistant en prod)'}`);
+
 // Créer le dossier data si nécessaire
-const dataDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const _db = new DatabaseSync(DB_PATH);
 
