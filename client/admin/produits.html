@@ -83,10 +83,16 @@
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Catégorie</label>
+          <label class="form-label">Catégorie
+            <button type="button" onclick="toggleCategoryManager()" style="background:none;border:none;color:var(--rose-dark);font-size:.75rem;cursor:pointer;text-decoration:underline;padding:0;margin-left:6px">Gérer les catégories</button>
+          </label>
           <select id="f-category" class="form-select" onchange="onCategorySelectChange()">
             <option value="">— Sélectionner —</option>
           </select>
+          <div id="category-manager-box" style="display:none;margin-top:10px;padding:12px;background:var(--cream-dark);border-radius:var(--radius)">
+            <div style="font-size:.78rem;color:var(--text-light);margin-bottom:8px">Renommer ou supprimer une catégorie existante (suppression impossible tant que des produits l'utilisent).</div>
+            <div id="category-manager-list"></div>
+          </div>
           <div id="new-category-box" style="display:none;margin-top:10px;padding:12px;background:var(--cream-dark);border-radius:var(--radius)">
             <div class="form-row" style="margin-bottom:8px">
               <div class="form-group" style="margin-bottom:0">
@@ -164,6 +170,8 @@
               <input type="file" id="new-variant-img" accept="image/*" style="display:none" onchange="previewNewVariantImg(this)">
               <div id="new-variant-img-preview"
                 onclick="document.getElementById('new-variant-img').click()"
+                onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('new-variant-img').click();}"
+                role="button" tabindex="0" aria-label="Ajouter une photo pour cette nouvelle variante"
                 style="width:48px;height:48px;border-radius:8px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer;background:var(--cream);color:var(--text-light);overflow:hidden">
                 📷
               </div>
@@ -194,7 +202,7 @@
     <div class="admin-table-wrap">
       <div style="padding:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input type="text" id="search-products" class="form-input" style="max-width:280px" placeholder="Rechercher un produit…" oninput="filterTable()">
+          <input type="text" id="search-products" class="form-input" style="max-width:280px" placeholder="Rechercher un produit…" aria-label="Rechercher un produit" oninput="filterTable()">
           <button type="button" class="cat-chip" id="low-stock-chip" onclick="toggleLowStockFilter()">⚠️ Stock faible / épuisé</button>
         </div>
         <span id="prod-count" style="font-size:.8rem;color:var(--text-light)"></span>
@@ -241,9 +249,57 @@ async function loadCategories() {
     categories = await apiFetch('/products/categories');
     const sel = document.getElementById('f-category');
     sel.innerHTML = '<option value="">— Sélectionner —</option>' +
-      categories.map(c => `<option value="${c.id}">${c.type === 'crochet' ? '🧶' : '✂️'} ${c.name}</option>`).join('') +
+      categories.map(c => `<option value="${c.id}">${c.type === 'crochet' ? '🧶' : '✂️'} ${escapeHtml(c.name)}</option>`).join('') +
       '<option value="__new__">+ Créer une nouvelle catégorie…</option>';
+    if (document.getElementById('category-manager-box').style.display !== 'none') renderCategoryManager();
   } catch {}
+}
+
+// ── Gestion des catégories (renommer/supprimer) ────────────────
+// Avant cette correction, une catégorie mal nommée (faute de frappe, mauvais
+// type crochet/couture) ne pouvait jamais être corrigée ni supprimée —
+// seule la création existait.
+function toggleCategoryManager() {
+  const box = document.getElementById('category-manager-box');
+  const opening = box.style.display === 'none';
+  box.style.display = opening ? '' : 'none';
+  if (opening) renderCategoryManager();
+}
+
+function renderCategoryManager() {
+  const list = document.getElementById('category-manager-list');
+  if (!categories.length) { list.innerHTML = '<div style="font-size:.82rem;color:var(--text-light)">Aucune catégorie.</div>'; return; }
+  list.innerHTML = categories.map(c => `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <input type="text" value="${escapeHtml(c.name)}" id="cat-rename-${c.id}" class="form-input" style="font-size:.82rem;padding:6px 8px;flex:1">
+      <select id="cat-type-${c.id}" class="form-select" style="font-size:.82rem;padding:6px 8px;width:auto">
+        <option value="crochet" ${c.type === 'crochet' ? 'selected' : ''}>🧶 Crochet</option>
+        <option value="couture" ${c.type === 'couture' ? 'selected' : ''}>✂️ Couture</option>
+      </select>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="renameCategory(${c.id})">Enregistrer</button>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="deleteCategory(${c.id}, '${escapeHtml(c.name).replace(/'/g, "\\'")}')" style="color:#d9534f">Supprimer</button>
+    </div>`).join('');
+}
+
+async function renameCategory(id) {
+  const name = document.getElementById(`cat-rename-${id}`).value.trim();
+  const type = document.getElementById(`cat-type-${id}`).value;
+  if (!name) { Toast.show('Le nom est requis', 'error'); return; }
+  try {
+    await apiFetch(`/products/categories/${id}`, { method: 'PUT', body: { name, type } });
+    Toast.show('Catégorie mise à jour ✓', 'success');
+    await loadCategories();
+    await loadProducts();
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+async function deleteCategory(id, name) {
+  if (!confirm(`Supprimer la catégorie "${name}" ?`)) return;
+  try {
+    await apiFetch(`/products/categories/${id}`, { method: 'DELETE' });
+    Toast.show('Catégorie supprimée ✓', 'success');
+    await loadCategories();
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 function onCategorySelectChange() {
@@ -581,10 +637,25 @@ async function saveProduct() {
     } else {
       const res = await apiFetchForm('/products', formData, 'POST');
       productId = res.id;
+      // IMPORTANT : réinjecter l'id créé dans le formulaire AVANT de tenter
+      // la synchro des variantes. Avant cette correction, si syncVariants()
+      // ci-dessous échouait, #edit-id restait vide — un nouveau clic sur
+      // "Enregistrer" pour corriger l'erreur repartait sur un POST et créait
+      // un second produit en double au lieu de corriger le premier.
+      document.getElementById('edit-id').value = productId;
     }
-    // Sync variantes si activées
-    if (document.getElementById('f-has-variants').checked && productId) {
-      await syncVariants(productId);
+    if (productId) {
+      if (document.getElementById('f-has-variants').checked) {
+        await syncVariants(productId);
+      } else if (_variantRows.some(v => v.id)) {
+        // L'admin a décoché "a des variantes" sur un produit qui en avait :
+        // il faut réellement les supprimer côté serveur, sinon elles restent
+        // actives en base malgré ce que montre le formulaire.
+        for (const v of _variantRows) {
+          if (v.id) await apiFetch(`/products/${productId}/variants/${v.id}`, { method: 'DELETE' });
+        }
+        _variantRows = [];
+      }
     }
     Toast.show(id ? 'Produit mis à jour ✓' : 'Produit créé ✓', 'success');
     hideForm();
@@ -657,6 +728,8 @@ function renderVariantsTable() {
       <td style="padding:8px 6px">
         <input type="file" accept="image/*" id="vimg-${realIdx}" style="display:none" onchange="setVariantImg(${realIdx}, this)">
         <div onclick="document.getElementById('vimg-${realIdx}').click()"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('vimg-${realIdx}').click();}"
+          role="button" tabindex="0" aria-label="Changer la photo de cette variante"
           style="width:52px;height:52px;border-radius:8px;border:1px solid var(--border);overflow:hidden;cursor:pointer;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.4rem">
           ${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover">` : '📷'}
         </div>
