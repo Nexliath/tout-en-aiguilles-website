@@ -26,4 +26,21 @@ async function processAndSaveImage(buffer, destDir, filenameBase, opts = {}) {
   return finalName;
 }
 
-module.exports = { processAndSaveImage };
+// Variante qui renvoie l'image traitée en mémoire (Buffer JPEG) au lieu de
+// l'écrire sur disque — utilisée pour l'avatar, stocké en base64 en base
+// (voir server/routes/auth.js) plutôt que comme fichier. Fait passer le
+// buffer uploadé par sharp comme les autres uploads (produits, articles,
+// avis...) : contrairement à un simple contrôle du champ Content-Type
+// (fourni par le client, donc falsifiable), sharp doit réellement décoder
+// l'image — un fichier qui n'en est pas une (ou un format dangereux comme
+// un SVG avec script embarqué) est rejeté ici plutôt que stocké tel quel.
+async function processImageToBuffer(buffer, opts = {}) {
+  const { maxWidth = 512, maxHeight = 512, quality = 85 } = opts;
+  return sharp(buffer)
+    .rotate()
+    .resize({ width: maxWidth, height: maxHeight, fit: 'cover' })
+    .jpeg({ quality, mozjpeg: true })
+    .toBuffer();
+}
+
+module.exports = { processAndSaveImage, processImageToBuffer };
