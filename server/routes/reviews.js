@@ -7,6 +7,8 @@ const router = express.Router();
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { processAndSaveImage } = require('../utils/imageProcess');
+const { asyncRoute } = require('../middleware/asyncRoute');
 
 // Limite uniquement la soumission d'avis par les clients (spam) —
 // ne doit JAMAIS s'appliquer aux routes admin (dashboard, modération),
@@ -20,25 +22,21 @@ const submitReviewLimiter = rateLimit({
 });
 
 // ─── Config upload photos d'avis ────────────────────────────
-const reviewStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../client/assets/images/reviews');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    cb(null, `review_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
-  }
-});
+// En mémoire : redimensionnées et compressées (sharp) avant écriture sur
+// disque, voir saveReviewPhoto().
+const REVIEWS_IMG_DIR = path.join(__dirname, '../../client/assets/images/reviews');
 const upload = multer({
-  storage: reviewStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB par photo (le client compresse déjà)
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB par photo (le client compresse déjà, sharp comprime encore côté serveur)
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
     cb(null, true);
   }
 });
+async function saveReviewPhoto(file) {
+  const name = await processAndSaveImage(file.buffer, REVIEWS_IMG_DIR, `review_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, { maxWidth: 1200, maxHeight: 1200 });
+  return `/assets/images/reviews/${name}`;
+}
 
 // ─── GET /api/reviews?product_id=X ──────────────────────────
 // Public : retourne les avis approuvés + leurs photos pour un produit
@@ -75,7 +73,7 @@ router.get('/', (req, res) => {
 
 // ─── POST /api/reviews ──────────────────────────────────────
 // Authentifié : poster un avis avec jusqu'à 3 photos
-router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), (req, res) => {
+router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), asyncRoute(async (req, res) => {
   const { product_id, rating, comment } = req.body;
   const user_id = req.user.id;
 
@@ -100,9 +98,8 @@ router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), (r
   // Enregistrer les photos si présentes
   if (req.files && req.files.length > 0) {
     const insertPhoto = db.prepare('INSERT INTO review_photos (review_id, photo_url) VALUES (?, ?)');
-    for (const file of req.files) {
-      insertPhoto.run(reviewId, `/assets/images/reviews/${file.filename}`);
-    }
+    const urls = await Promise.all(req.files.map(f => saveReviewPhoto(f)));
+    for (const url of urls) insertPhoto.run(reviewId, url);
   }
 
   res.status(201).json({
@@ -110,7 +107,7 @@ router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), (r
     message: 'Avis enregistré ! Il sera visible après validation.',
     pending: true
   });
-});
+}));
 
 // ─── GET /api/reviews/admin ─────────────────────────────────
 // Admin : tous les avis avec photos
