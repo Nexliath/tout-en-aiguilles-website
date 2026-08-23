@@ -195,6 +195,16 @@ async function savePromo() {
     expires_at: document.getElementById('f-expires').value || null,
     description: document.getElementById('f-desc').value.trim(),
   };
+  // Avertir si la date d'expiration choisie est déjà passée — sinon le code
+  // promo créé est immédiatement inutilisable sans que l'admin s'en rende
+  // compte (erreur de saisie de date fréquente).
+  if (body.expires_at) {
+    const expiryEndOfDay = new Date(body.expires_at + 'T23:59:59');
+    if (expiryEndOfDay < new Date()) {
+      const proceed = confirm('La date d\'expiration choisie est déjà passée : ce code promo sera immédiatement expiré et inutilisable. Continuer quand même ?');
+      if (!proceed) return;
+    }
+  }
   try {
     if (editingPromoId) {
       await apiFetch(`/promo/${editingPromoId}`, { method: 'PUT', body });
