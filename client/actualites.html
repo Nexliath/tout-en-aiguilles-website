@@ -93,8 +93,15 @@
     </div>
   </div>
 
-  <section class="section">
+  <section class="section" style="padding-top:0">
     <div class="container">
+      <div id="news-featured" style="display:none;margin-bottom:32px"></div>
+
+      <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:20px">
+        <div id="news-categories" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <input type="text" id="news-search" class="form-input" placeholder="🔎 Rechercher un article…" style="max-width:280px" oninput="onSearchInput()">
+      </div>
+
       <div id="news-list" class="news-grid">
         <div class="loading" style="grid-column:1/-1"><div class="spinner"></div> Chargement…</div>
       </div>
@@ -102,6 +109,9 @@
         <div class="empty-state-icon">📰</div>
         <h3>Pas encore d'actualités</h3>
         <p>Revenez bientôt, Victorine a plein de choses à partager !</p>
+      </div>
+      <div style="text-align:center;margin-top:32px">
+        <button id="news-more-btn" class="btn btn-secondary" style="display:none" onclick="showMore()">Voir plus d'articles ↓</button>
       </div>
     </div>
   </section>
@@ -123,6 +133,17 @@
           <h1 id="art-title" style="margin-bottom:24px"></h1>
           <div class="article-cover" id="art-cover"><span>🌸</span></div>
           <div class="article-body" id="art-content"></div>
+
+          <div id="art-related-products" style="display:none;margin-top:48px">
+            <div class="section-divider" style="margin-bottom:20px"><span class="section-tag">Les créations de cet article</span></div>
+            <div id="products-grid" class="grid-3"></div>
+          </div>
+
+          <div id="art-related-articles" style="display:none;margin-top:48px">
+            <div class="section-divider" style="margin-bottom:20px"><span class="section-tag">À lire aussi</span></div>
+            <div id="art-related-articles-grid" class="news-grid"></div>
+          </div>
+
           <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
             <a href="/actualites.html" onclick="showList()" class="btn btn-secondary">← Retour aux actualités</a>
             <a href="/boutique.html" class="btn btn-primary">Visiter la boutique →</a>
@@ -144,30 +165,125 @@
 
 <script src="/assets/js/main.js"></script>
 <script>
-async function loadNewsList() {
-  try {
-    const articles = await apiFetch('/news?limit=20');
-    const grid = document.getElementById('news-list');
-    if (!articles.length) {
-      grid.style.display = 'none';
-      document.getElementById('news-empty').style.display = '';
-      return;
-    }
-    grid.innerHTML = articles.map(a => `
+let allNewsArticles = [];
+let featuredArticle = null;
+let allCategories = [];
+let activeCategory = 'all';
+let visibleCount = 9;
+const PAGE_SIZE = 9;
+
+function newsCardHTML(a) {
+  return `
       <div class="card news-card" onclick="openArticle('${a.slug}')">
         <div class="news-card-img">
           ${a.cover_image ? `<img src="${a.cover_image}" alt="${a.title}" loading="lazy" onerror="this.parentElement.innerHTML='🌸'">` : '🌸'}
         </div>
         <div class="news-card-body">
-          <div class="news-card-date">${formatDate(a.created_at)}</div>
+          <div class="news-card-date">${formatDate(a.created_at)}${a.category ? ` · 🏷️ ${a.category}` : ''}</div>
           <div class="news-card-title">${a.title}</div>
           <p class="news-card-excerpt">${a.excerpt || ''}</p>
           <span class="btn btn-secondary btn-sm" style="margin-top:12px">Lire l'article →</span>
         </div>
-      </div>`).join('');
+      </div>`;
+}
+
+async function loadNewsList() {
+  try {
+    const [articles, categories, featured] = await Promise.all([
+      apiFetch('/news?limit=200'),
+      apiFetch('/news/categories').catch(() => []),
+      apiFetch('/news?featured=1&limit=1').catch(() => [])
+    ]);
+    allNewsArticles = articles;
+    featuredArticle = featured && featured[0] ? featured[0] : null;
+    allCategories = categories;
+
+    renderFeatured();
+    renderCategoryChips(allCategories);
+    visibleCount = PAGE_SIZE;
+    renderNewsGrid();
   } catch {
     document.getElementById('news-list').innerHTML = '<p class="text-muted" style="grid-column:1/-1">Impossible de charger les actualités.</p>';
   }
+}
+
+function renderFeatured() {
+  const box = document.getElementById('news-featured');
+  if (!featuredArticle) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const a = featuredArticle;
+  box.style.display = '';
+  box.innerHTML = `
+    <div class="card" style="cursor:pointer;overflow:hidden;display:flex;flex-wrap:wrap" onclick="openArticle('${a.slug}')">
+      <div style="flex:1 1 320px;min-height:220px;background:var(--rose-pale);display:flex;align-items:center;justify-content:center;font-size:3rem">
+        ${a.cover_image ? `<img src="${a.cover_image}" alt="${a.title}" style="width:100%;height:100%;object-fit:cover" loading="lazy">` : '🌸'}
+      </div>
+      <div style="flex:1 1 320px;padding:28px;display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:.8rem;color:var(--rose-dark);font-weight:700;margin-bottom:8px">⭐ À la une${a.category ? ` · ${a.category}` : ''}</div>
+        <h2 style="margin-bottom:12px">${a.title}</h2>
+        <p style="color:var(--text-light);margin-bottom:16px">${a.excerpt || ''}</p>
+        <span class="btn btn-primary btn-sm" style="align-self:flex-start">Lire l'article →</span>
+      </div>
+    </div>`;
+}
+
+function renderCategoryChips(categories) {
+  const box = document.getElementById('news-categories');
+  if (!categories.length) { box.innerHTML = ''; return; }
+  const chip = (val, label) => `<button type="button" class="btn btn-sm ${activeCategory === val ? 'btn-primary' : 'btn-secondary'}" onclick="setCategory('${val}')">${label}</button>`;
+  box.innerHTML = chip('all', 'Toutes') + categories.map(c => chip(c.category, `${c.category} (${c.count})`)).join('');
+}
+
+function setCategory(cat) {
+  activeCategory = cat;
+  visibleCount = PAGE_SIZE;
+  renderCategoryChips(allCategories);
+  renderNewsGrid();
+}
+
+let searchDebounce = null;
+function onSearchInput() {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => { visibleCount = PAGE_SIZE; renderNewsGrid(); }, 250);
+}
+
+function getFilteredArticles() {
+  const q = (document.getElementById('news-search')?.value || '').trim().toLowerCase();
+  return allNewsArticles.filter(a => {
+    if (featuredArticle && a.id === featuredArticle.id) return false; // déjà affiché en haut
+    if (activeCategory !== 'all' && a.category !== activeCategory) return false;
+    if (q && !(a.title.toLowerCase().includes(q) || (a.excerpt || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderNewsGrid() {
+  const grid = document.getElementById('news-list');
+  const moreBtn = document.getElementById('news-more-btn');
+  const filtered = getFilteredArticles();
+
+  if (!allNewsArticles.length) {
+    grid.style.display = 'none';
+    document.getElementById('news-empty').style.display = '';
+    moreBtn.style.display = 'none';
+    return;
+  }
+  document.getElementById('news-empty').style.display = 'none';
+  grid.style.display = '';
+
+  if (!filtered.length) {
+    grid.innerHTML = '<p class="text-muted" style="grid-column:1/-1;text-align:center;padding:24px">Aucun article ne correspond à votre recherche.</p>';
+    moreBtn.style.display = 'none';
+    return;
+  }
+
+  const slice = filtered.slice(0, visibleCount);
+  grid.innerHTML = slice.map(newsCardHTML).join('');
+  moreBtn.style.display = filtered.length > slice.length ? '' : 'none';
+}
+
+function showMore() {
+  visibleCount += PAGE_SIZE;
+  renderNewsGrid();
 }
 
 async function openArticle(slug) {
@@ -183,7 +299,7 @@ async function openArticle(slug) {
   try {
     const article = await apiFetch(`/news/${slug}`);
     document.getElementById('article-bc').textContent = article.title;
-    document.getElementById('art-date').textContent = formatDate(article.created_at);
+    document.getElementById('art-date').textContent = formatDate(article.created_at) + (article.category ? ` · 🏷️ ${article.category}` : '');
     document.getElementById('art-title').textContent = article.title;
     document.getElementById('art-content').innerHTML = article.content;
     document.title = article.meta_title?.trim() || `${article.title} — Tout en Aiguilles`;
@@ -199,6 +315,25 @@ async function openArticle(slug) {
     if (article.cover_image) {
       cover.innerHTML = `<img src="${article.cover_image}" alt="${article.title}">`;
     }
+
+    const rpBox = document.getElementById('art-related-products');
+    const rpGrid = document.getElementById('products-grid');
+    if (article.related_products && article.related_products.length) {
+      rpGrid.innerHTML = article.related_products.map(renderProductCard).join('');
+      rpBox.style.display = '';
+    } else {
+      rpBox.style.display = 'none';
+    }
+
+    const raBox = document.getElementById('art-related-articles');
+    const raGrid = document.getElementById('art-related-articles-grid');
+    if (article.related_articles && article.related_articles.length) {
+      raGrid.innerHTML = article.related_articles.map(newsCardHTML).join('');
+      raBox.style.display = '';
+    } else {
+      raBox.style.display = 'none';
+    }
+
     document.getElementById('article-loading').style.display = 'none';
     document.getElementById('article-body').style.display = '';
   } catch {
