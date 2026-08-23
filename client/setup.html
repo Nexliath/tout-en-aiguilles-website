@@ -87,13 +87,17 @@
         </div>
         <div style="text-align:center;margin-bottom:14px">
           <img id="s-mfa-qr" src="" alt="QR code MFA" style="width:180px;height:180px;border:1px solid var(--border);border-radius:12px;padding:8px;background:white">
+          <div id="s-mfa-qr-loading" style="font-size:.8rem;color:var(--text-light);margin-top:8px">Chargement du QR code…</div>
+          <div id="s-mfa-qr-error" style="display:none;font-size:.85rem;color:#d9534f;margin-top:8px">
+            Impossible de charger le QR code. <a href="#" id="s-mfa-qr-retry" style="font-weight:700">Réessayer</a>
+          </div>
         </div>
         <p style="font-size:.75rem;color:var(--text-light);text-align:center;margin-bottom:14px">Impossible de scanner ? Entrez ce code manuellement :<br><code id="s-mfa-secret" style="user-select:all;font-size:.8rem;background:var(--cream-dark);padding:4px 8px;border-radius:6px;display:inline-block;margin-top:6px"></code></p>
         <div class="form-group">
           <label class="form-label">Code de confirmation</label>
           <input id="s-mfa-code" type="text" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456" style="text-align:center;font-size:1.3rem;letter-spacing:.3em">
         </div>
-        <div id="s-mfa-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+        <div id="s-mfa-error" role="alert" aria-live="polite" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
         <button class="btn btn-primary btn-block" id="s-mfa-confirm-btn" type="button">Activer la double authentification</button>
       </div>
       <div id="mfa-step-recovery" style="display:none">
@@ -102,7 +106,8 @@
           <p style="font-weight:700">Double authentification activée !</p>
           <p style="font-size:.82rem;color:var(--text-light);margin-top:6px">Notez ces codes de secours dans un endroit sûr — chacun ne peut être utilisé qu'une fois.</p>
         </div>
-        <div id="s-mfa-recovery-list" style="background:var(--cream);border-radius:10px;padding:14px;font-family:monospace;font-size:.85rem;line-height:1.9;text-align:center;margin-bottom:16px"></div>
+        <div id="s-mfa-recovery-list" style="background:var(--cream);border-radius:10px;padding:14px;font-family:monospace;font-size:.85rem;line-height:1.9;text-align:center;margin-bottom:10px;user-select:all"></div>
+        <button class="btn btn-secondary btn-block" id="s-mfa-copy-btn" type="button" style="margin-bottom:16px">📋 Copier les codes</button>
         <button class="btn btn-primary btn-block" id="s-mfa-done-btn" type="button">J'ai noté mes codes, continuer</button>
       </div>
     </div>
@@ -231,15 +236,42 @@
     document.getElementById('mfa-step-qr').style.display = '';
     document.getElementById('mfa-step-recovery').style.display = 'none';
 
-    fetch(API + '/auth/mfa/setup/init', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ setup_token: setupToken })
-    })
-    .then(function (res) { return res.json(); })
-    .then(function (data) {
-      document.getElementById('s-mfa-qr').src = data.qr;
-      document.getElementById('s-mfa-secret').textContent = data.secret;
+    function loadQr() {
+      var qrImg = document.getElementById('s-mfa-qr');
+      var loadingEl = document.getElementById('s-mfa-qr-loading');
+      var errorEl = document.getElementById('s-mfa-qr-error');
+      var confirmBtn = document.getElementById('s-mfa-confirm-btn');
+      qrImg.style.display = 'none';
+      loadingEl.style.display = '';
+      errorEl.style.display = 'none';
+      confirmBtn.disabled = true;
+
+      fetch(API + '/auth/mfa/setup/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setup_token: setupToken })
+      })
+      .then(function (res) {
+        return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+      })
+      .then(function (result) {
+        if (!result.ok) { throw new Error(result.data.error || 'Erreur serveur'); }
+        qrImg.src = result.data.qr;
+        document.getElementById('s-mfa-secret').textContent = result.data.secret;
+        qrImg.style.display = '';
+        loadingEl.style.display = 'none';
+        confirmBtn.disabled = false;
+      })
+      .catch(function () {
+        loadingEl.style.display = 'none';
+        errorEl.style.display = '';
+      });
+    }
+
+    loadQr();
+    document.getElementById('s-mfa-qr-retry').addEventListener('click', function (e) {
+      e.preventDefault();
+      loadQr();
     });
 
     document.getElementById('s-mfa-confirm-btn').addEventListener('click', function () {
@@ -276,6 +308,13 @@
     document.getElementById('s-mfa-done-btn').addEventListener('click', function () {
       document.getElementById('view-mfa').style.display = 'none';
       document.getElementById('view-success').style.display = 'block';
+    });
+
+    document.getElementById('s-mfa-copy-btn').addEventListener('click', function () {
+      var codes = Array.prototype.map.call(document.getElementById('s-mfa-recovery-list').children, function (el) { return el.textContent; }).join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(codes).catch(function () {});
+      }
     });
   }
 
