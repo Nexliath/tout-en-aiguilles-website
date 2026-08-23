@@ -5,22 +5,19 @@ const fs = require('fs');
 const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { processAndSaveImage } = require('../utils/imageProcess');
+const { asyncRoute } = require('../middleware/asyncRoute');
 
 const router = express.Router();
 
-// Config upload images d'articles
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../../client/assets/images/news');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `news_${Date.now()}${ext}`);
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+// Config upload images d'articles — en mémoire : redimensionnées et
+// compressées (sharp) avant écriture sur disque, voir saveNewsImage().
+const NEWS_IMG_DIR = path.join(__dirname, '../../client/assets/images/news');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+async function saveNewsImage(file) {
+  const name = await processAndSaveImage(file.buffer, NEWS_IMG_DIR, `news_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  return `/assets/images/news/${name}`;
+}
 
 function slugify(str) {
   return str.toLowerCase()
@@ -128,10 +125,10 @@ router.get('/:slug', (req, res) => {
 });
 
 // POST /api/news/upload-image — upload d'une image à insérer dans le corps d'un article (admin)
-router.post('/upload-image', requireAdmin, upload.single('image'), (req, res) => {
+router.post('/upload-image', requireAdmin, upload.single('image'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Image requise' });
-  res.json({ url: `/assets/images/news/${req.file.filename}` });
-});
+  res.json({ url: await saveNewsImage(req.file) });
+}));
 
 // Synchronise la table news_products à partir d'un tableau d'IDs produits (ordre conservé)
 function syncRelatedProducts(newsId, rawIds) {
@@ -156,7 +153,7 @@ function slugTaken(slug, excludeId) {
 }
 
 // POST /api/news — créer un article
-router.post('/', requireAdmin, upload.single('cover_image'), (req, res) => {
+router.post('/', requireAdmin, upload.single('cover_image'), asyncRoute(async (req, res) => {
   const { title, excerpt, content, published, meta_title, meta_description,
           category, is_featured, publish_at, related_products } = req.body;
   if (!title || !content) return res.status(400).json({ error: 'Titre et contenu requis' });
@@ -164,7 +161,7 @@ router.post('/', requireAdmin, upload.single('cover_image'), (req, res) => {
   let slug = (req.body.slug || '').trim() ? slugify(req.body.slug) : slugify(title);
   if (!slug || slugTaken(slug)) slug = slugify(title) + '-' + Date.now();
 
-  const cover = req.file ? `/assets/images/news/${req.file.filename}` : null;
+  const cover = req.file ? await saveNewsImage(req.file) : null;
   const featured = is_featured === 'true' || is_featured === '1' ? 1 : 0;
 
   const result = db.prepare(`
@@ -180,10 +177,10 @@ router.post('/', requireAdmin, upload.single('cover_image'), (req, res) => {
 
   logActivity(req.user, 'Article créé', title);
   res.status(201).json({ success: true, id: newsId, slug });
-});
+}));
 
 // PUT /api/news/:id — modifier un article
-router.put('/:id', requireAdmin, upload.single('cover_image'), (req, res) => {
+router.put('/:id', requireAdmin, upload.single('cover_image'), asyncRoute(async (req, res) => {
   const { title, excerpt, content, published, meta_title, meta_description,
           category, is_featured, publish_at, related_products } = req.body;
   const existing = db.prepare('SELECT * FROM news WHERE id = ?').get(req.params.id);
@@ -200,7 +197,7 @@ router.put('/:id', requireAdmin, upload.single('cover_image'), (req, res) => {
     }
   }
 
-  const cover = req.file ? `/assets/images/news/${req.file.filename}` : existing.cover_image;
+  const cover = req.file ? await saveNewsImage(req.file) : existing.cover_image;
   const featured = is_featured !== undefined ? (is_featured === 'true' || is_featured === '1' ? 1 : 0) : existing.is_featured;
 
   db.prepare(`
@@ -220,7 +217,7 @@ router.put('/:id', requireAdmin, upload.single('cover_image'), (req, res) => {
 
   logActivity(req.user, 'Article modifié', title || existing.title);
   res.json({ success: true, slug });
-});
+}));
 
 // DELETE /api/news/:id — supprimer un article
 router.delete('/:id', requireAdmin, (req, res) => {
