@@ -42,28 +42,8 @@
 </div>
 
 <div id="admin-content" class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
-  </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <!-- Sidebar -->
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html" class="active">📊 Tableau de bord</a>
-      <a href="produits.html">🧶 Produits</a>
-      <a href="commandes.html">📦 Commandes</a>
-      <a href="actualites.html">📝 Actualités</a>
-      <a href="utilisateurs.html">👥 Utilisateurs</a>
-      <a href="avis.html">⭐ Avis</a>
-      <a href="promo.html">🏷️ Codes promo</a>
-      <a href="newsletter.html">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <!-- Main -->
   <main class="admin-main">
@@ -109,6 +89,18 @@
         <div class="stat-val" id="stat-revenue">—</div>
         <div class="stat-label" id="stat-revenue-label">💰 CA du mois</div>
       </div>
+    </div>
+
+    <!-- Alertes -->
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr">
+      <a href="produits.html" id="alert-stock-card" class="stat-card" style="text-decoration:none;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(192,113,138,.2)'" onmouseout="this.style.boxShadow=''">
+        <div class="stat-val" id="stat-lowstock" style="color:#856404">—</div>
+        <div class="stat-label">⚠️ Stock faible / épuisé <span style="font-size:.7rem;margin-left:4px;opacity:.6">→ Voir</span></div>
+      </a>
+      <a href="avis.html" id="alert-reviews-card" class="stat-card" style="text-decoration:none;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(192,113,138,.2)'" onmouseout="this.style.boxShadow=''">
+        <div class="stat-val" id="stat-pendingreviews" style="color:#856404">—</div>
+        <div class="stat-label">⭐ Avis en attente <span style="font-size:.7rem;margin-left:4px;opacity:.6">→ Voir</span></div>
+      </a>
     </div>
 
     <!-- Recent orders -->
@@ -259,9 +251,10 @@ async function loadDashboard() {
   document.getElementById('admin-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
   try {
-    const [products, orders] = await Promise.all([
+    const [products, orders, reviews] = await Promise.all([
       apiFetch('/products/admin/all'),
-      apiFetch('/orders')
+      apiFetch('/orders'),
+      apiFetch('/reviews/admin').catch(() => [])
     ]);
 
     _allOrders = orders;
@@ -271,6 +264,15 @@ async function loadDashboard() {
     const pending = orders.filter(o => o.status === 'pending');
     document.getElementById('stat-products').textContent = active.length;
     document.getElementById('stat-pending').textContent  = pending.length;
+
+    // Alertes : stock faible/épuisé + avis en attente
+    const LOW_STOCK_THRESHOLD = 3;
+    const lowStock = active.filter(p => p.stock < LOW_STOCK_THRESHOLD);
+    document.getElementById('stat-lowstock').textContent = lowStock.length;
+    document.getElementById('stat-lowstock').style.color = lowStock.length ? '#856404' : 'var(--sage-dark)';
+    const pendingReviews = reviews.filter(r => !r.is_approved);
+    document.getElementById('stat-pendingreviews').textContent = pendingReviews.length;
+    document.getElementById('stat-pendingreviews').style.color = pendingReviews.length ? '#856404' : 'var(--sage-dark)';
 
     // Stats de période (mois courant par défaut)
     updatePeriodStats();
