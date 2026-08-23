@@ -246,7 +246,10 @@ ${urls.join('')}
 });
 
 // ─── Setup premier lancement ────────────────────────────────
-app.post('/api/setup', (req, res) => {
+// authLimiter : cette route bootstrap le tout premier compte admin et n'est
+// pas sous /api/auth (donc pas déjà couverte par le authLimiter appliqué à
+// ce préfixe) — sans ça, elle restait le seul endpoint sensible non limité.
+app.post('/api/setup', authLimiter, (req, res) => {
   const db = require('./db/database');
   const bcrypt = require('bcryptjs');
 
@@ -258,6 +261,15 @@ app.post('/api/setup', (req, res) => {
   const { email, password, first_name, last_name } = req.body;
   if (!email || !password || !first_name || !last_name) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
+  }
+  // Même exigence que l'inscription client (server/routes/auth.js /register) —
+  // le compte créé ici a accès à TOUT le site, il ne doit pas avoir une
+  // barrière plus faible que celle d'un simple compte client.
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères' });
+  }
+  if (!/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins une majuscule, un chiffre et un caractère spécial' });
   }
 
   const hash = bcrypt.hashSync(password, 10);
