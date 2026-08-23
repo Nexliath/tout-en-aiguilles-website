@@ -823,6 +823,11 @@ async function loadReviews(productId) {
           <div class="review-photos">
             ${r.photos.map(p => `<img src="${p}" class="review-photo" onclick="openLightbox('${p}')" alt="Photo du produit reçu">`).join('')}
           </div>` : ''}
+        ${r.admin_reply ? `
+          <div style="margin-top:12px;padding:12px 14px;background:var(--rose-pale);border-radius:var(--radius);border-left:3px solid var(--rose)">
+            <div style="font-size:.78rem;font-weight:700;color:var(--rose-dark);margin-bottom:4px">🧶 Réponse de Tout en Aiguilles</div>
+            <div style="font-size:.85rem;color:var(--text)">${r.admin_reply.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          </div>` : ''}
       </div>
     `).join('');
   } catch (e) {
