@@ -683,26 +683,78 @@ p  { color: var(--text-light); }
   max-height: 480px;
 }
 .article-cover img { width: 100%; height: 100%; object-fit: cover; }
-.article-body { font-size: 1.05rem; line-height: 1.85; color: var(--text); }
-.article-body p { margin-bottom: 20px; }
-.article-body h2 { font-family: var(--font-title); font-size: 1.5rem; margin: 40px 0 16px; color: var(--rose-dark); }
-.article-body h3 { font-family: var(--font-title); font-size: 1.2rem; margin: 28px 0 12px; }
-.article-body ul, .article-body ol { padding-left: 24px; margin-bottom: 20px; }
-.article-body li { margin-bottom: 6px; }
-.article-body figure { margin: 28px 0; }
-.article-body figure img { width: 100%; border-radius: var(--radius-lg); display: block; }
-.article-body figure figcaption { font-size: .8rem; color: var(--text-light); text-align: center; margin-top: 8px; }
-.article-body a { color: var(--rose-dark); text-decoration: underline; }
+
+/* Normalisation du contenu des articles ─────────────────────────
+   Les articles existants ont pu être créés avant l'ajout des outils de
+   mise en forme, ou par copier-coller (Word/Google Docs) qui embarque des
+   styles en ligne (tailles, polices, couleurs). Ces règles neutralisent
+   tout style importé pour garantir un rendu propre et cohérent, sur
+   mobile comme sur ordinateur, quel que soit le contenu déjà en base —
+   sans avoir à retoucher chaque article un par un. */
+.article-body, .article-body * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  font-family: var(--font-body) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.85 !important;
+  font-weight: 400 !important;
+  color: var(--text) !important;
+  background-color: transparent !important;
+  text-align: left !important;
+}
+.article-body { font-size: 1.05rem; line-height: 1.85; color: var(--text); overflow-wrap: break-word; }
+.article-body p { margin: 0 0 20px !important; }
+.article-body ul, .article-body ol { padding-left: 24px !important; margin: 0 0 20px !important; }
+.article-body li { margin-bottom: 6px !important; }
+.article-body strong, .article-body b { font-weight: 700 !important; }
+.article-body em, .article-body i { font-style: italic !important; }
+.article-body u { text-decoration: underline !important; }
+
+.article-body h2, .article-body h2 * {
+  font-family: var(--font-title) !important; font-size: 1.5rem !important; line-height: 1.3 !important;
+  font-weight: 600 !important; margin: 40px 0 16px !important; color: var(--rose-dark) !important;
+}
+.article-body h3, .article-body h3 * {
+  font-family: var(--font-title) !important; font-size: 1.2rem !important; line-height: 1.35 !important;
+  font-weight: 600 !important; margin: 28px 0 12px !important; color: var(--text) !important;
+}
+.article-body a, .article-body a * {
+  color: var(--rose-dark) !important; text-decoration: underline !important; font-weight: inherit !important;
+}
+.article-body blockquote, .article-body blockquote * {
+  border-left: 3px solid var(--rose) !important; padding: 12px 16px !important; margin: 24px 0 !important;
+  background: var(--rose-pale) !important; border-radius: 0 8px 8px 0 !important;
+  font-style: italic !important; color: var(--rose-dark) !important;
+}
+.article-body hr { border: none !important; border-top: 2px solid var(--border) !important; margin: 32px 0 !important; }
+.article-body table { display: block; overflow-x: auto; max-width: 100%; margin-bottom: 20px; }
+
+/* Images/vidéos : toujours contenues, jamais en dehors du cadre — y
+   compris les <img> collés sans balise <figure> (anciens articles). */
+.article-body img, .article-body video, .article-body iframe {
+  max-width: 100% !important; height: auto !important; display: block;
+  margin: 24px auto !important; border-radius: var(--radius-lg);
+}
+.article-body figure { margin: 28px 0 !important; max-width: 100% !important; }
+.article-body figure img { width: 100%; border-radius: var(--radius-lg); display: block; margin: 0 !important; }
+.article-body figure figcaption, .article-body figure figcaption * {
+  font-size: .8rem !important; color: var(--text-light) !important; text-align: center !important;
+  margin-top: 8px !important; font-style: normal !important;
+}
 
 /* Mise en page des images dans un article — inspiré des éditeurs de blog
    (Medium/Shopify/Substack) : pleine largeur, moyenne centrée, ou côte à côte */
-.article-body figure.img-medium { max-width: 62%; margin-left: auto; margin-right: auto; }
-.article-body .img-row { display: flex; gap: 16px; margin: 28px 0; align-items: flex-start; }
-.article-body .img-row figure { margin: 0; flex: 1 1 0; min-width: 0; }
+.article-body figure.img-medium { max-width: 62% !important; margin-left: auto !important; margin-right: auto !important; }
+.article-body .img-row { display: flex; gap: 16px; margin: 28px 0; align-items: flex-start; max-width: 100%; }
+.article-body .img-row figure { margin: 0 !important; flex: 1 1 0; min-width: 0; }
 .article-body .img-row figure img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 1; }
 @media (max-width: 768px) {
-  .article-body figure.img-medium { max-width: 100%; }
+  .article-body figure.img-medium { max-width: 100% !important; }
   .article-body .img-row { flex-direction: column; }
+}
+@media (max-width: 480px) {
+  .article-cover { max-height: 260px; }
+  .article-body, .article-body * { font-size: 1rem !important; line-height: 1.75 !important; }
 }
 
 /* ─── Admin ──────────────────────────────────────────────────── */
