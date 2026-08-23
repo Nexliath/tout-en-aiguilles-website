@@ -19,9 +19,25 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const _db = new DatabaseSync(DB_PATH);
 
-// Activer WAL mode et foreign keys
-_db.exec('PRAGMA journal_mode = WAL');
+// ── Mode journal : DELETE (pas WAL) ────────────────────────────
+// WAL écrit dans un fichier séparé puis "checkpoint" vers le fichier
+// principal plus tard — si Railway tue le conteneur pendant un redéploiement
+// avant ce checkpoint, les dernières écritures (flags, suppressions...) sont
+// perdues et la base "revient en arrière". DELETE + synchronous=FULL écrit
+// directement et durablement dans le fichier principal à chaque commit :
+// plus lent, mais aucune perte de données possible sur ce site à faible trafic.
+_db.exec('PRAGMA journal_mode = DELETE');
+_db.exec('PRAGMA synchronous = FULL');
 _db.exec('PRAGMA foreign_keys = ON');
+
+// Fermeture propre de la base si le process reçoit un signal d'arrêt
+// (sécurité supplémentaire, redondante avec synchronous=FULL mais inoffensive)
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    try { _db.close(); } catch {}
+    process.exit(0);
+  });
+}
 
 // Initialiser le schéma
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
