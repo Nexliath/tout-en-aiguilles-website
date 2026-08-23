@@ -290,4 +290,48 @@ router.put('/password', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ─── GET /api/auth/export ────────────────────────────────────
+// RGPD (droit à la portabilité) : export JSON de toutes les données
+// personnelles du compte connecté, téléchargeable par le client lui-même.
+router.get('/export', requireAuth, (req, res) => {
+  const profile = db.prepare(
+    'SELECT id, email, first_name, last_name, username, created_at, newsletter_opt_out FROM users WHERE id = ?'
+  ).get(req.user.id);
+  if (!profile) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+  const addresses = db.prepare('SELECT label, first_name, last_name, address, postal_code, city, country, is_primary FROM addresses WHERE user_id = ?').all(req.user.id);
+  const orders = db.prepare('SELECT id, status, total, items, delivery_type, delivery_fee, created_at FROM orders WHERE user_id = ?').all(req.user.id)
+    .map(o => ({ ...o, items: (() => { try { return JSON.parse(o.items); } catch { return o.items; } })() }));
+  const favorites = db.prepare(`
+    SELECT p.id, p.name FROM favorites f JOIN products p ON p.id = f.product_id WHERE f.user_id = ?
+  `).all(req.user.id);
+  const reviews = db.prepare('SELECT product_id, rating, comment, created_at FROM reviews WHERE user_id = ?').all(req.user.id);
+
+  res.setHeader('Content-Disposition', `attachment; filename="mes-donnees-tout-en-aiguilles.json"`);
+  res.json({ exported_at: new Date().toISOString(), profile, addresses, orders, favorites, reviews });
+});
+
+// ─── DELETE /api/auth/account ────────────────────────────────
+// RGPD (droit à l'effacement) : suppression du compte par le client
+// lui-même. Les commandes passées sont conservées (obligation légale de
+// conservation des factures, Code de commerce), mais ne sont plus liées
+// à un compte actif — comme pour une suppression de compte côté admin.
+router.delete('/account', requireAuth, (req, res) => {
+  const { password } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+  if (user.role === 'admin') {
+    return res.status(400).json({ error: 'Les comptes administrateur ne peuvent pas être supprimés depuis cette page.' });
+  }
+  if (!password || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Mot de passe incorrect' });
+  }
+
+  db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(user.id);
+  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+
+  res.json({ success: true, message: 'Votre compte a été supprimé.' });
+});
+
 module.exports = router;
