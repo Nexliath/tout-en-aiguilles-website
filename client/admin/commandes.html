@@ -274,7 +274,9 @@ async function bulkChangeStatus(status) {
   if (!confirm(`Changer le statut de ${selectedOrderIds.size} commande(s) vers "${STATUS[status]}" ?`)) return;
   try {
     const res = await apiFetch('/orders/bulk/status', { method: 'PUT', body: { ids: [...selectedOrderIds], status } });
-    Toast.show(`✅ ${res.updated} commande(s) mise(s) à jour`, 'success');
+    const hasSkipped = res.skipped && res.skipped.length;
+    const skippedMsg = hasSkipped ? ` — ${res.skipped.length} ignorée(s) (transition invalide)` : '';
+    Toast.show(`✅ ${res.updated} commande(s) mise(s) à jour${skippedMsg}`, hasSkipped ? 'info' : 'success');
     clearOrderSelection();
     await loadOrders();
   } catch (e) { Toast.show(e.message, 'error'); }
