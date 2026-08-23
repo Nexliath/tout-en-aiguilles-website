@@ -96,14 +96,23 @@
       <div id="relay-change-section" style="display:none"></div>
     </div>
 
+    <!-- Barre d'actions groupées -->
+    <div id="bulk-bar" style="display:none;padding:10px 16px;background:var(--rose-pale);border:1px solid var(--border);border-bottom:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0;align-items:center;gap:10px;flex-wrap:wrap">
+      <span id="bulk-count" style="font-size:.82rem;font-weight:700;color:var(--rose-dark)"></span>
+      <button class="btn btn-secondary btn-sm" onclick="bulkChangeStatus('paid')">💳 Marquer payées</button>
+      <button class="btn btn-secondary btn-sm" onclick="bulkChangeStatus('shipped')">🚚 Marquer expédiées</button>
+      <button class="btn btn-secondary btn-sm" onclick="bulkChangeStatus('delivered')">✓ Marquer livrées</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearOrderSelection()" style="margin-left:auto">Annuler la sélection</button>
+    </div>
+
     <!-- Table -->
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
-          <tr><th>#</th><th>Client</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th><th>Actions</th></tr>
+          <tr><th style="width:36px"><input type="checkbox" id="select-all-orders" onchange="toggleSelectAllOrders(this)"></th><th>#</th><th>Client</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th><th>Actions</th></tr>
         </thead>
         <tbody id="orders-tbody">
-          <tr><td colspan="7" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -114,6 +123,7 @@
 <script>
 let allOrders = [];
 let currentFilter = '';
+let selectedOrderIds = new Set();
 
 const STATUS = { pending:'En attente', paid:'Payée', shipped:'Expédiée', delivered:'Livrée', cancelled:'Annulée' };
 const DELIVERY_LABEL = { home: '🏠 Domicile', relay: '📦 Point Relais', handover: '🤝 Remise en main propre' };
@@ -172,7 +182,7 @@ async function loadOrders() {
     renderOrders(allOrders);
     document.getElementById('order-count').textContent = `${allOrders.length} commande${allOrders.length > 1 ? 's' : ''}`;
   } catch (e) {
-    document.getElementById('orders-tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+    document.getElementById('orders-tbody').innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
 }
 
@@ -251,11 +261,13 @@ function exportOrdersXLS() {
 function renderOrders(orders) {
   const tbody = document.getElementById('orders-tbody');
   if (!orders.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-light)">Aucune commande</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-light)">Aucune commande</td></tr>';
+    updateOrderBulkBar();
     return;
   }
   tbody.innerHTML = orders.map(o => `
     <tr>
+      <td><input type="checkbox" class="order-select" data-id="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onchange="toggleOrderSelect(${o.id}, this.checked)"></td>
       <td style="font-weight:700">#${o.id}</td>
       <td>
         <div style="font-weight:700">${o.first_name} ${o.last_name}</div>
@@ -269,6 +281,47 @@ function renderOrders(orders) {
         <button class="btn btn-secondary btn-sm" onclick="showDetail(${o.id})">Détails</button>
       </td>
     </tr>`).join('');
+  updateOrderBulkBar();
+}
+
+// ─── Sélection multiple / statut groupé ───────────────────
+function toggleOrderSelect(id, checked) {
+  if (checked) selectedOrderIds.add(id); else selectedOrderIds.delete(id);
+  updateOrderBulkBar();
+}
+function toggleSelectAllOrders(checkbox) {
+  document.querySelectorAll('.order-select').forEach(cb => {
+    cb.checked = checkbox.checked;
+    const id = Number(cb.dataset.id);
+    if (checkbox.checked) selectedOrderIds.add(id); else selectedOrderIds.delete(id);
+  });
+  updateOrderBulkBar();
+}
+function clearOrderSelection() {
+  selectedOrderIds.clear();
+  document.querySelectorAll('.order-select').forEach(cb => cb.checked = false);
+  const selectAll = document.getElementById('select-all-orders');
+  if (selectAll) selectAll.checked = false;
+  updateOrderBulkBar();
+}
+function updateOrderBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  if (selectedOrderIds.size > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('bulk-count').textContent = `${selectedOrderIds.size} commande${selectedOrderIds.size > 1 ? 's' : ''} sélectionnée${selectedOrderIds.size > 1 ? 's' : ''}`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+async function bulkChangeStatus(status) {
+  if (!selectedOrderIds.size) return;
+  if (!confirm(`Changer le statut de ${selectedOrderIds.size} commande(s) vers "${STATUS[status]}" ?`)) return;
+  try {
+    const res = await apiFetch('/orders/bulk/status', { method: 'PUT', body: { ids: [...selectedOrderIds], status } });
+    Toast.show(`✅ ${res.updated} commande(s) mise(s) à jour`, 'success');
+    clearOrderSelection();
+    await loadOrders();
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 function showDetail(id) {
