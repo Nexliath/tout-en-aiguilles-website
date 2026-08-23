@@ -20,14 +20,6 @@
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
-<!-- Mobile top bar -->
-<div class="admin-mobile-bar" id="admin-mobile-bar">
-  <button class="admin-hamburger" onclick="openAdminDrawer()" aria-label="Menu">☰</button>
-  <div class="admin-mobile-bar-title" id="admin-bar-title">Administration</div>
-  <a href="/panier.html" style="color:white;font-size:1.1rem;text-decoration:none">🛒</a>
-</div>
-<div class="admin-drawer-overlay" id="admin-drawer-overlay" onclick="closeAdminDrawer()"></div>
-
 <div class="admin-layout">
   <aside class="admin-sidebar">
     <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
@@ -40,7 +32,6 @@
       <a href="avis.html">⭐ Avis</a>
       <a href="promo.html">🏷️ Codes promo</a>
       <a href="newsletter.html">📧 Newsletter</a>
-      <a href="analytiques.html">📈 Analytiques</a>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
       <a href="/" target="_blank">🌐 Voir le site</a>
       <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
@@ -52,7 +43,7 @@
       <h1>Gestion des produits</h1>
       <div style="display:flex;gap:8px">
         <button class="btn btn-secondary btn-sm" onclick="showImport()">📥 Importer Excel</button>
-        <button class="btn btn-primary btn-sm" onclick="hideForm();showForm()">+ Ajouter un produit</button>
+        <button class="btn btn-primary btn-sm" onclick="showForm()">+ Ajouter un produit</button>
       </div>
     </div>
 
@@ -89,10 +80,9 @@
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group" id="stock-field-group">
+        <div class="form-group">
           <label class="form-label">Stock</label>
           <input type="number" id="f-stock" class="form-input" min="0" value="0">
-          <p class="form-hint" id="stock-custom-hint" style="display:none">Pas besoin pour un produit sur devis — chaque commande est faite à la demande.</p>
         </div>
         <div class="form-group">
           <label class="form-label">Catégorie</label>
@@ -112,48 +102,50 @@
       <div class="form-group">
         <label class="form-label">Photos du produit</label>
         <input type="file" id="f-images" multiple accept="image/*" class="form-input">
-        <p class="form-hint">Max 20 photos — JPG, PNG, WebP (5 Mo max chacune)</p>
-        <div id="current-images" style="display:flex;gap:14px 8px;flex-wrap:wrap;margin-top:16px"></div>
-        <p class="form-hint">La première photo (bordée en rose) est la couverture affichée sur la boutique. Utilisez ‹ › pour réordonner.</p>
+        <p class="form-hint">Max 5 photos — JPG, PNG, WebP (5 Mo max chacune)</p>
+        <div id="current-images" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
       </div>
-      <div style="display:flex;gap:16px;margin-bottom:20px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="f-custom-order" onchange="toggleStockField()"> <span class="form-label" style="margin:0">✉️ Produit personnalisé (sur devis — pas d'ajout au panier direct)</span>
-        </label>
-      </div>
-      <!-- Options / variations (libellé libre + photo + prix + stock) -->
-      <div id="variations-panel" style="background:var(--cream-dark);border-radius:var(--radius-lg);padding:16px;margin-bottom:20px">
-        <div style="font-size:.82rem;font-weight:700;margin-bottom:4px;color:var(--text)">📋 Options de l'article</div>
-        <p style="font-size:.75rem;color:var(--text-light);margin-bottom:12px">Ex : "Velours avec côtés", "Jean sans fond"… chaque option peut avoir sa propre photo, son prix et son stock.</p>
-        <div id="variations-need-save" style="font-size:.8rem;color:var(--text-light);font-style:italic;display:none">Enregistrez d'abord le produit pour pouvoir ajouter des options.</div>
-        <div id="variations-table-wrap" style="display:none">
-          <table class="admin-table" style="margin-bottom:12px">
-            <thead><tr><th>Photo</th><th>Libellé</th><th>Prix (€)</th><th>Stock</th><th>Visible</th><th>Actions</th></tr></thead>
-            <tbody id="variations-tbody"></tbody>
-          </table>
-          <div id="variation-add-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:white;border:1px dashed var(--border);border-radius:8px;padding:10px">
-            <input type="file" id="var-new-image" accept="image/*" style="max-width:140px;font-size:.78rem">
-            <input type="text" id="var-new-label" class="form-input" placeholder="Libellé (ex: Velours avec côtés)" style="flex:1;min-width:160px;font-size:.85rem">
-            <input type="number" id="var-new-price" class="form-input" placeholder="Prix €" step="0.01" style="width:90px;font-size:.85rem">
-            <input type="number" id="var-new-stock" class="form-input" placeholder="Stock" style="width:80px;font-size:.85rem">
-            <button class="btn btn-secondary btn-sm" onclick="addVariation()">+ Ajouter</button>
+      <!-- ── Options / Variantes (Etsy-style) ── -->
+      <div style="border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:20px;overflow:hidden">
+        <div style="padding:14px 16px;background:var(--cream-dark);display:flex;align-items:flex-start;gap:10px;cursor:pointer" onclick="document.getElementById('f-has-variants').click()">
+          <input type="checkbox" id="f-has-variants" onclick="event.stopPropagation()" onchange="toggleVariantSection()" style="margin-top:2px;flex-shrink:0">
+          <div>
+            <div style="font-weight:700;font-size:.95rem">📦 Options de l'article</div>
+            <div style="font-size:.77rem;color:var(--text-light);margin-top:2px">Ex : "Velours avec côtés", "Jean sans fond"… chaque option peut avoir sa propre photo, son prix et son stock.</div>
           </div>
         </div>
-      </div>
-      <!-- Variantes -->
-      <div style="background:var(--cream-dark);border-radius:var(--radius-lg);padding:16px;margin-bottom:20px">
-        <div style="font-size:.82rem;font-weight:700;margin-bottom:12px;color:var(--text)">🎨 Variantes (couleurs / motifs)</div>
-        <div class="form-row" style="margin-bottom:0">
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">ID du groupe <span style="font-weight:400;color:var(--text-light)">(identique sur toutes les variantes)</span></label>
-            <input type="text" id="f-variant-group" class="form-input" placeholder="ex: doudou-singe" style="font-size:.85rem">
+        <div id="variants-table-wrap" style="display:none;padding:16px">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border)">
+                  <th style="padding:8px 6px;text-align:left;font-size:.72rem;color:var(--text-light);font-weight:700;text-transform:uppercase;letter-spacing:.04em">PHOTO</th>
+                  <th style="padding:8px 6px;text-align:left;font-size:.72rem;color:var(--text-light);font-weight:700;text-transform:uppercase;letter-spacing:.04em">LIBELLÉ</th>
+                  <th style="padding:8px 6px;text-align:left;font-size:.72rem;color:var(--text-light);font-weight:700;text-transform:uppercase;letter-spacing:.04em">PRIX (€)</th>
+                  <th style="padding:8px 6px;text-align:left;font-size:.72rem;color:var(--text-light);font-weight:700;text-transform:uppercase;letter-spacing:.04em">STOCK</th>
+                  <th style="padding:8px 6px;text-align:left;font-size:.72rem;color:var(--text-light);font-weight:700;text-transform:uppercase;letter-spacing:.04em">VISIBLE</th>
+                  <th style="padding:8px 6px;text-align:left;font-size:.72rem;color:var(--text-light);font-weight:700;text-transform:uppercase;letter-spacing:.04em">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="variants-tbody"></tbody>
+            </table>
           </div>
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Étiquette de cette variante</label>
-            <input type="text" id="f-variant-label" class="form-input" placeholder="ex: Rose, Vert, Bleu marine" style="font-size:.85rem">
+          <!-- Ajouter une nouvelle variante -->
+          <div style="display:flex;gap:8px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);flex-wrap:wrap">
+            <div style="flex-shrink:0">
+              <input type="file" id="new-variant-img" accept="image/*" style="display:none" onchange="previewNewVariantImg(this)">
+              <div id="new-variant-img-preview"
+                onclick="document.getElementById('new-variant-img').click()"
+                style="width:48px;height:48px;border-radius:8px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer;background:var(--cream);color:var(--text-light);overflow:hidden">
+                📷
+              </div>
+            </div>
+            <input type="text" id="new-variant-label" class="form-input" placeholder="Libellé (ex: Rouge, Bleu, Coton…)" style="flex:2;min-width:140px">
+            <input type="number" id="new-variant-price" class="form-input" placeholder="Prix €" style="width:90px" step="0.01" min="0">
+            <input type="number" id="new-variant-stock" class="form-input" placeholder="Stock" style="width:72px" min="0">
+            <button type="button" class="btn btn-primary btn-sm" onclick="addVariantRow()" style="white-space:nowrap">+ Ajouter</button>
           </div>
         </div>
-        <p style="font-size:.75rem;color:var(--text-light);margin-top:8px">Remplissez les deux champs pour lier plusieurs produits ensemble. Laissez vide si pas de variantes.</p>
       </div>
       <div style="display:flex;gap:16px;margin-bottom:20px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -170,33 +162,11 @@
       </div>
     </div>
 
-    <!-- ── Stats & chart ── -->
-    <div id="category-stats" class="admin-panel mb-lg" style="display:none">
-      <div class="admin-panel-title">📊 Répartition par catégorie</div>
-      <div id="cat-bar-chart" style="padding:4px 0"></div>
-    </div>
-
     <!-- ── Products table ── -->
     <div class="admin-table-wrap">
-      <!-- Filter bar -->
-      <div style="padding:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border)">
-        <input type="text" id="search-products" class="form-input" style="max-width:220px;flex:1;min-width:140px" placeholder="🔍 Rechercher…" oninput="filterTable()">
-        <select id="filter-cat" class="form-select" style="max-width:180px;flex:1;min-width:130px" onchange="filterTable()">
-          <option value="">Toutes les catégories</option>
-        </select>
-        <select id="filter-status" class="form-select" style="max-width:140px" onchange="filterTable()">
-          <option value="">Tous les statuts</option>
-          <option value="actif">Actif</option>
-          <option value="inactif">Inactif</option>
-        </select>
-        <select id="filter-stock" class="form-select" style="max-width:150px" onchange="filterTable()">
-          <option value="">Tous les stocks</option>
-          <option value="dispo">En stock</option>
-          <option value="faible">Stock faible (≤3)</option>
-          <option value="rupture">Rupture</option>
-        </select>
-        <button class="btn btn-ghost btn-sm" onclick="resetFilters()" title="Réinitialiser les filtres">✕ Effacer</button>
-        <span id="prod-count" style="font-size:.8rem;color:var(--text-light);margin-left:auto;white-space:nowrap"></span>
+      <div style="padding:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
+        <input type="text" id="search-products" class="form-input" style="max-width:280px" placeholder="Rechercher un produit…" oninput="filterTable()">
+        <span id="prod-count" style="font-size:.8rem;color:var(--text-light)"></span>
       </div>
       <table class="admin-table">
         <thead>
@@ -210,11 +180,13 @@
   </main>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="/assets/js/main.js"></script>
 <script>
 let allProducts = [];
 let categories  = [];
+// Variantes : tableau local synchronisé avec l'API lors du save
+// { id, label, price, stock, is_active, imageFile, imagePreview, imageUrl, _delete }
+let _variantRows = [];
 
 async function init() {
   if (!Auth.isAdmin()) { window.location.href = 'index.html'; return; }
@@ -224,9 +196,9 @@ async function init() {
 async function loadCategories() {
   try {
     categories = await apiFetch('/products/categories');
-    const opts = categories.map(c => `<option value="${c.id}">${c.type === 'crochet' ? '🧶' : '✂️'} ${c.name}</option>`).join('');
-    document.getElementById('f-category').innerHTML   = '<option value="">— Sélectionner —</option>' + opts;
-    document.getElementById('filter-cat').innerHTML   = '<option value="">Toutes les catégories</option>' + opts;
+    const sel = document.getElementById('f-category');
+    sel.innerHTML = '<option value="">— Sélectionner —</option>' +
+      categories.map(c => `<option value="${c.id}">${c.type === 'crochet' ? '🧶' : '✂️'} ${c.name}</option>`).join('');
   } catch {}
 }
 
@@ -234,42 +206,10 @@ async function loadProducts() {
   try {
     allProducts = await apiFetch('/products/admin/all');
     renderTable(allProducts);
-    document.getElementById('prod-count').textContent =
-      `${allProducts.length} produit${allProducts.length > 1 ? 's' : ''}`;
-    renderCategoryChart();
+    document.getElementById('prod-count').textContent = `${allProducts.length} produit${allProducts.length > 1 ? 's' : ''}`;
   } catch (e) {
-    document.getElementById('products-tbody').innerHTML =
-      `<tr><td colspan="7" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+    document.getElementById('products-tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
-}
-
-function renderCategoryChart() {
-  if (!allProducts.length) return;
-  const counts = {};
-  allProducts.forEach(p => {
-    const k = p.category_name || 'Sans catégorie';
-    counts[k] = (counts[k] || 0) + 1;
-  });
-  // Sort descending
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const palette = ['#e8a4b0','#b5c9a8','#d4a5c9','#f0c47a','#a8c4d4','#e8c4a0','#c4a8d4','#a8d4c4'];
-  const max = sorted[0][1];
-  const total = sorted.reduce((s, [,v]) => s + v, 0);
-
-  document.getElementById('category-stats').style.display = '';
-  document.getElementById('cat-bar-chart').innerHTML = sorted.map(([label, count], i) => {
-    const pct = Math.round(count / total * 100);
-    const w   = Math.round(count / max * 100);
-    const col = palette[i % palette.length];
-    return `<div style="display:grid;grid-template-columns:160px 1fr 48px 36px;align-items:center;gap:10px;padding:5px 0">
-      <div style="font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${label}">${label}</div>
-      <div style="background:#f0ebe5;border-radius:4px;height:12px;overflow:hidden">
-        <div style="height:100%;width:${w}%;background:${col};border-radius:4px;transition:width .4s ease"></div>
-      </div>
-      <div style="font-size:.8rem;font-weight:700;color:#555;text-align:right">${count}</div>
-      <div style="font-size:.75rem;color:var(--text-light);text-align:right">${pct}%</div>
-    </div>`;
-  }).join('');
 }
 
 function renderTable(products) {
@@ -279,10 +219,9 @@ function renderTable(products) {
     return;
   }
   tbody.innerHTML = products.map(p => {
-    const imgContent = p.images && p.images.length > 0
-      ? `<img src="${p.images[0]}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;display:block" onerror="this.style.display='none'">`
+    const img = p.images && p.images.length > 0
+      ? `<img src="${p.images[0]}" style="width:48px;height:48px;border-radius:8px;object-fit:cover" onerror="this.innerHTML='🧶'">`
       : '<div style="width:48px;height:48px;border-radius:8px;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🧶</div>';
-    const img = `<a href="/produit.html?id=${p.id}" target="_blank" title="Voir la page produit" style="display:inline-block;border-radius:8px;overflow:hidden;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">${imgContent}</a>`;
     return `<tr data-name="${p.name.toLowerCase()}">
       <td>${img}</td>
       <td>
@@ -308,43 +247,9 @@ function renderTable(products) {
 }
 
 function filterTable() {
-  const q    = document.getElementById('search-products').value.toLowerCase();
-  const cat  = document.getElementById('filter-cat').value;
-  const stat = document.getElementById('filter-status').value;
-  const stk  = document.getElementById('filter-stock').value;
-
-  const filtered = allProducts.filter(p => {
-    if (q && !p.name.toLowerCase().includes(q) && !(p.category_name || '').toLowerCase().includes(q)) return false;
-    if (cat  && String(p.category_id) !== cat) return false;
-    if (stat === 'actif'   && !p.is_active)  return false;
-    if (stat === 'inactif' &&  p.is_active)  return false;
-    if (stk  === 'dispo'   && p.stock === 0) return false;
-    if (stk  === 'faible'  && (p.stock === 0 || p.stock > 3)) return false;
-    if (stk  === 'rupture' && p.stock !== 0) return false;
-    return true;
-  });
+  const q = document.getElementById('search-products').value.toLowerCase();
+  const filtered = allProducts.filter(p => p.name.toLowerCase().includes(q) || (p.category_name || '').toLowerCase().includes(q));
   renderTable(filtered);
-  document.getElementById('prod-count').textContent =
-    `${filtered.length} / ${allProducts.length} produit${allProducts.length > 1 ? 's' : ''}`;
-}
-
-function resetFilters() {
-  document.getElementById('search-products').value = '';
-  document.getElementById('filter-cat').value    = '';
-  document.getElementById('filter-status').value = '';
-  document.getElementById('filter-stock').value  = '';
-  renderTable(allProducts);
-  document.getElementById('prod-count').textContent =
-    `${allProducts.length} produit${allProducts.length > 1 ? 's' : ''}`;
-}
-
-function toggleStockField() {
-  const isCustom = document.getElementById('f-custom-order').checked;
-  const stockInput = document.getElementById('f-stock');
-  document.getElementById('stock-custom-hint').style.display = isCustom ? '' : 'none';
-  stockInput.disabled = isCustom;
-  stockInput.style.opacity = isCustom ? '.5' : '1';
-  if (isCustom) stockInput.value = '0';
 }
 
 function showForm(title = 'Ajouter un produit') {
@@ -362,19 +267,17 @@ function hideForm() {
   document.getElementById('f-category').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-tags').value = '';
-  document.getElementById('f-variant-group').value = '';
-  document.getElementById('f-variant-label').value = '';
   document.getElementById('f-featured').checked = false;
   document.getElementById('f-active').checked = true;
-  document.getElementById('f-custom-order').checked = false;
   document.getElementById('f-images').value = '';
   document.getElementById('current-images').innerHTML = '';
   window._currentProductImages = [];
-  document.getElementById('variations-need-save').style.display = '';
-  document.getElementById('variations-table-wrap').style.display = 'none';
-  document.getElementById('variations-tbody').innerHTML = '';
   document.getElementById('form-error').style.display = 'none';
-  toggleStockField();
+  // Reset variantes
+  _variantRows = [];
+  document.getElementById('f-has-variants').checked = false;
+  document.getElementById('variants-table-wrap').style.display = 'none';
+  renderVariantsTable();
 }
 
 function editProduct(id) {
@@ -388,50 +291,46 @@ function editProduct(id) {
   document.getElementById('f-category').value = p.category_id || '';
   document.getElementById('f-desc').value = p.description || '';
   document.getElementById('f-tags').value = (p.tags || []).join(', ');
-  document.getElementById('f-variant-group').value = p.variant_group_id || '';
-  document.getElementById('f-variant-label').value = p.variant_label || '';
   document.getElementById('f-featured').checked = !!p.is_featured;
   document.getElementById('f-active').checked = !!p.is_active;
-  document.getElementById('f-custom-order').checked = !!p.is_custom_order;
-  toggleStockField();
 
-  // Show current images with delete buttons
+  // Images principales
   window._currentProductImages = [...(p.images || [])];
   renderCurrentImages();
 
-  // Options / variations
-  document.getElementById('variations-need-save').style.display = 'none';
-  document.getElementById('variations-table-wrap').style.display = '';
-  window._currentVariationsProductId = id;
-  loadVariations(id);
+  // Charger les variantes existantes
+  _variantRows = [];
+  const existing = p.variants || [];
+  if (existing.length > 0) {
+    document.getElementById('f-has-variants').checked = true;
+    document.getElementById('variants-table-wrap').style.display = '';
+    _variantRows = existing.map(v => ({
+      id: v.id,
+      label: v.label,
+      price: v.price,
+      stock: v.stock,
+      is_active: v.is_active !== 0,
+      imageFile: null,
+      imagePreview: null,
+      imageUrl: (v.images || [])[0] || null,
+      _delete: false
+    }));
+  } else {
+    document.getElementById('f-has-variants').checked = false;
+    document.getElementById('variants-table-wrap').style.display = 'none';
+  }
+  renderVariantsTable();
 }
 
 function renderCurrentImages() {
-  const imgs = window._currentProductImages || [];
-  document.getElementById('current-images').innerHTML = imgs.map((img, i) => `
+  document.getElementById('current-images').innerHTML = (window._currentProductImages || []).map((img, i) => `
     <div style="position:relative;display:inline-block">
-      <img src="${img}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:2px solid ${i === 0 ? 'var(--rose-dark)' : 'var(--border)'};display:block">
-      ${i === 0 ? '<span style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);background:var(--rose-dark);color:white;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap">Couverture</span>' : ''}
+      <img src="${img}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:2px solid var(--border);display:block">
       <button type="button" onclick="removeProductImage(${i})" title="Supprimer cette photo"
         style="position:absolute;top:-6px;left:-6px;width:20px;height:20px;border-radius:50%;background:#d9534f;color:white;border:none;cursor:pointer;font-size:.75rem;line-height:1;display:flex;align-items:center;justify-content:center;font-weight:700;padding:0">
         ✕
       </button>
-      <div style="position:absolute;top:-6px;right:-6px;display:flex;gap:2px">
-        <button type="button" onclick="moveProductImage(${i},-1)" title="Déplacer vers la gauche" ${i === 0 ? 'disabled style="opacity:.3"' : ''}
-          style="width:20px;height:20px;border-radius:50%;background:var(--rose-dark);color:white;border:none;cursor:pointer;font-size:.7rem;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">‹</button>
-        <button type="button" onclick="moveProductImage(${i},1)" title="Déplacer vers la droite" ${i === imgs.length - 1 ? 'disabled style="opacity:.3"' : ''}
-          style="width:20px;height:20px;border-radius:50%;background:var(--rose-dark);color:white;border:none;cursor:pointer;font-size:.7rem;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">›</button>
-      </div>
     </div>`).join('');
-}
-
-function moveProductImage(index, dir) {
-  const imgs = window._currentProductImages;
-  if (!imgs) return;
-  const newIndex = index + dir;
-  if (newIndex < 0 || newIndex >= imgs.length) return;
-  [imgs[index], imgs[newIndex]] = [imgs[newIndex], imgs[index]];
-  renderCurrentImages();
 }
 
 function removeProductImage(index) {
@@ -458,9 +357,6 @@ async function saveProduct() {
   formData.append('tags',        JSON.stringify(document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean)));
   formData.append('is_featured',     document.getElementById('f-featured').checked ? '1' : '0');
   formData.append('is_active',       document.getElementById('f-active').checked ? '1' : '0');
-  formData.append('is_custom_order', document.getElementById('f-custom-order').checked ? '1' : '0');
-  formData.append('variant_group_id', document.getElementById('f-variant-group').value.trim().toLowerCase().replace(/\s+/g, '-') || '');
-  formData.append('variant_label',    document.getElementById('f-variant-label').value.trim() || '');
   const files = document.getElementById('f-images').files;
   for (const f of files) formData.append('images', f);
   // Envoyer les images à conserver (après suppressions individuelles)
@@ -469,20 +365,20 @@ async function saveProduct() {
   }
 
   try {
+    let productId = id;
     if (id) {
       await apiFetchForm(`/products/${id}`, formData, 'PUT');
-      Toast.show('Produit mis à jour ✓', 'success');
-      hideForm();
-      loadProducts();
     } else {
-      await apiFetchForm('/products', formData, 'POST');
-      Toast.show('Produit créé ✓', 'success');
-      await loadProducts();
-      // Rouvrir en édition pour permettre l'ajout d'options tout de suite
-      const created = allProducts.find(x => x.name === name);
-      if (created) { editProduct(created.id); }
-      else { hideForm(); }
+      const res = await apiFetchForm('/products', formData, 'POST');
+      productId = res.id;
     }
+    // Sync variantes si activées
+    if (document.getElementById('f-has-variants').checked && productId) {
+      await syncVariants(productId);
+    }
+    Toast.show(id ? 'Produit mis à jour ✓' : 'Produit créé ✓', 'success');
+    hideForm();
+    loadProducts();
   } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
 }
 
@@ -492,94 +388,6 @@ async function deleteProduct(id, name) {
     await apiFetch(`/products/${id}`, { method: 'DELETE' });
     Toast.show('Produit supprimé ✓', 'success');
     loadProducts();
-  } catch (e) { Toast.show(e.message, 'error'); }
-}
-
-// ─── Options / variations ──────────────────────────────────────
-async function loadVariations(productId) {
-  try {
-    const variations = await apiFetch(`/products/${productId}/variations`);
-    renderVariationsTable(variations);
-  } catch (e) {
-    document.getElementById('variations-tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
-  }
-}
-
-function renderVariationsTable(variations) {
-  const tbody = document.getElementById('variations-tbody');
-  if (!variations.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-light);padding:12px">Aucune option pour l\'instant</td></tr>';
-    return;
-  }
-  tbody.innerHTML = variations.map(v => `
-    <tr>
-      <td>
-        <label style="cursor:pointer" title="Changer la photo">
-          ${v.image_url
-            ? `<img src="${v.image_url}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;display:block">`
-            : '<div style="width:44px;height:44px;border-radius:6px;background:var(--rose-pale);display:flex;align-items:center;justify-content:center">🧶</div>'}
-          <input type="file" accept="image/*" style="display:none" onchange="uploadVariationImage(${v.id}, this)">
-        </label>
-      </td>
-      <td><input type="text" class="form-input" style="font-size:.85rem" value="${v.label.replace(/"/g, '&quot;')}" onchange="updateVariationField(${v.id}, 'label', this.value)"></td>
-      <td><input type="number" class="form-input" style="font-size:.85rem;width:90px" step="0.01" value="${v.price ?? ''}" placeholder="—" onchange="updateVariationField(${v.id}, 'price', this.value)"></td>
-      <td><input type="number" class="form-input" style="font-size:.85rem;width:80px" value="${v.stock}" onchange="updateVariationField(${v.id}, 'stock', this.value)"></td>
-      <td>
-        <label style="display:flex;align-items:center;cursor:pointer">
-          <input type="checkbox" ${v.visible ? 'checked' : ''} onchange="updateVariationField(${v.id}, 'visible', this.checked ? '1' : '0')">
-        </label>
-      </td>
-      <td><button class="btn btn-ghost btn-sm" onclick="deleteVariation(${v.id})" title="Supprimer">🗑️</button></td>
-    </tr>`).join('');
-}
-
-async function addVariation() {
-  const productId = window._currentVariationsProductId;
-  if (!productId) return;
-  const label = document.getElementById('var-new-label').value.trim();
-  if (!label) { Toast.show('Le libellé est requis', 'error'); return; }
-  const formData = new FormData();
-  formData.append('label', label);
-  formData.append('price', document.getElementById('var-new-price').value || '');
-  formData.append('stock', document.getElementById('var-new-stock').value || '0');
-  const file = document.getElementById('var-new-image').files[0];
-  if (file) formData.append('image', file);
-  try {
-    await apiFetchForm(`/products/${productId}/variations`, formData, 'POST');
-    document.getElementById('var-new-label').value = '';
-    document.getElementById('var-new-price').value = '';
-    document.getElementById('var-new-stock').value = '';
-    document.getElementById('var-new-image').value = '';
-    Toast.show('Option ajoutée ✓', 'success');
-    loadVariations(productId);
-  } catch (e) { Toast.show(e.message, 'error'); }
-}
-
-async function updateVariationField(variationId, field, value) {
-  const formData = new FormData();
-  formData.append(field, value);
-  try {
-    await apiFetchForm(`/products/variations/${variationId}`, formData, 'PUT');
-  } catch (e) { Toast.show(e.message, 'error'); loadVariations(window._currentVariationsProductId); }
-}
-
-async function uploadVariationImage(variationId, input) {
-  const file = input.files[0];
-  if (!file) return;
-  const formData = new FormData();
-  formData.append('image', file);
-  try {
-    await apiFetchForm(`/products/variations/${variationId}`, formData, 'PUT');
-    Toast.show('Photo mise à jour ✓', 'success');
-    loadVariations(window._currentVariationsProductId);
-  } catch (e) { Toast.show(e.message, 'error'); }
-}
-
-async function deleteVariation(variationId) {
-  if (!confirm('Supprimer cette option ?')) return;
-  try {
-    await apiFetch(`/products/variations/${variationId}`, { method: 'DELETE' });
-    loadVariations(window._currentVariationsProductId);
   } catch (e) { Toast.show(e.message, 'error'); }
 }
 
@@ -614,50 +422,134 @@ async function importXLS(file) {
   }
 }
 
-init();
-</script>
+// ── Gestion des variantes ─────────────────────────────────────
+function toggleVariantSection() {
+  const checked = document.getElementById('f-has-variants').checked;
+  document.getElementById('variants-table-wrap').style.display = checked ? '' : 'none';
+}
 
-<script>
-function openAdminDrawer() {
-  document.querySelector('.admin-sidebar').classList.add('open');
-  document.getElementById('admin-drawer-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeAdminDrawer() {
-  document.querySelector('.admin-sidebar').classList.remove('open');
-  document.getElementById('admin-drawer-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-}
-// Set page title in mobile bar
-document.addEventListener('DOMContentLoaded', () => {
-  const active = document.querySelector('.admin-nav a.active');
-  if (active) {
-    const t = document.getElementById('admin-bar-title');
-    if (t) t.textContent = active.textContent.replace(/^[^\w]+/, '').trim();
+function renderVariantsTable() {
+  const tbody = document.getElementById('variants-tbody');
+  if (!tbody) return;
+  const visible = _variantRows.filter(v => !v._delete);
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:var(--text-light);font-size:.85rem">Aucune option — ajoutez-en ci-dessous</td></tr>';
+    return;
   }
-  // Close drawer on nav link click
-  document.querySelectorAll('.admin-nav a').forEach(a => {
-    a.addEventListener('click', closeAdminDrawer);
-  });
-});
-</script>
+  tbody.innerHTML = visible.map((v, i) => {
+    const realIdx = _variantRows.indexOf(v);
+    const imgSrc = v.imagePreview || v.imageUrl || '';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 6px">
+        <input type="file" accept="image/*" id="vimg-${realIdx}" style="display:none" onchange="setVariantImg(${realIdx}, this)">
+        <div onclick="document.getElementById('vimg-${realIdx}').click()"
+          style="width:52px;height:52px;border-radius:8px;border:1px solid var(--border);overflow:hidden;cursor:pointer;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.4rem">
+          ${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover">` : '📷'}
+        </div>
+      </td>
+      <td style="padding:8px 6px">
+        <input type="text" value="${v.label.replace(/"/g,'&quot;')}" class="form-input" style="font-size:.85rem;min-width:120px"
+          oninput="_variantRows[${realIdx}].label=this.value">
+      </td>
+      <td style="padding:8px 6px">
+        <input type="number" value="${v.price != null ? v.price : ''}" class="form-input" style="font-size:.85rem;width:82px"
+          placeholder="Hérite" step="0.01" min="0"
+          oninput="_variantRows[${realIdx}].price=this.value||null">
+      </td>
+      <td style="padding:8px 6px">
+        <input type="number" value="${v.stock}" class="form-input" style="font-size:.85rem;width:66px" min="0"
+          oninput="_variantRows[${realIdx}].stock=Number(this.value)">
+      </td>
+      <td style="padding:8px 6px;text-align:center">
+        <input type="checkbox" ${v.is_active ? 'checked' : ''}
+          onchange="_variantRows[${realIdx}].is_active=this.checked" style="width:18px;height:18px;cursor:pointer">
+      </td>
+      <td style="padding:8px 6px">
+        <button type="button" onclick="deleteVariantRow(${realIdx})"
+          style="background:none;border:none;cursor:pointer;color:#d9534f;font-size:1.1rem;padding:4px" title="Supprimer">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
 
-<script>
-// Auto-label table cells for mobile card layout
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.admin-table').forEach(table => {
-    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
-    table.querySelectorAll('tbody tr').forEach(row => {
-      Array.from(row.querySelectorAll('td')).forEach((td, i) => {
-        if (headers[i]) td.setAttribute('data-label', headers[i]);
-        // Hide photo/image column label
-        if (i === 0 && (td.querySelector('img') || td.querySelector('.table-img'))) {
-          td.removeAttribute('data-label');
-        }
-      });
-    });
+function setVariantImg(i, input) {
+  const file = input.files[0];
+  if (!file) return;
+  _variantRows[i].imageFile = file;
+  _variantRows[i].imagePreview = URL.createObjectURL(file);
+  renderVariantsTable();
+}
+
+function addVariantRow() {
+  const label = document.getElementById('new-variant-label').value.trim();
+  if (!label) { Toast.show('Le libellé est requis', 'error'); return; }
+  const imgInput = document.getElementById('new-variant-img');
+  const file = imgInput.files[0] || null;
+  _variantRows.push({
+    id: null, label,
+    price: document.getElementById('new-variant-price').value || null,
+    stock: Number(document.getElementById('new-variant-stock').value) || 0,
+    is_active: true,
+    imageFile: file,
+    imagePreview: file ? URL.createObjectURL(file) : null,
+    imageUrl: null,
+    _delete: false
   });
-});
+  // Reset add-row
+  document.getElementById('new-variant-label').value = '';
+  document.getElementById('new-variant-price').value = '';
+  document.getElementById('new-variant-stock').value = '';
+  imgInput.value = '';
+  document.getElementById('new-variant-img-preview').innerHTML = '📷';
+  renderVariantsTable();
+}
+
+function deleteVariantRow(i) {
+  if (_variantRows[i].id) {
+    _variantRows[i]._delete = true; // sera supprimé via API au save
+  } else {
+    _variantRows.splice(i, 1);
+  }
+  renderVariantsTable();
+}
+
+function previewNewVariantImg(input) {
+  const file = input.files[0];
+  const preview = document.getElementById('new-variant-img-preview');
+  if (file) {
+    const url = URL.createObjectURL(file);
+    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+  }
+}
+
+async function syncVariants(productId) {
+  for (const v of _variantRows) {
+    const fd = new FormData();
+    if (v._delete && v.id) {
+      await apiFetch(`/products/${productId}/variants/${v.id}`, { method: 'DELETE' });
+      continue;
+    }
+    if (v._delete) continue;
+
+    fd.append('label', v.label);
+    fd.append('price', v.price != null ? v.price : '');
+    fd.append('stock', v.stock || 0);
+    fd.append('is_active', v.is_active ? '1' : '0');
+    if (v.imageFile) {
+      fd.append('image', v.imageFile);
+    } else if (v.imageUrl) {
+      fd.append('keep_image', '1');
+    }
+
+    if (v.id) {
+      await apiFetchForm(`/products/${productId}/variants/${v.id}`, fd, 'PUT');
+    } else {
+      await apiFetchForm(`/products/${productId}/variants`, fd, 'POST');
+    }
+  }
+}
+
+init();
 </script>
 </body>
 </html>
