@@ -6,6 +6,9 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const { processAndSaveImage } = require('./utils/imageProcess');
+const { asyncRoute } = require('./middleware/asyncRoute');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -141,6 +144,47 @@ app.post('/api/contact', contactLimiter, async (req, res) => {
     res.status(500).json({ error: 'Erreur lors de l\'envoi. Réessayez ou contactez-nous par email.' });
   }
 });
+
+// ─── Formulaire de commande personnalisée ────────────────────
+// En mémoire : la photo d'inspiration est redimensionnée/compressée (sharp)
+// avant écriture sur disque, comme pour les avis clients (voir reviews.js).
+const CUSTOM_ORDER_IMG_DIR = path.join(__dirname, '../client/assets/images/custom-orders');
+const customOrderUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Seules les images sont autorisées'));
+    cb(null, true);
+  }
+});
+
+app.post('/api/contact/custom-order', contactLimiter, customOrderUpload.single('photo'), asyncRoute(async (req, res) => {
+  const { name, email, message, creationType, color, size, timeline, budget } = req.body;
+  if (!name?.trim() || !email?.trim())
+    return res.status(400).json({ error: 'Nom et email requis' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ error: 'Adresse email invalide' });
+  if ((message || '').trim().length > 2000)
+    return res.status(400).json({ error: 'Message trop long (2000 caractères max)' });
+
+  let photoUrl = null;
+  if (req.file) {
+    const filename = await processAndSaveImage(req.file.buffer, CUSTOM_ORDER_IMG_DIR, `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, { maxWidth: 1600, maxHeight: 1600 });
+    photoUrl = `/assets/images/custom-orders/${filename}`;
+  }
+
+  const { sendCustomOrderEmail } = require('./utils/email');
+  await sendCustomOrderEmail(name.trim(), email.trim(), {
+    creationType: (creationType || '').trim(),
+    color: (color || '').trim(),
+    size: (size || '').trim(),
+    timeline: (timeline || '').trim(),
+    budget: (budget || '').trim(),
+    message: (message || '').trim(),
+  }, photoUrl);
+
+  res.json({ success: true, message: 'Demande envoyée !' });
+}));
 
 // ─── Sitemap XML dynamique ───────────────────────────────────
 app.get('/sitemap.xml', (req, res) => {
