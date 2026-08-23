@@ -37,6 +37,11 @@
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 <div class="admin-layout">
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
+    <span class="admin-mobile-title">🧶 Administration</span>
+  </div>
+  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
   <aside class="admin-sidebar">
     <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
     <nav class="admin-nav">
@@ -58,6 +63,30 @@
     <div class="admin-header">
       <h1>Gestion des actualités</h1>
       <button class="btn btn-primary btn-sm" onclick="showForm()">+ Écrire un article</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="news-stats">
+      <div class="stat-card"><div class="stat-val" id="stat-total">—</div><div class="stat-label">Articles</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-published">—</div><div class="stat-label">Publiés</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-drafts">—</div><div class="stat-label">Brouillons</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-views">—</div><div class="stat-label">Vues totales</div></div>
+    </div>
+
+    <!-- Toolbar : recherche + tri -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <input type="text" id="art-search" class="form-input" placeholder="🔎 Rechercher un article…" style="max-width:280px" oninput="renderTable()">
+      <select id="art-sort" class="form-input" style="max-width:200px" onchange="renderTable()">
+        <option value="date_desc">Plus récents</option>
+        <option value="date_asc">Plus anciens</option>
+        <option value="views_desc">Plus lus</option>
+        <option value="views_asc">Moins lus</option>
+      </select>
+      <select id="art-filter" class="form-input" style="max-width:160px" onchange="renderTable()">
+        <option value="all">Tous les statuts</option>
+        <option value="published">Publiés</option>
+        <option value="draft">Brouillons</option>
+      </select>
     </div>
 
     <!-- Article form -->
@@ -162,10 +191,10 @@
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
-          <tr><th>Couverture</th><th>Titre</th><th>Résumé</th><th>Statut</th><th>Date</th><th>Actions</th></tr>
+          <tr><th>Couverture</th><th>Titre</th><th>Résumé</th><th>Statut</th><th>👁 Vues</th><th>Date</th><th>Actions</th></tr>
         </thead>
         <tbody id="articles-tbody">
-          <tr><td colspan="6" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          <tr><td colspan="7" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -184,19 +213,53 @@ async function init() {
 async function loadArticles() {
   try {
     allArticles = await apiFetch('/news/admin/all');
+    renderStats();
     renderTable();
   } catch (e) {
-    document.getElementById('articles-tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+    document.getElementById('articles-tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
+}
+
+function renderStats() {
+  const total = allArticles.length;
+  const published = allArticles.filter(a => a.published).length;
+  const totalViews = allArticles.reduce((sum, a) => sum + (a.views || 0), 0);
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-published').textContent = published;
+  document.getElementById('stat-drafts').textContent = total - published;
+  document.getElementById('stat-views').textContent = totalViews.toLocaleString('fr-FR');
 }
 
 function renderTable() {
   const tbody = document.getElementById('articles-tbody');
+  const search = (document.getElementById('art-search')?.value || '').trim().toLowerCase();
+  const sort = document.getElementById('art-sort')?.value || 'date_desc';
+  const filter = document.getElementById('art-filter')?.value || 'all';
+
+  let list = allArticles.filter(a => {
+    if (search && !a.title.toLowerCase().includes(search)) return false;
+    if (filter === 'published' && !a.published) return false;
+    if (filter === 'draft' && a.published) return false;
+    return true;
+  });
+
+  list = list.slice().sort((a, b) => {
+    if (sort === 'date_asc') return new Date(a.created_at) - new Date(b.created_at);
+    if (sort === 'views_desc') return (b.views || 0) - (a.views || 0);
+    if (sort === 'views_asc') return (a.views || 0) - (b.views || 0);
+    return new Date(b.created_at) - new Date(a.created_at); // date_desc par défaut
+  });
+
   if (!allArticles.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-light)">Aucun article. <a href="#" onclick="showForm()" style="color:var(--rose-dark)">Écrire le premier →</a></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-light)">Aucun article. <a href="#" onclick="showForm()" style="color:var(--rose-dark)">Écrire le premier →</a></td></tr>';
     return;
   }
-  tbody.innerHTML = allArticles.map(a => `
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-light)">Aucun article ne correspond à ces critères.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(a => `
     <tr>
       <td>
         ${a.cover_image
@@ -205,7 +268,10 @@ function renderTable() {
       </td>
       <td style="font-weight:700">${a.title}</td>
       <td style="font-size:.8rem;color:var(--text-light);max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${a.excerpt || '—'}</td>
-      <td><span class="order-status ${a.published ? 'status-delivered' : 'status-pending'}">${a.published ? 'Publié' : 'Brouillon'}</span></td>
+      <td>
+        <span class="order-status ${a.published ? 'status-delivered' : 'status-pending'}" style="cursor:pointer" onclick="togglePublish(${a.id}, ${a.published ? 0 : 1})" title="Cliquer pour ${a.published ? 'dépublier' : 'publier'}">${a.published ? 'Publié' : 'Brouillon'}</span>
+      </td>
+      <td style="font-size:.85rem;color:var(--text-light)">👁 ${(a.views || 0).toLocaleString('fr-FR')}</td>
       <td style="font-size:.8rem;color:var(--text-light)">${formatDate(a.created_at)}</td>
       <td>
         <div class="admin-actions">
@@ -214,6 +280,20 @@ function renderTable() {
         </div>
       </td>
     </tr>`).join('');
+}
+
+async function togglePublish(id, newState) {
+  const a = allArticles.find(x => x.id === id);
+  if (!a) return;
+  const formData = new FormData();
+  formData.append('published', newState ? '1' : '0');
+  try {
+    await apiFetchForm(`/news/${id}`, formData, 'PUT');
+    a.published = newState;
+    Toast.show(newState ? 'Article publié ✓' : 'Article dépublié', 'success');
+    renderStats();
+    renderTable();
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 function showForm(title = 'Écrire un article') {
