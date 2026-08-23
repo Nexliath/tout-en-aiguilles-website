@@ -82,9 +82,16 @@
       </div>
       <div class="form-row">
         <div class="form-group">
+          <label class="form-label">Coût de revient (€) <span style="font-weight:400;color:var(--text-light)">(matière + temps, optionnel)</span></label>
+          <input type="number" id="f-cost" class="form-input" step="0.01" min="0" placeholder="8.50" oninput="updateMarginPreview()">
+          <p class="form-hint" id="margin-preview"></p>
+        </div>
+        <div class="form-group">
           <label class="form-label">Stock</label>
           <input type="number" id="f-stock" class="form-input" min="0" value="0">
         </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">Catégorie</label>
           <select id="f-category" class="form-select" onchange="onCategorySelectChange()">
@@ -118,6 +125,17 @@
       <div class="form-group">
         <label class="form-label">Tags <span style="font-weight:400;color:var(--text-light)">(séparés par des virgules)</span></label>
         <input type="text" id="f-tags" class="form-input" placeholder="bébé, cadeau, crochet">
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:20px">
+        <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">🔍 Référencement (SEO) <span style="font-weight:400;color:var(--text-light)">(optionnel)</span></div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label">Titre SEO <span style="font-weight:400;color:var(--text-light)">(sinon le nom du produit est utilisé)</span></label>
+          <input type="text" id="f-meta-title" class="form-input" placeholder="Doudou Lapin Rose au crochet — fait main">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Description SEO</label>
+          <input type="text" id="f-meta-desc" class="form-input" placeholder="Doudou lapin crocheté à la main, doux et unique, idéal pour une naissance…">
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Photos du produit</label>
@@ -331,7 +349,10 @@ function renderTable(products) {
         ${p.is_featured ? '<span style="font-size:.7rem;background:var(--rose-pale);color:var(--rose-dark);padding:2px 8px;border-radius:10px">⭐ En avant</span>' : ''}
       </td>
       <td style="font-size:.8rem;color:var(--text-light)">${p.category_name || '—'}</td>
-      <td style="font-weight:700;color:var(--rose-dark)">${Number(p.price).toFixed(2)} €</td>
+      <td>
+        <div style="font-weight:700;color:var(--rose-dark)">${Number(p.price).toFixed(2)} €</div>
+        ${p.cost_price != null ? `<div style="font-size:.72rem;color:${(p.price - p.cost_price) < 0 ? '#d9534f' : 'var(--text-light)'}">marge ${(p.price - p.cost_price).toFixed(2)} €</div>` : ''}
+      </td>
       <td>
         <span style="font-weight:700;color:${p.stock === 0 ? '#d9534f' : p.stock < LOW_STOCK_THRESHOLD ? '#856404' : 'var(--sage-dark)'}">${p.stock}${p.stock === 0 ? ' — épuisé' : p.stock < LOW_STOCK_THRESHOLD ? ' — faible' : ''}</span>
       </td>
@@ -449,15 +470,30 @@ function showForm(title = 'Ajouter un produit') {
   document.getElementById('product-form-panel').scrollIntoView({ behavior: 'smooth' });
 }
 
+function updateMarginPreview() {
+  const price = Number(document.getElementById('f-price').value) || 0;
+  const cost = Number(document.getElementById('f-cost').value) || 0;
+  const el = document.getElementById('margin-preview');
+  if (!cost || !price) { el.textContent = ''; return; }
+  const margin = price - cost;
+  const marginPct = price > 0 ? (margin / price * 100) : 0;
+  el.textContent = `Marge : ${margin.toFixed(2)} € (${marginPct.toFixed(0)} %)`;
+  el.style.color = margin < 0 ? '#d9534f' : 'var(--sage-dark)';
+}
+
 function hideForm() {
   document.getElementById('product-form-panel').style.display = 'none';
   document.getElementById('edit-id').value = '';
   document.getElementById('f-name').value = '';
   document.getElementById('f-price').value = '';
+  document.getElementById('f-cost').value = '';
+  document.getElementById('margin-preview').textContent = '';
   document.getElementById('f-stock').value = '0';
   document.getElementById('f-category').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-tags').value = '';
+  document.getElementById('f-meta-title').value = '';
+  document.getElementById('f-meta-desc').value = '';
   document.getElementById('f-featured').checked = false;
   document.getElementById('f-active').checked = true;
   document.getElementById('f-images').value = '';
@@ -480,12 +516,16 @@ function editProduct(id) {
   document.getElementById('edit-id').value = id;
   document.getElementById('f-name').value = p.name;
   document.getElementById('f-price').value = p.price;
+  document.getElementById('f-cost').value = p.cost_price != null ? p.cost_price : '';
   document.getElementById('f-stock').value = p.stock;
   document.getElementById('f-category').value = p.category_id || '';
   document.getElementById('f-desc').value = p.description || '';
   document.getElementById('f-tags').value = (p.tags || []).join(', ');
+  document.getElementById('f-meta-title').value = p.meta_title || '';
+  document.getElementById('f-meta-desc').value = p.meta_description || '';
   document.getElementById('f-featured').checked = !!p.is_featured;
   document.getElementById('f-active').checked = !!p.is_active;
+  updateMarginPreview();
 
   // Images principales
   window._currentProductImages = [...(p.images || [])];
@@ -553,6 +593,9 @@ async function saveProduct() {
   formData.append('category_id', document.getElementById('f-category').value);
   formData.append('description', document.getElementById('f-desc').value);
   formData.append('tags',        JSON.stringify(document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean)));
+  formData.append('cost_price',  document.getElementById('f-cost').value || '');
+  formData.append('meta_title',       document.getElementById('f-meta-title').value.trim());
+  formData.append('meta_description', document.getElementById('f-meta-desc').value.trim());
   formData.append('is_featured',     document.getElementById('f-featured').checked ? '1' : '0');
   formData.append('is_active',       document.getElementById('f-active').checked ? '1' : '0');
   const files = document.getElementById('f-images').files;
