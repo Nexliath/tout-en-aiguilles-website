@@ -103,7 +103,10 @@ function renderAdminSidebar() {
     </div>
     <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
     <aside class="admin-sidebar">
-      <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
+      <div class="admin-logo">
+        <span style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--rose) 0%,var(--rose-dark) 100%);font-size:1.15rem;flex-shrink:0">🧶</span>
+        <span style="line-height:1.3">Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></span>
+      </div>
       <nav class="admin-nav">
         ${ADMIN_NAV_ITEMS.map(item => `<a href="${item.href}"${item.href === current ? ' class="active"' : ''}>${item.icon} ${item.label}</a>`).join('\n        ')}
         <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
@@ -140,8 +143,10 @@ function closeAdminSidebar() {
 
 // ─── Recherche header (autocomplete produits) ──────────────────
 function initHeaderSearch() {
+  const wrap = document.querySelector('.header-search-wrap');
   const input = document.querySelector('.header-search-input');
   const dropdown = document.getElementById('header-search-dropdown');
+  const icon = document.querySelector('.header-search-icon');
   if (!input || !dropdown) return;
 
   let debounceTimer = null;
@@ -149,6 +154,22 @@ function initHeaderSearch() {
   function closeDropdown() {
     dropdown.classList.remove('open');
     dropdown.innerHTML = '';
+  }
+
+  // Sur mobile/tablette (≤1024px), la barre de recherche est repliée en
+  // icône (voir style.css) — un tap l'ouvre en overlay sous le header au
+  // lieu de la faire disparaître complètement.
+  function closeMobile() {
+    if (wrap) wrap.classList.remove('mobile-open');
+  }
+  if (icon && wrap) {
+    icon.addEventListener('click', () => {
+      if (window.innerWidth > 1024) return; // desktop : icône décorative
+      const opening = !wrap.classList.contains('mobile-open');
+      wrap.classList.toggle('mobile-open', opening);
+      if (opening) setTimeout(() => input.focus(), 50);
+      else closeDropdown();
+    });
   }
 
   async function runSearch(q) {
@@ -191,11 +212,15 @@ function initHeaderSearch() {
       if (term) window.location.href = `/boutique.html?search=${encodeURIComponent(term)}`;
     } else if (e.key === 'Escape') {
       closeDropdown();
+      closeMobile();
       input.blur();
     }
   });
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.header-search-wrap')) closeDropdown();
+    if (!e.target.closest('.header-search-wrap')) {
+      closeDropdown();
+      closeMobile();
+    }
   });
 }
 
@@ -228,8 +253,21 @@ async function apiFetch(path, opts = {}) {
     res._opts = { headers: h };
   }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+  if (!res.ok) throw apiError(data, res.status);
   return data;
+}
+
+// Hook global optionnel (voir admin-guard.js) : permet à une page admin de
+// rebasculer proprement vers l'écran de connexion quand le token a expiré
+// en cours d'utilisation, plutôt que de laisser chaque action échouer
+// silencieusement sans explication.
+function apiError(data, status) {
+  const err = new Error((data && data.error) || 'Erreur serveur');
+  err.status = status;
+  if (status === 401 && typeof window.onApiUnauthorized === 'function') {
+    window.onApiUnauthorized();
+  }
+  return err;
 }
 
 async function apiFetchForm(path, formData, method = 'POST') {
@@ -238,7 +276,7 @@ async function apiFetchForm(path, formData, method = 'POST') {
   if (t) headers['Authorization'] = `Bearer ${t}`;
   const res = await fetch(API + path, { method, headers, body: formData });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+  if (!res.ok) throw apiError(data, res.status);
   return data;
 }
 
@@ -400,8 +438,8 @@ function openAuthModal() {
       <div class="modal">
         <div class="modal-header">
           <div>
-            <h3 style="font-family:var(--font-title)">Mon compte</h3>
-            <p style="font-size:.85rem;color:var(--text-light)">Connectez-vous ou créez un compte</p>
+            <h3 style="font-family:var(--font-title)" id="modal-title">Mon compte</h3>
+            <p style="font-size:.85rem;color:var(--text-light)" id="modal-subtitle">Connectez-vous ou créez un compte</p>
           </div>
           <button class="modal-close" id="modal-close-btn">✕</button>
         </div>
@@ -466,7 +504,7 @@ function openAuthModal() {
             <label class="form-label">Code de vérification</label>
             <input id="mfa-verify-code" type="text" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456" style="text-align:center;font-size:1.3rem;letter-spacing:.3em">
           </div>
-          <div id="mfa-verify-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+          <div id="mfa-verify-error" role="alert" aria-live="polite" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
           <button class="btn btn-primary btn-block" id="mfa-verify-btn">Vérifier</button>
           <p style="text-align:center;margin-top:14px"><a href="#" id="mfa-use-recovery-link" style="font-size:.8rem;color:var(--text-light)">Appareil perdu ? Utiliser un code de secours</a></p>
         </div>
@@ -482,7 +520,7 @@ function openAuthModal() {
               <label class="form-label">Code de confirmation</label>
               <input id="mfa-setup-code" type="text" inputmode="numeric" maxlength="6" class="form-input" placeholder="123456" style="text-align:center;font-size:1.3rem;letter-spacing:.3em">
             </div>
-            <div id="mfa-setup-error" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
+            <div id="mfa-setup-error" role="alert" aria-live="polite" style="display:none;color:#d9534f;font-size:.85rem;padding:8px 12px;background:#f8d7da;border-radius:8px;margin-bottom:12px"></div>
             <button class="btn btn-primary btn-block" id="mfa-setup-confirm-btn">Activer la double authentification</button>
           </div>
           <div id="mfa-setup-step-recovery" style="display:none">
@@ -491,7 +529,8 @@ function openAuthModal() {
               <p style="font-weight:700">Double authentification activée !</p>
               <p style="font-size:.82rem;color:var(--text-light);margin-top:6px">Notez ces codes de secours dans un endroit sûr — chacun ne peut être utilisé qu'une fois si vous perdez l'accès à votre application.</p>
             </div>
-            <div id="mfa-recovery-codes-list" style="background:var(--cream);border-radius:10px;padding:14px;font-family:monospace;font-size:.85rem;line-height:1.9;text-align:center;margin-bottom:16px"></div>
+            <div id="mfa-recovery-codes-list" style="background:var(--cream);border-radius:10px;padding:14px;font-family:monospace;font-size:.85rem;line-height:1.9;text-align:center;margin-bottom:10px;user-select:all"></div>
+            <button class="btn btn-secondary btn-block" id="mfa-recovery-copy-btn" type="button" style="margin-bottom:16px">📋 Copier les codes</button>
             <button class="btn btn-primary btn-block" id="mfa-recovery-done-btn">J'ai noté mes codes, continuer</button>
           </div>
         </div>
@@ -563,6 +602,15 @@ function openAuthModal() {
       modal.classList.remove('open');
       setTimeout(() => location.reload(), 300);
     });
+    document.getElementById('mfa-recovery-copy-btn').addEventListener('click', async function() {
+      const codes = Array.from(document.getElementById('mfa-recovery-codes-list').children).map(function(el) { return el.textContent; }).join('\n');
+      try {
+        await navigator.clipboard.writeText(codes);
+        Toast.show('Codes copiés dans le presse-papiers 📋', 'success');
+      } catch (e) {
+        Toast.show('Copie impossible — sélectionnez le texte manuellement', 'error');
+      }
+    });
 
     // Touche Entrée dans les champs
     document.getElementById('login-password').addEventListener('keydown', function(e) {
@@ -597,6 +645,18 @@ function openAuthModal() {
       if (e.target === modal) modal.classList.remove('open');
     });
   }
+  // Réinitialise l'état par défaut (onglet connexion) à chaque ouverture —
+  // sinon un appel précédent à showMfaVerifyStep/showMfaSetupStep laisserait
+  // le modal coincé sur cet écran au prochain openAuthModal(). Les appelants
+  // qui veulent afficher directement une étape MFA le font juste après
+  // (synchrone, donc sans flash visible).
+  modal.querySelector('.modal-header h3').textContent = 'Mon compte';
+  modal.querySelector('#modal-subtitle').textContent = 'Connectez-vous ou créez un compte';
+  modal.querySelector('.modal-tabs').style.display = '';
+  ['tab-login', 'tab-register', 'tab-forgot', 'tab-mfa-verify', 'tab-mfa-setup'].forEach(function(id) {
+    document.getElementById(id).style.display = id === 'tab-login' ? '' : 'none';
+  });
+  modal.querySelectorAll('.modal-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.tab === 'login'); });
   requestAnimationFrame(function() { modal.classList.add('open'); });
 }
 
@@ -637,6 +697,9 @@ function hideAllAuthSteps() {
 
 function showMfaVerifyStep(mfaToken) {
   hideAllAuthSteps();
+  const authModal = document.getElementById('auth-modal');
+  authModal.querySelector('.modal-header h3').textContent = 'Vérification en deux étapes';
+  authModal.querySelector('#modal-subtitle').textContent = 'Entrez le code de votre application d\'authentification';
   const step = document.getElementById('tab-mfa-verify');
   step.style.display = '';
   step.dataset.mfaToken = mfaToken;
@@ -673,6 +736,10 @@ function showMfaSetupStep(setupToken, forceLogin) {
   hideAllAuthSteps();
   const modal = document.getElementById('auth-modal');
   modal.classList.add('open');
+  modal.querySelector('.modal-header h3').textContent = 'Double authentification';
+  modal.querySelector('#modal-subtitle').textContent = forceLogin
+    ? 'Cette étape est obligatoire pour les comptes administrateur'
+    : 'Scannez le QR code avec votre application d\'authentification';
   const step = document.getElementById('tab-mfa-setup');
   step.style.display = '';
   step.dataset.setupToken = setupToken || '';
@@ -683,7 +750,24 @@ function showMfaSetupStep(setupToken, forceLogin) {
   document.getElementById('mfa-setup-step-recovery').style.display = 'none';
   document.getElementById('mfa-setup-error').style.display = 'none';
   document.getElementById('mfa-setup-code').value = '';
-  initMfaSetupQr(setupToken);
+  loadMfaQr(setupToken);
+}
+
+function loadMfaQr(setupToken) {
+  const confirmBtn = document.getElementById('mfa-setup-confirm-btn');
+  const errEl = document.getElementById('mfa-setup-error');
+  confirmBtn.disabled = true;
+  errEl.style.display = 'none';
+  document.getElementById('mfa-qr-img').src = '';
+  document.getElementById('mfa-secret-text').textContent = '…';
+  initMfaSetupQr(setupToken).then(function(ok) {
+    if (ok) { confirmBtn.disabled = false; return; }
+    errEl.innerHTML = 'Impossible de charger le QR code (problème réseau). ' +
+      '<a href="#" id="mfa-qr-retry-link" style="color:#c8937a;text-decoration:underline">Réessayer</a>';
+    errEl.style.display = '';
+    const retry = document.getElementById('mfa-qr-retry-link');
+    if (retry) retry.addEventListener('click', function(e) { e.preventDefault(); loadMfaQr(setupToken); });
+  });
 }
 
 async function initMfaSetupQr(setupToken) {
@@ -692,8 +776,10 @@ async function initMfaSetupQr(setupToken) {
     const data = await apiFetch('/auth/mfa/setup/init', { method: 'POST', body });
     document.getElementById('mfa-qr-img').src = data.qr;
     document.getElementById('mfa-secret-text').textContent = data.secret;
+    return true;
   } catch (e) {
     Toast.show(e.message, 'error');
+    return false;
   }
 }
 
