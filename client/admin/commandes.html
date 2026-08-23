@@ -50,12 +50,12 @@
 
     <!-- Status filter tabs -->
     <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap">
-      <button class="cat-chip active" onclick="filterStatus('', this)">Toutes</button>
-      <button class="cat-chip" onclick="filterStatus('pending', this)">⏳ En attente</button>
-      <button class="cat-chip" onclick="filterStatus('paid', this)">💳 Payées</button>
-      <button class="cat-chip" onclick="filterStatus('shipped', this)">🚚 Expédiées</button>
-      <button class="cat-chip" onclick="filterStatus('delivered', this)">✓ Livrées</button>
-      <button class="cat-chip" onclick="filterStatus('cancelled', this)">✗ Annulées</button>
+      <button class="cat-chip active" data-status="" onclick="filterStatus('', this)">Toutes</button>
+      <button class="cat-chip" data-status="pending" onclick="filterStatus('pending', this)">⏳ En attente</button>
+      <button class="cat-chip" data-status="paid" onclick="filterStatus('paid', this)">💳 Payées</button>
+      <button class="cat-chip" data-status="shipped" onclick="filterStatus('shipped', this)">🚚 Expédiées</button>
+      <button class="cat-chip" data-status="delivered" onclick="filterStatus('delivered', this)">✓ Livrées</button>
+      <button class="cat-chip" data-status="cancelled" onclick="filterStatus('cancelled', this)">✗ Annulées</button>
     </div>
 
     <!-- Order detail panel -->
@@ -130,6 +130,14 @@ window.ADMIN_ON_READY = function() { init(); };
 
 async function init() {
   await loadOrders();
+  // Le dashboard admin renvoie ici avec ?status=pending — avant cette
+  // correction, ce paramètre n'était jamais lu et l'admin atterrissait sur
+  // la liste complète non filtrée malgré ce que suggérait l'URL.
+  const status = new URLSearchParams(location.search).get('status');
+  if (status) {
+    const btn = document.querySelector(`.admin-main .cat-chip[data-status="${status}"]`);
+    if (btn) filterStatus(status, btn);
+  }
 }
 
 async function loadOrders() {
