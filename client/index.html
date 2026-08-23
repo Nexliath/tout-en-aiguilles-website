@@ -89,7 +89,6 @@
     <nav class="nav">
       <a href="/" class="active">Accueil</a>
       <a href="/boutique.html">Boutique</a>
-      <a href="/boutique.html">🎁 Cadeaux</a>
       <a href="/actualites.html">Actualités</a>
       <a href="#contact">Contact</a>
     </nav>
@@ -148,7 +147,7 @@
     <div class="hero-floats">
       <div class="hero-float hf-main"><img src="/assets/images/victorine-marche.jpg" alt="Victorine et ses créations" loading="eager"></div>
       <div class="hero-float hf-accent1"><img src="/assets/images/hero-1.jpg" alt="Créations crochet colorées" loading="eager"></div>
-      <div class="hero-float hf-accent2"><img src="/assets/images/hero-accent2.jpg" alt="Stand du marché" loading="eager"></div>
+      <div class="hero-float hf-accent2"><img src="/assets/images/hero-accent2.jpg" alt="Stand du marché" loading="lazy"></div>
     </div>
   </div>
 </section>
@@ -531,9 +530,12 @@ async function sendContact() {
   // Anti-bot: honeypot check
   const hp = document.querySelector('input[name="website"]');
   if (hp && hp.value) return;
-  // Anti-bot: timing check (< 3s = bot)
+  // Anti-bot: timing check — seuil abaissé à 1,2s (au lieu de 3s) : un
+  // remplissage automatique par le gestionnaire de mots de passe/autofill du
+  // navigateur remplit tous les champs quasi instantanément, ce qui pouvait
+  // déclencher ce filtre pour un vrai visiteur avec un message peu clair.
   const t = document.getElementById('contact-time')?.value;
-  if (t && Date.now() - Number(t) < 3000) { Toast.show('Veuillez patienter un instant…', 'error'); return; }
+  if (t && Date.now() - Number(t) < 1200) { Toast.show('Un instant… réessayez l\'envoi dans une seconde.', 'error'); return; }
 
   const btn = document.querySelector('[onclick="sendContact()"]');
   const originalText = btn ? btn.textContent : '';
