@@ -34,8 +34,11 @@ router.put('/users/:id/role', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
 
-  if (!['admin', 'user'].includes(role)) {
-    return res.status(400).json({ error: 'Rôle invalide (admin ou user)' });
+  // 'customer' est la valeur réellement utilisée partout ailleurs (schéma,
+  // inscription) — 'user' n'existe nulle part dans la base et créerait des
+  // comptes orphelins pour tout filtre futur sur role = 'customer'.
+  if (!['admin', 'customer'].includes(role)) {
+    return res.status(400).json({ error: 'Rôle invalide (admin ou customer)' });
   }
 
   // Empêcher l'admin de se rétrograder lui-même
@@ -62,7 +65,12 @@ router.delete('/users/:id', requireAdmin, (req, res) => {
   const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(id);
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
 
+  // orders.user_id n'a pas de ON DELETE CASCADE/SET NULL (volontaire, pour
+  // ne jamais perdre une commande) — sans ce détachement, PRAGMA
+  // foreign_keys=ON bloque la suppression de tout client ayant commandé.
+  db.prepare('UPDATE orders SET user_id = NULL WHERE user_id = ?').run(id);
   db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(id);
+  db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(id);
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
   logActivity(req.user, 'Utilisateur supprimé', `#${id} (${user.email || ''})`);
   res.json({ success: true });
