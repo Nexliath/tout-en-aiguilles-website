@@ -446,3 +446,5 @@ function seedNews(db) {
 }
 
 // deploy-test-3: 2026-08-23T13:05:51.862813Z — verif finale seed desactive (RUN_SEED)
+
+// deploy-test-4: 2026-08-23T13:10:56.717164Z — verif finale apres fix schema.sql (root cause)
