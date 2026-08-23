@@ -93,9 +93,9 @@
       <div class="admin-panel-title">🕓 Historique des envois</div>
       <div class="admin-table-wrap">
         <table class="admin-table">
-          <thead><tr><th>Sujet</th><th>Destinataires</th><th>Erreurs</th><th>Date d'envoi</th></tr></thead>
+          <thead><tr><th>Sujet</th><th>Statut</th><th>Destinataires</th><th>Erreurs</th><th>Date d'envoi</th></tr></thead>
           <tbody id="campaigns-tbody">
-            <tr><td colspan="4" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+            <tr><td colspan="5" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -211,13 +211,20 @@ async function loadCampaigns() {
       ? campaigns.map(c => `
         <tr>
           <td style="font-weight:700">${c.subject}</td>
+          <td>${c.status === 'sending' ? '🟡 En cours…' : '✅ Terminé'}</td>
           <td>${c.recipients}</td>
           <td style="color:${c.errors > 0 ? '#d9534f' : 'var(--text-light)'}">${c.errors}</td>
           <td style="font-size:.8rem;color:var(--text-light)">${new Date(c.sent_at).toLocaleString('fr-FR')}</td>
         </tr>`).join('')
-      : '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-light)">Aucun envoi pour l\'instant</td></tr>';
+      : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-light)">Aucun envoi pour l\'instant</td></tr>';
+    // Si un envoi est encore en cours, on rafraîchit automatiquement dans
+    // quelques secondes pour afficher le résultat final sans que l'admin
+    // ait à recharger la page manuellement.
+    if (campaigns.some(c => c.status === 'sending')) {
+      setTimeout(loadCampaigns, 4000);
+    }
   } catch (e) {
-    document.getElementById('campaigns-tbody').innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+    document.getElementById('campaigns-tbody').innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
   }
 }
 
@@ -235,7 +242,9 @@ async function sendNewsletter() {
   btn.disabled = true; btn.textContent = '⏳ Envoi en cours…';
   try {
     const r = await apiFetch('/newsletter/send', { method: 'POST', body: { subject, html_content } });
-    successEl.textContent = `✅ Newsletter envoyée avec succès — ${r.sent} envoi(s), ${r.errors} erreur(s)`;
+    successEl.textContent = r.queued
+      ? `📤 Envoi lancé pour ${r.total} destinataire(s) — suivez l'avancement dans l'historique ci-dessous.`
+      : `✅ Aucun subscriber actif à qui envoyer.`;
     successEl.style.display = '';
     document.getElementById('nl-subject').value = '';
     document.getElementById('nl-content').value = '';
