@@ -44,4 +44,16 @@ router.delete('/:id', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Historique d'utilisation d'un code (admin) ──────────────
+router.get('/:id/usage', requireAdmin, (req, res) => {
+  const promo = db.prepare('SELECT * FROM promo_codes WHERE id = ?').get(req.params.id);
+  if (!promo) return res.status(404).json({ error: 'Code promo introuvable' });
+  const orders = db.prepare(`
+    SELECT id, first_name, last_name, email, total, promo_discount, status, created_at
+    FROM orders WHERE promo_code = ? COLLATE NOCASE
+    ORDER BY created_at DESC
+  `).all(promo.code);
+  res.json({ code: promo.code, orders });
+});
+
 module.exports = router;
