@@ -1,8 +1,25 @@
 const express = require('express');
 const db = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
+
+// ─── GET /api/admin/activity-log — journal d'activité récent ─
+router.get('/activity-log', requireAdmin, (req, res) => {
+  const logs = db.prepare('SELECT * FROM admin_activity_log ORDER BY created_at DESC LIMIT 100').all();
+  res.json(logs);
+});
+
+// ─── GET /api/admin/cart-sessions — paniers (abandonnés / convertis) ─
+router.get('/cart-sessions', requireAdmin, (req, res) => {
+  const sessions = db.prepare(`
+    SELECT * FROM cart_sessions
+    WHERE items_json IS NOT NULL AND items_json != '[]'
+    ORDER BY updated_at DESC LIMIT 200
+  `).all().map(s => ({ ...s, items: JSON.parse(s.items_json || '[]') }));
+  res.json(sessions);
+});
 
 // ─── GET /api/admin/users — liste tous les utilisateurs ─────
 router.get('/users', requireAdmin, (req, res) => {
@@ -30,6 +47,7 @@ router.put('/users/:id/role', requireAdmin, (req, res) => {
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
 
   db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+  logActivity(req.user, 'Rôle utilisateur modifié', `#${id} → ${role}`);
   res.json({ success: true });
 });
 
@@ -41,11 +59,12 @@ router.delete('/users/:id', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte' });
   }
 
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+  const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(id);
   if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
 
   db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(id);
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  logActivity(req.user, 'Utilisateur supprimé', `#${id} (${user.email || ''})`);
   res.json({ success: true });
 });
 
