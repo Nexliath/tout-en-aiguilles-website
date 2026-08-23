@@ -519,12 +519,24 @@ async function sendContact() {
 const fyEl = document.getElementById('footer-year');
 if (fyEl) fyEl.textContent = new Date().getFullYear();
 
-// Vus récemment
-const rvItems = RecentlyViewed.get();
-if (rvItems.length > 0) {
-  document.getElementById('rv-home-section').style.display = '';
-  renderRecentlyViewedHome('rv-home-grid');
-}
+// Charger en priorité le contenu principal de la page
+// (isolé du reste par Promise.all + catch pour ne jamais bloquer le script)
+Promise.all([loadFeaturedProducts(), loadNews()]).then(() => {
+  if (location.hash) {
+    const target = document.querySelector(location.hash);
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: 'auto', block: 'start' }));
+  }
+}).catch(() => {});
+initHeaderSearch();
+
+// Vus récemment — protégé par try/catch pour ne jamais bloquer le reste du script
+try {
+  const rvItems = RecentlyViewed.get();
+  if (rvItems.length > 0) {
+    document.getElementById('rv-home-section').style.display = '';
+    renderRecentlyViewedHome('rv-home-grid');
+  }
+} catch (e) { console.error('Erreur "Vus récemment" :', e); }
 
 // Pré-remplissage du formulaire de contact (venant d'une demande produit personnalisé)
 try {
@@ -535,14 +547,6 @@ try {
     sessionStorage.removeItem('tea_prefill_contact');
   }
 } catch {}
-
-Promise.all([loadFeaturedProducts(), loadNews()]).then(() => {
-  if (location.hash) {
-    const target = document.querySelector(location.hash);
-    if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: 'auto', block: 'start' }));
-  }
-});
-initHeaderSearch();
 </script>
 </body>
 </html>
