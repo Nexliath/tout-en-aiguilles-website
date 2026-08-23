@@ -1,7 +1,7 @@
 {
   "name": "tout-en-aiguilles",
   "version": "1.0.0",
-  "description": "Site e-commerce Tout en Aiguilles \u2014 crochet, couture & cr\u00e9ations artisanales",
+  "description": "Site e-commerce Tout en Aiguilles — crochet, couture & créations artisanales",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
@@ -18,10 +18,9 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.13",
+    "sharp": "^0.35.3",
     "stripe": "^14.18.0",
-    "xlsx": "^0.18.5",
-    "web-push": "^3.6.7",
-    "cloudinary": "^2.5.1"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
