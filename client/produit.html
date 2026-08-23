@@ -550,7 +550,10 @@ function setMainImg(src, thumb) {
 }
 
 function changeQty(delta) {
-  currentQty = Math.max(1, Math.min(currentProduct?.stock || 99, currentQty + delta));
+  // Si une variante est sélectionnée, plafonner sur SON stock (pas celui du
+  // produit parent qui peut être un total agrégé différent).
+  const maxStock = window._selectedVariant ? window._selectedVariant.stock : (currentProduct?.stock || 99);
+  currentQty = Math.max(1, Math.min(maxStock || 99, currentQty + delta));
   document.getElementById('qty-display').textContent = currentQty;
 }
 
@@ -941,6 +944,13 @@ function selectVariant(vid) {
       stockEl.innerHTML = `<span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700">Rupture de stock</span>`;
       if (cartBtn) cartBtn.disabled = true;
     }
+  }
+
+  // Si la quantité déjà sélectionnée dépasse le stock de cette variante, la ramener au max
+  if (currentQty > (v.stock || 0)) {
+    currentQty = Math.max(1, v.stock || 1);
+    const qtyEl = document.getElementById('qty-display');
+    if (qtyEl) qtyEl.textContent = currentQty;
   }
 }
 
