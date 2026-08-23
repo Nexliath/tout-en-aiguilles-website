@@ -15,6 +15,21 @@ const JWT_SECRET = process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_202
 // Valeur par défaut non-évidente, à remplacer dans Railway par ADMIN_PATH
 const ADMIN_PATH = process.env.ADMIN_PATH || 'atelier';
 
+// ─── Alerte sécurité : valeurs par défaut détectées ──────────
+// Ces valeurs par défaut sont visibles dans le code source (donc publiques).
+// En production, JWT_SECRET et ADMIN_PATH DOIVENT être définis dans les
+// variables d'environnement Railway avec des valeurs uniques.
+if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
+  if (!process.env.JWT_SECRET) {
+    console.warn('\n⚠️⚠️⚠️  SÉCURITÉ : JWT_SECRET non défini — valeur par défaut (publique) utilisée !');
+    console.warn('   → Définissez JWT_SECRET dans les variables Railway (chaîne aléatoire longue).\n');
+  }
+  if (!process.env.ADMIN_PATH) {
+    console.warn('\n⚠️⚠️⚠️  SÉCURITÉ : ADMIN_PATH non défini — chemin admin par défaut ("atelier", public) utilisé !');
+    console.warn('   → Définissez ADMIN_PATH dans les variables Railway avec une valeur secrète.\n');
+  }
+}
+
 // ─── Vérification node:sqlite ────────────────────────────────
 try {
   require('node:sqlite');
