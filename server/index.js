@@ -8,9 +8,6 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-// Railway place l'app derrière un reverse proxy unique qui ajoute X-Forwarded-For.
-// Sans ça, express-rate-limit plante sa détection d'IP sur les routes protégées.
-app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'toutenaiguilles_secret_dev_key_2024';
 
@@ -112,8 +109,6 @@ app.use('/api/cart',       require('./routes/cart'));
 app.use('/api/news',            require('./routes/news'));
 app.use('/api/admin',           require('./routes/admin'));
 app.use('/api/reviews',         reviewLimiter, require('./routes/reviews'));
-app.use('/api/loyalty',         require('./routes/loyalty'));
-app.use('/api/push',            require('./routes/push'));
 
 // ─── Formulaire de contact ───────────────────────────────────
 app.post('/api/contact', contactLimiter, async (req, res) => {
@@ -142,19 +137,10 @@ app.get('/sitemap.xml', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
 
   const staticPages = [
-    { url: '/',                  priority: '1.0', changefreq: 'weekly'  },
-    { url: '/boutique.html',     priority: '0.9', changefreq: 'daily'   },
-    { url: '/actualites.html',   priority: '0.7', changefreq: 'weekly'  },
-    { url: '/cadeaux.html',      priority: '0.8', changefreq: 'weekly'  },
-    { url: '/materiaux.html',    priority: '0.6', changefreq: 'monthly' },
-    { url: '/livraison.html',    priority: '0.5', changefreq: 'monthly' },
-    { url: '/cgv.html',          priority: '0.4', changefreq: 'monthly' },
-    { url: '/mentions-legales.html', priority: '0.3', changefreq: 'monthly' },
+    { url: '/',              priority: '1.0', changefreq: 'weekly'  },
+    { url: '/boutique.html', priority: '0.9', changefreq: 'daily'   },
+    { url: '/actualites.html',priority:'0.7', changefreq: 'weekly'  },
   ];
-
-  const newsArticles = db.prepare(
-    "SELECT slug, updated_at FROM news WHERE published = 1 ORDER BY updated_at DESC"
-  ).all();
 
   const products = db.prepare(
     "SELECT slug, updated_at FROM products WHERE is_active = 1 ORDER BY updated_at DESC"
@@ -174,13 +160,6 @@ app.get('/sitemap.xml', (req, res) => {
     <lastmod>${(p.updated_at || today).split('T')[0]}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-  </url>`),
-    ...(newsArticles || []).map(a => `
-  <url>
-    <loc>${BASE}/actualites.html?slug=${a.slug}</loc>
-    <lastmod>${(a.updated_at || today).split('T')[0]}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
   </url>`),
   ];
 
@@ -246,12 +225,6 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── SPA fallback ───────────────────────────────────────────
-app.get('/404', (req, res) => res.sendFile(require('path').join(__dirname, '../client/404.html')));
-app.get('/suivi', (req, res) => res.sendFile(require('path').join(__dirname, '../client/suivi.html')));
-
-// URL propres produits : /produit/:slug → produit.html (slug résolu côté client)
-app.get('/produit/:slug', (req, res) => res.sendFile(require('path').join(__dirname, '../client/produit.html')));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/index.html'));
 });
@@ -328,17 +301,6 @@ async function checkStockAlerts() {
   } catch(e) {}
 }
 
-
-// ─── Error handler global — garantit JSON pour les routes /api ──
-// Sans ça, Express renvoie du HTML en cas d'erreur non gérée
-app.use((err, req, res, next) => {
-  console.error('[Express error]', req.method, req.path, err.message);
-  if (req.path.startsWith('/api')) {
-    return res.status(err.status || 500).json({ error: err.message || 'Erreur serveur' });
-  }
-  next(err);
-});
-
 // ─── Démarrage ──────────────────────────────────────────────
 app.listen(PORT, async () => {
   const db = require('./db/database');
@@ -372,6 +334,11 @@ function slugify(str) {
 }
 
 function seedNews(db) {
+  // Guard : ne seeder qu'une seule fois (même logique que seedEtsyProducts)
+  db.prepare(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)`).run();
+  const alreadySeeded = db.prepare(`SELECT value FROM app_settings WHERE key = 'news_seed_done'`).get();
+  if (alreadySeeded) return;
+
   const articles = [
     {
       title: "Foire à tout de La Mailleray-sur-Seine — notre première sortie !",
@@ -462,4 +429,5 @@ function seedNews(db) {
       console.log(`📰 Article créé : ${article.title}`);
     }
   }
+  db.prepare(`INSERT OR REPLACE INTO app_settings (key, value) VALUES ('news_seed_done', '1')`).run();
 }
