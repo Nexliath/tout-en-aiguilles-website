@@ -2,10 +2,22 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const db = require('../db/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+
+// Limite uniquement la soumission d'avis par les clients (spam) —
+// ne doit JAMAIS s'appliquer aux routes admin (dashboard, modération),
+// sinon quelques rechargements de page suffisent à bloquer l'admin.
+const submitReviewLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 10,                   // max 10 avis par heure par IP
+  message: { error: 'Trop d\'avis soumis. Réessayez dans une heure.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ─── Config upload photos d'avis ────────────────────────────
 const reviewStorage = multer.diskStorage({
@@ -63,7 +75,7 @@ router.get('/', (req, res) => {
 
 // ─── POST /api/reviews ──────────────────────────────────────
 // Authentifié : poster un avis avec jusqu'à 3 photos
-router.post('/', requireAuth, upload.array('photos', 3), (req, res) => {
+router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), (req, res) => {
   const { product_id, rating, comment } = req.body;
   const user_id = req.user.id;
 
