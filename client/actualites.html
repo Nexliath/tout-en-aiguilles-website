@@ -93,7 +93,7 @@
 
       <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:20px">
         <div id="news-categories" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-        <input type="text" id="news-search" class="form-input" placeholder="🔎 Rechercher un article…" style="max-width:280px" oninput="onSearchInput()">
+        <input type="text" id="news-search" class="form-input" placeholder="🔎 Rechercher un article…" aria-label="Rechercher un article" style="max-width:280px" oninput="onSearchInput()">
       </div>
 
       <div id="news-list" class="news-grid">
@@ -223,10 +223,27 @@ function newsCardHTML(a) {
       </div>`;
 }
 
+// L'API publique /news plafonne désormais chaque réponse à 50 articles
+// (protection anti-abus côté serveur) : on paginé donc par lots de 50 pour
+// reconstituer la liste complète utilisée par le filtre/recherche client,
+// au lieu d'un seul appel ?limit=200 qui serait silencieusement tronqué.
+async function fetchAllNews() {
+  const batchSize = 50;
+  let offset = 0;
+  let all = [];
+  for (let i = 0; i < 10; i++) { // garde-fou : 500 articles max chargés côté client
+    const batch = await apiFetch(`/news?limit=${batchSize}&offset=${offset}`);
+    all = all.concat(batch);
+    if (batch.length < batchSize) break;
+    offset += batchSize;
+  }
+  return all;
+}
+
 async function loadNewsList() {
   try {
     const [articles, categories, featured] = await Promise.all([
-      apiFetch('/news?limit=200'),
+      fetchAllNews(),
       apiFetch('/news/categories').catch(() => []),
       apiFetch('/news?featured=1&limit=1').catch(() => [])
     ]);
