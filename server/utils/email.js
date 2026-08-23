@@ -396,6 +396,79 @@ async function sendNewOrderNotification(order) {
     `Nouvelle commande #${order.id} de ${order.first_name} ${order.last_name} (${order.email}) — Total : ${Number(order.total).toFixed(2)} €`);
 }
 
+// ─── Notification boutique — demande de commande personnalisée ──
+async function sendCustomOrderEmail(visitorName, visitorEmail, details, photoUrl) {
+  const CONTACT_DEST = process.env.CONTACT_EMAIL || 'tout.en.aiguilles@gmail.com';
+  const BASE_URL = process.env.BASE_URL || 'https://tout-en-aiguilles.com';
+
+  const row = (label, value) => value ? `
+    <tr>
+      <td style="padding:8px 0;border-bottom:1px solid #f0e8e0;">
+        <span style="color:#9e8070;font-size:13px;">${label}</span><br>
+        <strong style="color:#5a3e2b;">${String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</strong>
+      </td>
+    </tr>` : '';
+
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#fdf8f5;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f5;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+        ${emailHeader('🧵', 'Demande de commande personnalisée')}
+        <tr><td style="padding:40px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            ${row('De', visitorName)}
+            ${row('Email', `<a href="mailto:${visitorEmail}" style="color:#c8937a;">${visitorEmail}</a>`)}
+            ${row('Type de création', details.creationType)}
+            ${row('Couleur / motif souhaité', details.color)}
+            ${row('Taille souhaitée', details.size)}
+            ${row('Délai souhaité', details.timeline)}
+            ${row('Budget indicatif', details.budget)}
+          </table>
+          ${details.message ? `
+          <div style="margin-top:16px;">
+            <span style="color:#9e8070;font-size:13px;">Message</span>
+            <p style="color:#5a3e2b;line-height:1.7;margin:8px 0 0;white-space:pre-wrap;">${details.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+          </div>` : ''}
+          ${photoUrl ? `
+          <div style="margin-top:20px;text-align:center;">
+            <span style="color:#9e8070;font-size:13px;display:block;margin-bottom:8px;">Photo d'inspiration</span>
+            <a href="${BASE_URL}${photoUrl}"><img src="${BASE_URL}${photoUrl}" alt="Photo d'inspiration" style="max-width:100%;border-radius:8px;"></a>
+          </div>` : ''}
+          <div style="margin-top:24px;text-align:center;">
+            <a href="mailto:${visitorEmail}?subject=Re: votre demande de commande personnalisée"
+               style="display:inline-block;background:#c8937a;color:#fff;text-decoration:none;
+                      padding:12px 28px;border-radius:8px;font-size:15px;font-family:Georgia,serif;">
+              ✉️ Répondre à ${visitorName}
+            </a>
+          </div>
+        </td></tr>
+        ${emailFooter()}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const textParts = [
+    `Nouvelle demande de commande personnalisée de ${visitorName} (${visitorEmail})`,
+    details.creationType && `Type : ${details.creationType}`,
+    details.color && `Couleur/motif : ${details.color}`,
+    details.size && `Taille : ${details.size}`,
+    details.timeline && `Délai : ${details.timeline}`,
+    details.budget && `Budget : ${details.budget}`,
+    details.message && `Message : ${details.message}`,
+    photoUrl && `Photo : ${BASE_URL}${photoUrl}`,
+  ].filter(Boolean);
+
+  if (!process.env.BREVO_API_KEY) {
+    console.log('\n📧 [MODE DÉMO — DEMANDE PERSONNALISÉE NON ENVOYÉE]');
+    console.log(textParts.join('\n') + '\n');
+    return { demo: true };
+  }
+
+  return sendBrevo(CONTACT_DEST, 'Tout en Aiguilles', `🧵 Commande personnalisée — ${visitorName}`, html, textParts.join('\n'));
+}
+
 // ─── Email client — changement de statut + facture ──────────────
 async function sendOrderStatusEmail(order) {
   const status = order.status;
@@ -418,7 +491,7 @@ async function sendOrderStatusEmail(order) {
     delivered: isHandover
       ? `Votre commande vous a été remise 🎉<br>Nous espérons qu'elle vous plaît ! N'hésitez pas à laisser un avis.`
       : `Votre commande a été livrée 🎉<br>Nous espérons qu'elle vous plaît ! N'hésitez pas à laisser un avis.`,
-    cancelled: `Votre commande a été annulée.<br>Si un paiement a été effectué, nous vous contacterons directement pour trouver une solution.`,
+    cancelled: `Votre commande a été annulée.<br>Si vous avez été débité(e), un remboursement sera effectué sous 5 à 10 jours ouvrés.`,
     pending: `Votre commande est enregistrée et en attente de paiement.<br>Complétez votre paiement pour la valider.`,
   };
 
@@ -571,4 +644,78 @@ async function sendRelayChangeEmail(order, oldRelay, newRelay) {
   );
 }
 
-module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendContactEmail, sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail };
+async function sendAbandonedCartEmail(email, firstName, items) {
+  const BASE = process.env.BASE_URL || 'https://tout-en-aiguilles.com';
+  const itemRows = items.slice(0, 3).map(i => `
+    <tr>
+      <td style="padding:10px;border-bottom:1px solid #f0e8e0">
+        ${i.image ? `<img src="${BASE}${i.image}" width="44" height="44" style="border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:10px" alt="">` : ''}
+        ${i.name}
+      </td>
+      <td style="padding:10px;border-bottom:1px solid #f0e8e0;text-align:right;font-weight:700;color:#c0718a">
+        ${(i.price * i.qty).toFixed(2)} €
+      </td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#fdf8f5;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f5;padding:40px 20px;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+      ${emailHeader('🛒', 'Vous avez oublié quelque chose ?')}
+      <tr><td style="padding:40px;">
+        <h2 style="margin:0 0 12px;color:#5a3e2b;font-size:20px;">Votre panier vous attend 🌸</h2>
+        <p style="color:#6b5547;line-height:1.7;margin:0 0 24px;">Vous avez laissé des créations dans votre panier. Elles ne sont pas encore à vous — mais elles pourraient l'être !</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #f0e8e0;border-radius:8px;overflow:hidden;">
+          ${itemRows}
+        </table>
+        <div style="text-align:center">
+          <a href="${BASE}/panier.html" style="display:inline-block;background:#c0718a;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-family:Georgia,serif;">
+            Reprendre mon panier →
+          </a>
+        </div>
+      </td></tr>
+      ${emailFooter()}
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+
+  if (!process.env.BREVO_API_KEY) { console.log(`📧 [DEMO] Panier abandonné → ${email}`); return { demo: true }; }
+  return sendBrevo(email, firstName || email, '🛒 Votre panier vous attend — Tout en Aiguilles', html, `Vous avez laissé des articles dans votre panier. Finalisez votre commande : ${BASE}/panier.html`);
+}
+
+async function sendBackInStockEmail(email, product) {
+  const BASE = process.env.BASE_URL || 'https://tout-en-aiguilles.com';
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#fdf8f5;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f5;padding:40px 20px;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+      ${emailHeader('🔔', 'Bonne nouvelle !')}
+      <tr><td style="padding:40px;text-align:center;">
+        <h2 style="margin:0 0 12px;color:#5a3e2b;font-size:20px;">Le produit que vous attendez est disponible ! 🌸</h2>
+        ${product.image ? `<img src="${BASE}${product.image}" width="180" height="180" style="border-radius:12px;object-fit:cover;margin:16px 0" alt="${product.name}">` : ''}
+        <h3 style="color:#c0718a;margin:0 0 8px">${product.name}</h3>
+        <p style="color:#5a3e2b;font-size:1.1rem;font-weight:700;margin:0 0 24px">${Number(product.price).toFixed(2)} €</p>
+        <a href="${BASE}/produit.html?id=${product.id}" style="display:inline-block;background:#c0718a;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-family:Georgia,serif;">
+          Commander maintenant →
+        </a>
+        <p style="color:#b8a090;font-size:12px;margin-top:20px">Les stocks sont limités — commandez vite !</p>
+      </td></tr>
+      ${emailFooter()}
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+
+  if (!process.env.BREVO_API_KEY) { console.log(`📧 [DEMO] Back in stock → ${email} pour ${product.name}`); return { demo: true }; }
+  return sendBrevo(email, email, `🔔 ${product.name} est de nouveau disponible — Tout en Aiguilles`, html, `Bonne nouvelle ! ${product.name} est de nouveau en stock sur ${BASE}/produit.html?id=${product.id}`);
+}
+
+async function sendNewsletterEmail(email, firstName, subject, htmlContent) {
+  if (!process.env.BREVO_API_KEY) { console.log(`📧 [DEMO] Newsletter → ${email}`); return { demo: true }; }
+  return sendBrevo(email, firstName || email, subject, htmlContent, subject);
+}
+
+module.exports = { sendVerificationEmail, sendEmailChangeConfirmation, sendContactEmail, sendCustomOrderEmail, sendNewOrderNotification, sendOrderStatusEmail, sendReviewRequestEmail, sendRelayChangeEmail, sendAbandonedCartEmail, sendBackInStockEmail, sendNewsletterEmail };
