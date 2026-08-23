@@ -23,27 +23,8 @@
 </div>
 
 <div id="admin-content" class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
-  </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html">📊 Tableau de bord</a>
-      <a href="produits.html">🧶 Produits</a>
-      <a href="commandes.html">📦 Commandes</a>
-      <a href="actualites.html">📝 Actualités</a>
-      <a href="utilisateurs.html">👥 Utilisateurs</a>
-      <a href="avis.html">⭐ Avis</a>
-      <a href="promo.html">🏷️ Codes promo</a>
-      <a href="newsletter.html" class="active">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <main class="admin-main">
     <div class="admin-header">
@@ -72,6 +53,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Contenu (HTML ou texte) *</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input type="file" id="nl-img-input" accept="image/*" style="display:none" onchange="insertNlImage(this)">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('nl-img-input').click()">🖼️ Insérer une image</button>
+          </div>
           <textarea id="nl-content" class="form-textarea" style="min-height:200px;font-family:monospace;font-size:.82rem" placeholder="<p>Bonjour,</p><p>Découvrez nos dernières créations...</p>"></textarea>
         </div>
         <div style="background:var(--cream-dark);border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:.82rem;color:var(--text-light)">
@@ -79,7 +64,10 @@
         </div>
         <div id="nl-error" class="form-error" style="display:none;margin-bottom:12px"></div>
         <div id="nl-success" style="display:none;background:var(--sage-pale);color:var(--sage-dark);padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:.875rem"></div>
-        <button class="btn btn-primary" id="nl-send-btn" onclick="sendNewsletter()">📧 Envoyer à tous les subscribers</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary" id="nl-test-btn" onclick="sendTestNewsletter()">🧪 Envoyer un test à moi-même</button>
+          <button class="btn btn-primary" id="nl-send-btn" onclick="sendNewsletter()">📧 Envoyer à tous les subscribers</button>
+        </div>
       </div>
 
       <!-- Liste subscribers -->
@@ -95,6 +83,19 @@
         </div>
       </div>
     </div>
+
+    <!-- Historique des campagnes -->
+    <div class="admin-panel" style="margin-top:24px">
+      <div class="admin-panel-title">🕓 Historique des envois</div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Sujet</th><th>Destinataires</th><th>Erreurs</th><th>Date d'envoi</th></tr></thead>
+          <tbody id="campaigns-tbody">
+            <tr><td colspan="4" style="text-align:center;padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -106,7 +107,7 @@ function checkAdmin() {
   const guard = document.getElementById('admin-guard');
   const content = document.getElementById('admin-content');
   if (!Auth.isLoggedIn() || !Auth.isAdmin()) { content.style.display='none'; guard.style.display='flex'; }
-  else { guard.style.display='none'; content.style.display=''; loadSubscribers(); }
+  else { guard.style.display='none'; content.style.display=''; loadSubscribers(); loadCampaigns(); }
 }
 
 document.getElementById('guard-btn').addEventListener('click', function() {
@@ -142,6 +143,60 @@ async function loadSubscribers() {
   } catch(e) { Toast.show(e.message, 'error'); }
 }
 
+async function insertNlImage(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('image', file);
+  try {
+    const res = await apiFetchForm('/newsletter/upload-image', fd, 'POST');
+    const textarea = document.getElementById('nl-content');
+    const url = `${location.origin}${res.url}`;
+    const tag = `<img src="${url}" alt="" style="max-width:100%;border-radius:8px;display:block;margin:16px 0">`;
+    const pos = textarea.selectionStart || textarea.value.length;
+    textarea.value = textarea.value.slice(0, pos) + tag + textarea.value.slice(pos);
+    textarea.focus();
+    Toast.show('Image insérée ✓', 'success');
+  } catch (e) { Toast.show('Erreur upload image : ' + e.message, 'error'); }
+}
+
+async function sendTestNewsletter() {
+  const subject = document.getElementById('nl-subject').value.trim();
+  const html_content = document.getElementById('nl-content').value.trim();
+  const errEl = document.getElementById('nl-error');
+  const successEl = document.getElementById('nl-success');
+  errEl.style.display = 'none'; successEl.style.display = 'none';
+  if (!subject || !html_content) { errEl.textContent = 'Sujet et contenu requis'; errEl.style.display = ''; return; }
+
+  const btn = document.getElementById('nl-test-btn');
+  btn.disabled = true; btn.textContent = '⏳ Envoi…';
+  try {
+    await apiFetch('/newsletter/send-test', { method: 'POST', body: { subject, html_content } });
+    successEl.textContent = '✅ Email de test envoyé à votre adresse admin.';
+    successEl.style.display = '';
+  } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+  btn.disabled = false; btn.textContent = '🧪 Envoyer un test à moi-même';
+}
+
+async function loadCampaigns() {
+  try {
+    const campaigns = await apiFetch('/newsletter/campaigns');
+    const tbody = document.getElementById('campaigns-tbody');
+    tbody.innerHTML = campaigns.length
+      ? campaigns.map(c => `
+        <tr>
+          <td style="font-weight:700">${c.subject}</td>
+          <td>${c.recipients}</td>
+          <td style="color:${c.errors > 0 ? '#d9534f' : 'var(--text-light)'}">${c.errors}</td>
+          <td style="font-size:.8rem;color:var(--text-light)">${new Date(c.sent_at).toLocaleString('fr-FR')}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-light)">Aucun envoi pour l\'instant</td></tr>';
+  } catch (e) {
+    document.getElementById('campaigns-tbody').innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-light)">${e.message}</td></tr>`;
+  }
+}
+
 async function sendNewsletter() {
   const subject = document.getElementById('nl-subject').value.trim();
   const html_content = document.getElementById('nl-content').value.trim();
@@ -160,6 +215,7 @@ async function sendNewsletter() {
     successEl.style.display = '';
     document.getElementById('nl-subject').value = '';
     document.getElementById('nl-content').value = '';
+    loadCampaigns();
   } catch(e) { errEl.textContent = e.message; errEl.style.display = ''; }
   btn.disabled = false; btn.textContent = '📧 Envoyer à tous les subscribers';
 }
