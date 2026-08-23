@@ -4,6 +4,81 @@
 
 const API = '/api';
 
+// ─── Consentement cookies (RGPD/CNIL) ───────────────────────
+// Google Tag Manager ne doit être chargé qu'après consentement explicite
+// du visiteur (mesure d'audience = cookie non essentiel). Ce bloc remplace
+// le chargement direct de GTM dans le <head> de chaque page publique :
+// tant que l'utilisateur n'a pas répondu, GTM n'est pas chargé du tout.
+const GTM_ID = 'GTM-5M8NK6RH';
+const COOKIE_CONSENT_KEY = 'tea_cookie_consent';
+
+function loadGTM() {
+  if (window._gtmLoaded) return;
+  window._gtmLoaded = true;
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+  const f = document.getElementsByTagName('script')[0];
+  const j = document.createElement('script');
+  j.async = true;
+  j.src = 'https://www.googletagmanager.com/gtm.js?id=' + GTM_ID;
+  f.parentNode.insertBefore(j, f);
+}
+
+function initCookieConsent() {
+  if (document.getElementById('admin-guard')) return; // pas de bannière dans le backoffice
+  const consent = localStorage.getItem(COOKIE_CONSENT_KEY);
+  if (consent === 'accepted') { loadGTM(); return; }
+  if (consent === 'rejected') return;
+  showCookieBanner();
+}
+
+function showCookieBanner() {
+  if (document.getElementById('cookie-banner')) return;
+  const el = document.createElement('div');
+  el.id = 'cookie-banner';
+  el.innerHTML = `
+    <div class="cookie-banner-inner">
+      <p>🍪 Nous utilisons des cookies de mesure d'audience pour comprendre comment le site est utilisé. Vous pouvez les accepter ou les refuser à tout moment. <a href="/mentions-legales.html">En savoir plus</a></p>
+      <div class="cookie-banner-actions">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="setCookieConsent(false)">Refuser</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="setCookieConsent(true)">Accepter</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+}
+
+function setCookieConsent(accepted) {
+  localStorage.setItem(COOKIE_CONSENT_KEY, accepted ? 'accepted' : 'rejected');
+  const el = document.getElementById('cookie-banner');
+  if (el) el.remove();
+  if (accepted) loadGTM();
+  showCookieFab();
+}
+
+function openCookieSettings() {
+  localStorage.removeItem(COOKIE_CONSENT_KEY);
+  const fab = document.getElementById('cookie-fab');
+  if (fab) fab.remove();
+  showCookieBanner();
+}
+
+function showCookieFab() {
+  if (document.getElementById('admin-guard')) return;
+  if (document.getElementById('cookie-fab')) return;
+  const btn = document.createElement('button');
+  btn.id = 'cookie-fab';
+  btn.type = 'button';
+  btn.className = 'cookie-fab';
+  btn.title = 'Gérer les cookies';
+  btn.setAttribute('aria-label', 'Gérer les cookies');
+  btn.textContent = '🍪';
+  btn.onclick = openCookieSettings;
+  document.body.appendChild(btn);
+}
+
+initCookieConsent();
+if (localStorage.getItem(COOKIE_CONSENT_KEY)) showCookieFab();
+
 // ─── Sidebar admin partagée ─────────────────────────────────
 // Évite de dupliquer le HTML de la sidebar dans chaque page admin.
 // Injectée dans <div id="admin-sidebar-mount"></div> si présent sur la page.
