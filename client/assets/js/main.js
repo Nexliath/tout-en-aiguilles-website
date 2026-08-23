@@ -270,10 +270,13 @@ const Cart = {
     const suffix = variantLabel ? ` — ${variantLabel}` : '';
     Toast.show(`${product.name}${suffix} ajouté au panier 🛒`, 'success');
   },
-  remove: (product_id) => { Cart.save(Cart.get().filter(i => i.product_id !== product_id)); },
-  updateQty: (product_id, qty) => {
-    if (qty <= 0) return Cart.remove(product_id);
-    const items = Cart.get(); const idx = items.findIndex(i => i.product_id === product_id);
+  // variant_id optionnel : un même produit peut avoir plusieurs lignes dans le
+  // panier (une par variante choisie) — sans lui, on retirerait/modifierait
+  // la mauvaise ligne si plusieurs couleurs du même produit sont au panier.
+  remove: (product_id, variant_id) => { Cart.save(Cart.get().filter(i => !(i.product_id === product_id && (i.variant_id || null) === (variant_id || null)))); },
+  updateQty: (product_id, qty, variant_id) => {
+    if (qty <= 0) return Cart.remove(product_id, variant_id);
+    const items = Cart.get(); const idx = items.findIndex(i => i.product_id === product_id && (i.variant_id || null) === (variant_id || null));
     if (idx >= 0) { items[idx].qty = qty; Cart.save(items); }
   },
   count: () => Cart.get().reduce((s, i) => s + i.qty, 0),
