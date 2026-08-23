@@ -250,9 +250,52 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
 });
 
-// ─── SPA fallback ───────────────────────────────────────────
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/index.html'));
+// ─── 404 ──────────────────────────────────────────────────────
+// Toute route non trouvée (ni fichier statique, ni route API) renvoie une
+// vraie page 404 avec le bon code HTTP. Avant, n'importe quelle URL
+// invalide renvoyait la page d'accueil en 200 OK (« soft 404 »), ce qui
+// nuit au référencement et n'aide pas un visiteur qui a tapé une mauvaise
+// adresse. Générée directement ici (pas un fichier statique séparé) pour
+// éviter tout souci de propagation du fichier lors du déploiement.
+const NOT_FOUND_HTML = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Page introuvable — Tout en Aiguilles</title>
+<link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo"><span class="logo-icon">🧶</span>Tout en <span>Aiguilles</span></a>
+  </div>
+</header>
+<div class="section" style="text-align:center;padding:100px 20px">
+  <div style="font-size:4rem;margin-bottom:16px">🧶</div>
+  <h1 style="margin-bottom:12px">Page introuvable</h1>
+  <p style="color:var(--text-light);margin-bottom:32px">Ce fil s'est égaré… la page que vous cherchez n'existe pas ou plus.</p>
+  <a href="/" class="btn btn-primary">Retour à l'accueil</a>
+  <a href="/boutique.html" class="btn btn-secondary" style="margin-left:12px">Voir la boutique</a>
+</div>
+<footer class="site-footer">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;padding:20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.6)">
+      <span>© 2024 Tout en Aiguilles</span>
+      <a href="/" style="color:rgba(255,255,255,.6)">Accueil</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>`;
+
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'Route API introuvable' });
+  }
+  res.status(404).send(NOT_FOUND_HTML);
 });
 
 // ─── Demandes d'avis automatiques (J+8, 10h heure de Paris) ────
