@@ -41,28 +41,8 @@
 </div>
 
 <div id="admin-content" class="admin-layout">
-  <div class="admin-mobile-bar">
-    <button class="admin-hamburger" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
-    <span class="admin-mobile-title">🧶 Administration</span>
-  </div>
-  <div class="admin-sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
-  <!-- Sidebar -->
-  <aside class="admin-sidebar">
-    <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Panneau d'administration</span></div>
-    <nav class="admin-nav">
-      <a href="index.html">📊 Tableau de bord</a>
-      <a href="produits.html">🧶 Produits</a>
-      <a href="commandes.html">📦 Commandes</a>
-      <a href="actualites.html">📝 Actualités</a>
-      <a href="utilisateurs.html">👥 Utilisateurs</a>
-      <a href="avis.html" class="active">⭐ Avis</a>
-      <a href="promo.html">🏷️ Codes promo</a>
-      <a href="newsletter.html">📧 Newsletter</a>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
-      <a href="/" target="_blank">🌐 Voir le site</a>
-      <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
-    </nav>
-  </aside>
+  <div id="admin-sidebar-mount"></div>
+  <script src="/assets/js/admin-nav.js"></script>
 
   <!-- Main -->
   <main class="admin-main">
@@ -214,11 +194,47 @@ function renderReviews(reviews) {
           ${!r.is_approved
             ? `<button class="btn btn-sage btn-sm" onclick="approveReview(${r.id})">✅ Approuver</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="rejectReview(${r.id})">↩ Rejeter</button>`}
+          <button class="btn btn-ghost btn-sm" onclick="toggleReplyRow(${r.id})">${r.admin_reply ? '💬 Modifier réponse' : '💬 Répondre'}</button>
           <button class="btn btn-sm" style="background:#f8d7da;color:#d9534f;border:none" onclick="confirmDelete(${r.id})">🗑️</button>
         </div>
       </td>
     </tr>
+    <tr id="reply-row-${r.id}" style="display:none">
+      <td colspan="9" style="background:var(--cream);padding:14px 16px">
+        ${r.admin_reply ? `<div style="font-size:.78rem;color:var(--text-light);margin-bottom:6px">Réponse publiée le ${formatDate(r.admin_reply_at)} — visible sous l'avis côté client :</div>` : ''}
+        <textarea id="reply-text-${r.id}" class="form-input" rows="2" placeholder="Votre réponse publique à cet avis…" style="resize:vertical">${r.admin_reply || ''}</textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-primary btn-sm" onclick="saveReply(${r.id})">Publier la réponse</button>
+          ${r.admin_reply ? `<button class="btn btn-ghost btn-sm" onclick="deleteReply(${r.id})" style="color:#d9534f">Supprimer la réponse</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="toggleReplyRow(${r.id})">Fermer</button>
+        </div>
+      </td>
+    </tr>
   `).join('');
+}
+
+function toggleReplyRow(id) {
+  const row = document.getElementById(`reply-row-${id}`);
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+async function saveReply(id) {
+  const text = document.getElementById(`reply-text-${id}`).value.trim();
+  if (!text) { Toast.show('Écrivez une réponse avant de publier', 'error'); return; }
+  try {
+    await apiFetch(`/reviews/${id}/reply`, { method: 'PUT', body: { reply: text } });
+    Toast.show('✅ Réponse publiée', 'success');
+    loadReviews();
+  } catch (e) { Toast.show(e.message, 'error'); }
+}
+
+async function deleteReply(id) {
+  if (!confirm('Supprimer cette réponse ?')) return;
+  try {
+    await apiFetch(`/reviews/${id}/reply`, { method: 'PUT', body: { reply: '' } });
+    Toast.show('Réponse supprimée', 'success');
+    loadReviews();
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 async function approveReview(id) {
