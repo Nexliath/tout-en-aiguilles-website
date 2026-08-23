@@ -461,7 +461,58 @@ router.get('/', requireAdmin, (req, res) => {
   res.json(orders);
 });
 
-// PUT /api/orders/:id/status — changer le statut (+ tracking_number optionnel)
+// Transitions de statut autorisées (empêche par ex. de repasser une commande
+// déjà expédiée/livrée à "en attente", ou de modifier une commande annulée).
+// Une commande peut toujours être déplacée vers son statut actuel (no-op, ignoré).
+const ORDER_STATUS_TRANSITIONS = {
+  pending: ['paid', 'cancelled'],
+  paid: ['shipped', 'cancelled'],
+  shipped: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
+// ─── PUT /api/orders/bulk/status — changement de statut groupé ─
+// IMPORTANT : cette route DOIT être déclarée avant PUT /:id/status ci-dessous
+// — sinon Express fait correspondre '/bulk/status' à '/:id/status' (avec
+// id='bulk') et cette route n'est jamais atteinte. C'est exactement ce qui
+// s'est produit ici : le changement de statut groupé était silencieusement
+// no-op depuis son introduction (aucune ligne mise à jour, id='bulk' ne
+// correspondant à aucune commande), jusqu'à ce que le test local du round 4
+// le révèle.
+router.put('/bulk/status', requireAdmin, (req, res) => {
+  const { ids, status } = req.body;
+  const valid = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'];
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Aucune commande sélectionnée' });
+  if (!valid.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
+
+  const update = db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  let updated = 0;
+  const skipped = [];
+  for (const id of ids) {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    if (!order) continue;
+    if (order.status === status) continue; // déjà dans cet état, rien à faire
+    const allowed = ORDER_STATUS_TRANSITIONS[order.status] || [];
+    if (!allowed.includes(status)) {
+      skipped.push({ id: order.id, from: order.status });
+      continue;
+    }
+    update.run(status, id);
+    updated++;
+    if (order.email) {
+      sendOrderStatusEmail({ ...order, status, items: JSON.parse(order.items || '[]') }).catch(console.error);
+    }
+  }
+  logActivity(req.user, 'Statut commandes modifié (groupé)', `${updated} commande(s) → ${status}${skipped.length ? `, ${skipped.length} ignorée(s)` : ''}`);
+  res.json({ success: true, updated, skipped });
+});
+
+// PUT /api/orders/:id/status — changer le statut d'une commande individuelle
+// (+ tracking_number optionnel). Contrairement au changement groupé
+// ci-dessus, ceci reste un override manuel délibéré par l'admin sur UNE
+// commande précise — pas de garde de transition ici, volontairement, pour
+// permettre de corriger une erreur de statut au cas par cas.
 router.put('/:id/status', requireAdmin, (req, res) => {
   const { status, tracking_number } = req.body;
   const valid = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'];
@@ -479,28 +530,6 @@ router.put('/:id/status', requireAdmin, (req, res) => {
   }
   logActivity(req.user, 'Statut commande modifié', `#${req.params.id} → ${status}`);
   res.json({ success: true });
-});
-
-// ─── PUT /api/orders/bulk/status — changement de statut groupé ─
-router.put('/bulk/status', requireAdmin, (req, res) => {
-  const { ids, status } = req.body;
-  const valid = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'];
-  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Aucune commande sélectionnée' });
-  if (!valid.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
-
-  const update = db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-  let updated = 0;
-  for (const id of ids) {
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
-    if (!order) continue;
-    update.run(status, id);
-    updated++;
-    if (order.email) {
-      sendOrderStatusEmail({ ...order, status, items: JSON.parse(order.items || '[]') }).catch(console.error);
-    }
-  }
-  logActivity(req.user, 'Statut commandes modifié (groupé)', `${updated} commande(s) → ${status}`);
-  res.json({ success: true, updated });
 });
 
 // PUT /api/orders/:id/relay-point — changer le point relais + notifier le client
