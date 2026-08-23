@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
     .editor-toolbar { display:flex;gap:2px;padding:8px;background:var(--cream-dark);border-radius:8px 8px 0 0;border:1.5px solid var(--border);border-bottom:none;flex-wrap:wrap;align-items:center }
-    .editor-btn { padding:4px 8px;border-radius:4px;border:none;background:transparent;font-size:.82rem;cursor:pointer;font-weight:700;min-width:28px;text-align:center }
+    .editor-btn { padding:4px 8px;border-radius:4px;border:none;background:transparent;font-size:.82rem;cursor:pointer;font-weight:700;min-width:28px;text-align:center;white-space:nowrap }
     .editor-btn:hover { background:white }
     .editor-sep { width:1px;height:20px;background:var(--border);margin:0 4px;flex-shrink:0 }
     #f-content { border-radius:0 0 8px 8px;min-height:280px;outline:none;padding:16px;border:1.5px solid var(--border);border-top:none;line-height:1.8;font-size:.95rem }
@@ -23,10 +23,12 @@
     #f-content h3 { font-family:var(--font-title);font-size:1.15rem;margin:20px 0 8px }
     #f-content figure { margin:16px 0 }
     #f-content figure img { max-width:100%;border-radius:8px }
+    #f-content figure.img-medium { max-width:62% }
+    #f-content .img-row { display:flex;gap:12px }
+    #f-content .img-row figure { flex:1;margin:0 }
+    #f-content .img-row img { width:100%;height:140px;object-fit:cover;border-radius:8px }
     #f-content blockquote { border-left:3px solid var(--rose);padding:12px 16px;margin:16px 0;background:var(--rose-pale);border-radius:0 8px 8px 0;font-style:italic;color:var(--rose-dark) }
-    .editor-counter { font-size:.75rem;color:var(--text-light);margin-left:auto;padding:0 6px }
-    #art-preview { display:none;border:1.5px solid var(--border);border-radius:8px;padding:24px;margin-top:8px;background:white;max-height:400px;overflow-y:auto }
-    #art-preview.visible { display:block }
+    .editor-counter { font-size:.75rem;color:var(--text-light);margin-left:auto;padding:0 6px;white-space:nowrap }
   </style>
 </head>
 <body>
@@ -34,14 +36,6 @@
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M8NK6RH"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
-<!-- Mobile top bar -->
-<div class="admin-mobile-bar" id="admin-mobile-bar">
-  <button class="admin-hamburger" onclick="openAdminDrawer()" aria-label="Menu">☰</button>
-  <div class="admin-mobile-bar-title" id="admin-bar-title">Administration</div>
-  <a href="/panier.html" style="color:white;font-size:1.1rem;text-decoration:none">🛒</a>
-</div>
-<div class="admin-drawer-overlay" id="admin-drawer-overlay" onclick="closeAdminDrawer()"></div>
-
 <div class="admin-layout">
   <aside class="admin-sidebar">
     <div class="admin-logo">🧶 Tout en Aiguilles<br><span style="font-size:.7rem;opacity:.5;font-family:var(--font-body)">Administration</span></div>
@@ -54,7 +48,6 @@
       <a href="avis.html">⭐ Avis</a>
       <a href="promo.html">🏷️ Codes promo</a>
       <a href="newsletter.html">📧 Newsletter</a>
-      <a href="analytiques.html">📈 Analytiques</a>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
       <a href="/" target="_blank">🌐 Voir le site</a>
       <a href="#" onclick="Auth.logout()" style="color:rgba(255,100,100,.7)!important">🚪 Déconnexion</a>
@@ -96,14 +89,18 @@
           <button class="editor-btn" onclick="insertHR()" title="Séparateur">—</button>
           <div class="editor-sep"></div>
           <button class="editor-btn" onclick="insertLink()" title="Lien">🔗</button>
-          <button class="editor-btn" onclick="insertImageUrl()" title="Image (URL)">🖼️</button>
+          <div class="editor-sep"></div>
+          <button class="editor-btn" onclick="openImageInserter('full')" title="Image pleine largeur">🖼️ Pleine</button>
+          <button class="editor-btn" onclick="openImageInserter('medium')" title="Image moyenne centrée">🖼️ Moyenne</button>
+          <button class="editor-btn" onclick="openImageInserter('row')" title="Deux images côte à côte">🖼️🖼️ Côte à côte</button>
           <div class="editor-sep"></div>
           <button class="editor-btn" onclick="fmt('removeFormat')" title="Supprimer la mise en forme" style="font-size:.72rem;color:var(--text-light)">Ø</button>
-          <button class="editor-btn" onclick="togglePreview()" title="Aperçu" style="color:var(--rose-dark)">👁 Aperçu</button>
           <span class="editor-counter" id="word-count">0 mots</span>
         </div>
         <div id="f-content" contenteditable="true" oninput="updateWordCount()"></div>
-        <div id="art-preview" class="article-body"></div>
+        <div style="margin-top:10px">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="openFullPreview()">👁 Aperçu complet côté client</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Photo de couverture</label>
@@ -120,6 +117,44 @@
       <div style="display:flex;gap:8px">
         <button class="btn btn-primary" onclick="saveArticle()">Publier l'article</button>
         <button class="btn btn-ghost" onclick="hideForm()">Annuler</button>
+      </div>
+    </div>
+
+    <!-- Input caché pour l'upload d'images du contenu -->
+    <input type="file" id="content-img-input" accept="image/*" style="display:none" onchange="handleImageInsertFile(this)">
+
+    <!-- ── Modal aperçu complet côté client ── -->
+    <div id="preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 16px">
+      <div style="background:var(--cream);border-radius:var(--radius-xl);max-width:900px;width:100%;margin:0 auto;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:white;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2">
+          <div style="font-weight:700;font-size:.9rem">👁 Aperçu — rendu réel côté client</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;background:var(--cream-dark);border-radius:20px;padding:3px">
+              <button type="button" id="preview-btn-desktop" class="btn btn-sm" onclick="setPreviewWidth('desktop')" style="border-radius:16px;padding:4px 14px;font-size:.78rem">🖥️ Desktop</button>
+              <button type="button" id="preview-btn-mobile" class="btn btn-sm" onclick="setPreviewWidth('mobile')" style="border-radius:16px;padding:4px 14px;font-size:.78rem">📱 Mobile</button>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="closeFullPreview()">✕ Fermer</button>
+          </div>
+        </div>
+        <div style="background:#e9e4dc;padding:24px 12px;display:flex;justify-content:center">
+          <div id="preview-viewport" style="background:var(--cream);transition:max-width .25s ease;max-width:100%;width:100%">
+            <div class="section" style="padding:24px 0">
+              <div class="container">
+                <div class="breadcrumb" style="font-size:.78rem">
+                  <span>Accueil</span><span class="breadcrumb-sep">›</span>
+                  <span>Actualités</span><span class="breadcrumb-sep">›</span>
+                  <span id="preview-bc">Article</span>
+                </div>
+                <div class="article-content">
+                  <p id="preview-date" style="font-size:.8rem;color:var(--text-light);margin-bottom:8px"></p>
+                  <h1 id="preview-title" style="margin-bottom:24px"></h1>
+                  <div class="article-cover" id="preview-cover"><span>🌸</span></div>
+                  <div class="article-body" id="preview-content"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -267,12 +302,79 @@ function insertLink() {
   document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener">${text}</a>`);
 }
 
-function insertImageUrl() {
-  const url = prompt('URL de l\'image :', 'https://');
-  if (!url) return;
-  const alt = prompt('Description de l\'image (alt) :', '') || '';
-  document.execCommand('insertHTML', false,
-    `<figure><img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px"><figcaption>${alt}</figcaption></figure><p><br></p>`);
+// ─── Insertion d'images avec choix de mise en page ────────────
+// Trois dispositions possibles, inspirées des éditeurs de blog (Medium/Shopify) :
+//  - "full"   : image pleine largeur (par défaut, comme avant)
+//  - "medium" : image de taille moyenne, centrée
+//  - "row"    : deux images côte à côte (mini-galerie)
+let _pendingImageLayout = null;
+let _savedSelectionRange = null;
+
+function saveSelection() {
+  const sel = window.getSelection();
+  _savedSelectionRange = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+}
+function restoreSelection() {
+  const content = document.getElementById('f-content');
+  content.focus();
+  if (_savedSelectionRange) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_savedSelectionRange);
+  }
+}
+
+function openImageInserter(layout) {
+  saveSelection();
+  _pendingImageLayout = layout;
+  _rowImages = []; // reset pour la disposition côte à côte
+  document.getElementById('content-img-input').click();
+}
+
+let _rowImages = [];
+
+async function uploadContentImage(file) {
+  const fd = new FormData();
+  fd.append('image', file);
+  const res = await apiFetchForm('/news/upload-image', fd, 'POST');
+  return res.url;
+}
+
+async function handleImageInsertFile(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+
+  try {
+    const url = await uploadContentImage(file);
+
+    if (_pendingImageLayout === 'row') {
+      _rowImages.push(url);
+      if (_rowImages.length < 2) {
+        Toast.show('Photo 1/2 ajoutée — sélectionnez la seconde image', 'success');
+        document.getElementById('content-img-input').click();
+        return;
+      }
+      const caption = prompt('Légende commune (optionnel) :', '') || '';
+      restoreSelection();
+      document.execCommand('insertHTML', false,
+        `<div class="img-row">` +
+          _rowImages.map(u => `<figure><img src="${u}" alt=""></figure>`).join('') +
+        `</div>` +
+        (caption ? `<p style="text-align:center;font-size:.8rem;color:var(--text-light);margin-top:-16px">${caption}</p>` : '') +
+        `<p><br></p>`);
+      _rowImages = [];
+    } else {
+      const caption = prompt('Légende de l\'image (optionnel) :', '') || '';
+      const cls = _pendingImageLayout === 'medium' ? ' class="img-medium"' : '';
+      restoreSelection();
+      document.execCommand('insertHTML', false,
+        `<figure${cls}><img src="${url}" alt="${caption}">${caption ? `<figcaption>${caption}</figcaption>` : ''}</figure><p><br></p>`);
+    }
+    updateWordCount();
+  } catch (e) {
+    Toast.show('Erreur upload image : ' + e.message, 'error');
+  }
 }
 
 function insertBlockquote() {
@@ -289,66 +391,52 @@ function insertHR() {
 function updateWordCount() {
   const text = document.getElementById('f-content').innerText || '';
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const readMin = Math.max(1, Math.ceil(words / 200));
   const el = document.getElementById('word-count');
-  if (el) el.textContent = `${words} mot${words > 1 ? 's' : ''}`;
+  if (el) el.textContent = `${words} mot${words > 1 ? 's' : ''} · ~${readMin} min de lecture`;
 }
 
-function togglePreview() {
-  const preview = document.getElementById('art-preview');
+// ─── Aperçu complet côté client ─────────────────────────────
+// Réutilise exactement les classes CSS de la vraie page article
+// (.article-content / .article-cover / .article-body) pour un rendu 1:1.
+function openFullPreview() {
+  const title = document.getElementById('f-title').value.trim() || 'Titre de l\'article';
   const content = document.getElementById('f-content').innerHTML;
-  if (preview.classList.contains('visible')) {
-    preview.classList.remove('visible');
+  const coverFile = document.getElementById('f-cover').files[0];
+  const existingCoverImg = document.querySelector('#current-cover img');
+
+  document.getElementById('preview-bc').textContent = title;
+  document.getElementById('preview-title').textContent = title;
+  document.getElementById('preview-date').textContent = formatDate(new Date().toISOString());
+  document.getElementById('preview-content').innerHTML = content || '<p style="color:var(--text-light);font-style:italic">Aucun contenu à prévisualiser</p>';
+
+  const coverEl = document.getElementById('preview-cover');
+  if (coverFile) {
+    coverEl.innerHTML = `<img src="${URL.createObjectURL(coverFile)}" alt="">`;
+  } else if (existingCoverImg) {
+    coverEl.innerHTML = `<img src="${existingCoverImg.src}" alt="">`;
   } else {
-    preview.innerHTML = content || '<p style="color:var(--text-light);font-style:italic">Aucun contenu à prévisualiser</p>';
-    preview.classList.add('visible');
-    preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    coverEl.innerHTML = '<span>🌸</span>';
   }
+
+  setPreviewWidth('desktop');
+  document.getElementById('preview-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFullPreview() {
+  document.getElementById('preview-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function setPreviewWidth(mode) {
+  const vp = document.getElementById('preview-viewport');
+  vp.style.maxWidth = mode === 'mobile' ? '390px' : '100%';
+  document.getElementById('preview-btn-desktop').classList.toggle('btn-primary', mode === 'desktop');
+  document.getElementById('preview-btn-mobile').classList.toggle('btn-primary', mode === 'mobile');
 }
 
 init();
-</script>
-
-<script>
-function openAdminDrawer() {
-  document.querySelector('.admin-sidebar').classList.add('open');
-  document.getElementById('admin-drawer-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeAdminDrawer() {
-  document.querySelector('.admin-sidebar').classList.remove('open');
-  document.getElementById('admin-drawer-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-}
-// Set page title in mobile bar
-document.addEventListener('DOMContentLoaded', () => {
-  const active = document.querySelector('.admin-nav a.active');
-  if (active) {
-    const t = document.getElementById('admin-bar-title');
-    if (t) t.textContent = active.textContent.replace(/^[^\w]+/, '').trim();
-  }
-  // Close drawer on nav link click
-  document.querySelectorAll('.admin-nav a').forEach(a => {
-    a.addEventListener('click', closeAdminDrawer);
-  });
-});
-</script>
-
-<script>
-// Auto-label table cells for mobile card layout
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.admin-table').forEach(table => {
-    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
-    table.querySelectorAll('tbody tr').forEach(row => {
-      Array.from(row.querySelectorAll('td')).forEach((td, i) => {
-        if (headers[i]) td.setAttribute('data-label', headers[i]);
-        // Hide photo/image column label
-        if (i === 0 && (td.querySelector('img') || td.querySelector('.table-img'))) {
-          td.removeAttribute('data-label');
-        }
-      });
-    });
-  });
-});
 </script>
 </body>
 </html>
