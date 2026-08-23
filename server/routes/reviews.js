@@ -71,6 +71,18 @@ router.get('/', (req, res) => {
   res.json({ reviews: parsed, stats: { count: stats.count, average: stats.average || 0 } });
 });
 
+// ─── GET /api/reviews/mine?product_id=X ─────────────────────
+// Authentifié : indique si l'utilisateur connecté a déjà un avis sur ce
+// produit — permet au frontend de masquer le formulaire au lieu de le
+// laisser remplir en entier pour découvrir l'erreur 409 seulement à l'envoi
+// (voir POST / ci-dessous, qui reste la garde faisant foi côté serveur).
+router.get('/mine', requireAuth, (req, res) => {
+  const { product_id } = req.query;
+  if (!product_id) return res.status(400).json({ error: 'product_id requis' });
+  const existing = db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, req.user.id);
+  res.json({ has_review: !!existing });
+});
+
 // ─── POST /api/reviews ──────────────────────────────────────
 // Authentifié : poster un avis avec jusqu'à 3 photos
 router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), asyncRoute(async (req, res) => {
@@ -89,6 +101,14 @@ router.post('/', submitReviewLimiter, requireAuth, upload.array('photos', 3), as
   const existing = db.prepare('SELECT id FROM reviews WHERE product_id = ? AND user_id = ?').get(product_id, user_id);
   if (existing) return res.status(409).json({ error: 'Vous avez déjà laissé un avis sur ce produit.' });
 
+  // Le commentaire est stocké tel quel (pas échappé côté serveur) — c'est
+  // volontaire : l'échapper ici en plus de l'échappement déjà fait à
+  // l'affichage (client/produit.html et client/admin/avis.html, toutes deux
+  // remplacent < et > avant insertion dans le DOM) provoquerait un double
+  // échappement (un client tapant "<3" verrait "&lt;3" affiché littéralement
+  // au lieu de "<3"). Si un nouveau point d'affichage est ajouté ailleurs,
+  // il doit reproduire le même échappement à l'affichage — ne pas compter
+  // sur le stockage pour le faire.
   const result = db.prepare(
     'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES (?, ?, ?, ?)'
   ).run(product_id, user_id, r, comment?.trim() || null);
