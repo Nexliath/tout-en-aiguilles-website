@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const compression = require('compression');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
@@ -85,6 +87,13 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
+// Compression gzip/brotli des réponses (HTML/CSS/JS/JSON) — le site n'a pas
+// de build step ni de CDN devant lui sur Railway, donc rien ne compressait
+// les réponses jusqu'ici. N'affecte que le corps des réponses, pas le
+// parsing des requêtes (le webhook Stripe plus bas continue de lire le
+// corps brut normalement).
+app.use(compression());
+
 app.use(cors({
   origin: (origin, callback) => {
     // Autoriser les requêtes sans origin (Postman, apps mobiles) et l'origine configurée
@@ -129,6 +138,27 @@ const contactLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// /api/cart et /api/newsletter/subscribe n'avaient aucun rate-limit, ce qui
+// permettait d'automatiser à grande échelle des abus (spam d'inscriptions
+// newsletter, tentatives répétées sur le panier). max plus généreux que
+// authLimiter car un vrai visiteur peut synchroniser son panier plusieurs
+// fois en naviguant normalement.
+const cartLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Trop de requêtes. Réessayez dans quelques minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const newsletterSubscribeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: 'Trop de tentatives. Réessayez dans une heure.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ─── Body parsing ───────────────────────────────────────────
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '2mb' }));
@@ -138,13 +168,94 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 // Les scanners cherchent /admin — ils ne trouveront rien
 app.use('/admin', (req, res) => res.status(404).send('Not Found'));
 
+// ─── Cache-Control pour fichiers statiques ───────────────────
+// Le site n'a pas de build step ni de hash de fingerprinting dans les noms
+// de fichiers (pas de webpack/vite) : on ne peut donc pas mettre en cache
+// long les CSS/JS sans risquer de servir une version périmée après un
+// déploiement. Cache conservateur selon le type : pas de cache pour le HTML
+// (toujours revalidé — ne doit jamais masquer un déploiement derrière le
+// cache du navigateur), cache court pour CSS/JS, cache plus long pour les
+// images (qui changent rarement une fois uploadées ; une version périmée
+// pendant quelques jours n'a qu'un impact cosmétique mineur).
+function staticCacheHeaders(res, filePath) {
+  if (/\.html?$/i.test(filePath)) {
+    res.setHeader('Cache-Control', 'no-cache');
+  } else if (/\.(css|js)$/i.test(filePath)) {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+  } else if (/\.(jpe?g|png|webp|gif|svg|ico|avif)$/i.test(filePath)) {
+    res.setHeader('Cache-Control', 'public, max-age=604800');
+  } else {
+    res.setHeader('Cache-Control', 'public, max-age=300');
+  }
+}
+
+// ─── SEO : injection serveur des meta OG/Twitter de produit.html ────
+// Sans étape de build/SSR, les meta og:title/og:description/og:image
+// n'étaient mises à jour qu'en JS après le chargement du produit — invisibles
+// pour les robots qui n'exécutent pas de JS (aperçus de lien Facebook,
+// Twitter/X, WhatsApp, Slack, Discord...), qui ne voyaient donc que les
+// valeurs génériques par défaut du <head>. On intercepte la requête avant
+// express.static pour injecter les vraies valeurs du produit dans le HTML
+// servi. Doit être déclarée AVANT le middleware express.static ci-dessous,
+// sinon celui-ci répondrait en premier avec le fichier brut non modifié.
+const PRODUIT_HTML_PATH = path.join(__dirname, '../client/produit.html');
+function escapeHtmlAttr(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+app.get('/produit.html', (req, res, next) => {
+  const ref = req.query.id || req.query.slug;
+  if (!ref) return next(); // pas de référence produit → page générique, JS client prend le relais
+  try {
+    const db = require('./db/database');
+    const asId = /^\d+$/.test(String(ref)) ? Number(ref) : -1;
+    const product = db.prepare(
+      'SELECT name, slug, description, images, meta_title, meta_description FROM products WHERE (slug = ? OR id = ?) AND is_active = 1'
+    ).get(String(ref), asId);
+    if (!product) return next(); // produit introuvable → laisse la page gérer le 404 côté client
+
+    const BASE = 'https://tout-en-aiguilles.com';
+    const images = JSON.parse(product.images || '[]');
+    const title = product.meta_title?.trim() || `${product.name} — Création crochet faite main | Tout en Aiguilles`;
+    const description = product.meta_description?.trim()
+      || (product.description ? product.description.slice(0, 160).replace(/\n/g, ' ') : `${product.name} — création artisanale crochet faite main par Tout en Aiguilles.`);
+    const image = images[0] ? `${BASE}${images[0]}` : `${BASE}/assets/images/favicon.svg`;
+    const pageUrl = `${BASE}/produit.html?slug=${product.slug}`;
+
+    const t = escapeHtmlAttr(title);
+    const d = escapeHtmlAttr(description);
+    const i = escapeHtmlAttr(image);
+    const u = escapeHtmlAttr(pageUrl);
+
+    let html = fs.readFileSync(PRODUIT_HTML_PATH, 'utf8');
+    html = html
+      .replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`)
+      .replace(/(<meta name="description" content=")[^"]*(")/, `$1${d}$2`)
+      .replace(/(id="seo-canonical" href=")[^"]*(")/, `$1${u}$2`)
+      .replace(/(id="og-title" property="og:title" content=")[^"]*(")/, `$1${t}$2`)
+      .replace(/(id="og-description" property="og:description" content=")[^"]*(")/, `$1${d}$2`)
+      .replace(/(id="og-image" property="og:image" content=")[^"]*(")/, `$1${i}$2`)
+      .replace(/(id="og-url" property="og:url" content=")[^"]*(")/, `$1${u}$2`)
+      .replace(/(id="tw-title" name="twitter:title" content=")[^"]*(")/, `$1${t}$2`)
+      .replace(/(id="tw-description" name="twitter:description" content=")[^"]*(")/, `$1${d}$2`)
+      .replace(/(id="tw-image" name="twitter:image" content=")[^"]*(")/, `$1${i}$2`);
+
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'no-cache'); // page dynamique par produit, jamais mise en cache par le navigateur
+    res.send(html);
+  } catch (e) {
+    console.error('Erreur injection SEO produit.html:', e.message);
+    next(); // en cas d'erreur, on sert la page générique plutôt que de casser la navigation
+  }
+});
+
 // ─── Backoffice — chemin non-évident configurable ────────────
 // Servi depuis client/admin/, accessible uniquement via /${ADMIN_PATH}/
 // Protection réelle : formulaire de garde + APIs requireAdmin + rate limiting
-app.use(`/${ADMIN_PATH}`, express.static(path.join(__dirname, '../client/admin')));
+app.use(`/${ADMIN_PATH}`, express.static(path.join(__dirname, '../client/admin'), { setHeaders: staticCacheHeaders }));
 
 // ─── Fichiers statiques publics ──────────────────────────────
-app.use(express.static(path.join(__dirname, '../client')));
+app.use(express.static(path.join(__dirname, '../client'), { setHeaders: staticCacheHeaders }));
 
 // ─── Routes API ─────────────────────────────────────────────
 app.use('/api/auth',            authLimiter, require('./routes/auth'));
@@ -158,8 +269,9 @@ app.use('/api/orders/paypal/capture', checkoutLimiter);
 app.use('/api/orders',          require('./routes/orders'));
 app.use('/api/addresses',       require('./routes/addresses'));
 app.use('/api/promo',      require('./routes/promo'));
+app.use('/api/newsletter/subscribe', newsletterSubscribeLimiter);
 app.use('/api/newsletter', require('./routes/newsletter'));
-app.use('/api/cart',       require('./routes/cart'));
+app.use('/api/cart', cartLimiter, require('./routes/cart'));
 app.use('/api/news',            require('./routes/news'));
 app.use('/api/admin',           require('./routes/admin'));
 app.use('/api/reviews',         require('./routes/reviews'));
