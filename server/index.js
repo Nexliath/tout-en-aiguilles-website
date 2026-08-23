@@ -46,8 +46,42 @@ try {
 // ─── Middleware de sécurité ─────────────────────────────────
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://tout-en-aiguilles.com';
 
+// CSP conservative : le site n'a pas de build step et utilise énormément
+// d'attributs onclick=/style= et de <script> inline sur ~15 pages HTML
+// (voir les ~150 tâches précédentes) — une CSP stricte sans 'unsafe-inline'
+// casserait la quasi-totalité du site. On active donc une CSP qui autorise
+// l'inline existant (script/style) mais bloque le chargement de scripts
+// depuis une origine tierce non explicitement listée ci-dessous, ce qui
+// couvre déjà le risque principal (injection XSS chargeant un script externe
+// malveillant). useDefaults:true garde les autres directives raisonnables de
+// helmet (object-src 'none', base-uri 'self', etc.) sans avoir à les redéfinir.
 app.use(helmet({
-  contentSecurityPolicy: false,      // Requiert un audit page par page — ne pas activer à la légère
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      scriptSrc: [
+        "'self'", "'unsafe-inline'", "'unsafe-eval'",
+        'https://www.googletagmanager.com',
+        'https://www.google-analytics.com',
+        'https://analytics.google.com',
+        'https://cdnjs.cloudflare.com',
+        'https://www.paypal.com',
+        'https://www.paypalobjects.com',
+      ],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      fontSrc: ["'self'", 'data:'],
+      connectSrc: [
+        "'self'",
+        'https://www.google-analytics.com',
+        'https://analytics.google.com',
+        'https://region1.google-analytics.com',
+        'https://www.paypal.com',
+      ],
+      frameSrc: ["'self'", 'https://www.paypal.com', 'https://www.sandbox.paypal.com'],
+      objectSrc: ["'none'"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
 
