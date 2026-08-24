@@ -614,6 +614,24 @@ Promise.all([loadFeaturedProducts(), loadNews()]).then(() => {
     if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: 'auto', block: 'start' }));
   }
 }).catch(() => {});
+
+// ─── Nav actif sur "Contact" ────────────────────────────────
+// "Contact" n'est pas une page séparée mais une ancre (#contact) sur cette
+// même page d'accueil : le lien ne devient donc jamais actif tout seul
+// (contrairement à Boutique/Actualités). On bascule manuellement la classe
+// .active du lien Contact au clic, en la retirant du lien Accueil — même
+// mise en avant rose que pour les autres pages. On gère aussi le cas où
+// l'on arrive directement avec #contact dans l'URL (lien "/#contact" depuis
+// une autre page, favori, etc.).
+function setContactNavActive() {
+  document.querySelectorAll('.nav a, .mobile-nav-links a').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#contact');
+  });
+}
+document.querySelectorAll('a[href="#contact"]').forEach(a => {
+  a.addEventListener('click', setContactNavActive);
+});
+if (location.hash === '#contact') setContactNavActive();
 // initHeaderSearch() est désormais appelé globalement depuis main.js
 // (DOMContentLoaded) pour couvrir toutes les pages, plus seulement l'accueil.
 
