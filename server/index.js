@@ -70,6 +70,17 @@ app.use(helmet({
         'https://www.paypal.com',
         'https://www.paypalobjects.com',
       ],
+      // IMPORTANT : script-src-attr est une directive CSP distincte de
+      // script-src, qui régit spécifiquement les attributs onclick=/onchange=
+      // etc. useDefaults:true (ci-dessus) applique par défaut
+      // script-src-attr 'none' — sans cette ligne, TOUS les onclick= inline
+      // du site (boutons ajouter au panier, favoris, ouverture d'article,
+      // menu mobile...) sont silencieusement bloqués par le navigateur,
+      // malgré 'unsafe-inline' sur script-src qui ne couvre que les balises
+      // <script> inline, pas les attributs d'événements. Régression trouvée
+      // en prod le 2026-08-24 : panier/favoris/articles ne fonctionnaient
+      // plus suite à l'activation de la CSP (round 4).
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
       fontSrc: ["'self'", 'data:'],
